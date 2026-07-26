@@ -1,0 +1,86 @@
+project: FERA-MS
+study: core_module_ablation
+
+protocol:
+  splits:
+    - random
+    - scaffold
+  seeds:
+    - 42
+    - 43
+    - 44
+  evaluation_bin_resolution: 0.01
+  primary_metrics:
+    - micro_cbin
+    - micro_jss
+  supplementary_metrics:
+    - macro_cbin
+    - macro_jss
+  test_used_for_selection: false
+
+experiments:
+  fragment_node_mlp:
+    order: 1
+    formal_name: Fragment-wise node encoder
+    category: neural_backbone
+    status: pending
+    implementation:
+      frag_gnn_type: NodeMLP
+      preserve_fragment_nodes: true
+      preserve_candidate_space: true
+      use_fragment_edges: false
+      use_cut_chemistry: false
+    training_scope: full_neural_pipeline
+
+  topology_only_dag:
+    order: 2
+    formal_name: Topology-only fragment DAG
+    category: neural_backbone
+    status: pending
+    implementation:
+      frag_gnn_type: GINE
+      preserve_fragment_nodes: true
+      preserve_dag_edges: true
+      replace_cut_chemistry_with_generic_edge_token: true
+    training_scope: full_neural_pipeline
+
+  global_molecular_context:
+    order: 3
+    formal_name: Global molecular context
+    category: molecular_to_fragment_projection
+    status: pending
+    implementation:
+      replace_atom_subset_projection: true
+      broadcast_global_molecular_embedding: true
+      preserve_fragment_nodes: true
+      preserve_fragment_dag: true
+      preserve_cut_chemistry: true
+    training_scope: full_neural_pipeline
+
+  global_ace_only:
+    order: 4
+    formal_name: Global ACE conditioning only
+    category: ace_conditioning
+    status: pending
+    implementation:
+      preserve_true_ace: true
+      preserve_global_mlp_ace_embedding: true
+      disable_fragment_ace_gate: true
+      disable_ce_local_transition: true
+      disable_ce_path_energy: true
+      disable_ce_depth_mixture: true
+      disable_formula_h_ce_response: true
+      disable_ce_flowfrag: true
+    training_scope: ace_and_neural_refinement_pipeline
+
+  no_candidate_reranker:
+    order: 5
+    formal_name: Without chemical candidate reranking
+    category: hybrid_refinement
+    status: pending
+    implementation:
+      preserve_r160_backbone: true
+      reranker_alpha: 0.0
+      retrain_allocator: true
+      preserve_candidate_features: true
+    training_scope: allocator_only
