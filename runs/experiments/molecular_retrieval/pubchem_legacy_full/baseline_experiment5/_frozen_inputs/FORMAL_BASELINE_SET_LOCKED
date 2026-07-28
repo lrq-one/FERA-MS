@@ -1,0 +1,2 @@
+FORMAL_EXPERIMENT5_BASELINES=neims,massformer,fragnnet_d3
+FORMAL_RUNS=18

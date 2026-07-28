@@ -1,0 +1,87 @@
+wandb_name: BASE02_neims_ace_safe19659
+wandb_group: safe19659_official_baselines
+seed: 43
+spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
+mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
+split_dp: data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42
+spec_params:
+  merge: false
+  nce: false
+  merge_keep_ces: false
+  preprocess: true
+  prec_type: true
+  prec_type_str: false
+  prec_types:
+  - '[M+H]+'
+  inst_type: true
+  inst_types:
+  - QTOF
+  prec_mz: true
+  prec_mass_diff: true
+  ace: true
+  sparse: true
+  unique_id: true
+  counts: true
+mol_params:
+  fingerprint_morgan: true
+  fingerprint_rdkit: true
+  fingerprint_maccs: true
+  fingerprint: true
+  pyg: false
+  preprocess: true
+frag_params:
+  pyg: false
+model_type: neims
+mlp_hidden_size: 1024
+mlp_dropout: 0.1
+mlp_num_layers: 4
+mlp_use_residuals: true
+ff_prec_mz_offset: 50
+ff_bidirectional: true
+ff_output_map_size: 256
+ce_insert_type: embed
+ce_insert_location: mlp
+ce_insert_merge: false
+mz_max: 1500.0
+mz_bin_res: 0.01
+sum_ints: true
+loss_type: cosine_distance
+sparse_cosine_similarity: true
+ints_transform: sqrt
+train_batch_size: 256
+eval_batch_size: 256
+accumulate_grad_batches: 1
+gradient_clip_val: 5.0
+lr: 0.0004006
+weight_decay: 1.0e-07
+accelerator: gpu
+devices: 1
+min_epochs: 1
+max_epochs: 60
+lr_schedule: true
+lr_decay_rate: 0.7224
+lr_warmup_steps: 1000
+lr_decay_steps: 5000
+debug_overfit: false
+upload_checkpoints: false
+checkpoint_metric: val_cos_sim_0.01_epoch/mean
+checkpoint_metric_mode: max
+auxiliary_scores:
+- cos_sim
+- jss
+eval_mz_bin_res:
+- 0.01
+precision: 32
+use_tensor_float32: true
+automatic_optimization: true
+compile: false
+frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
+ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl
+wandb_root_dir: /hy-tmp/lrq/wandb_runs
+delete_checkpoints: false
+disable_checkpoints: false
+eval_test_split: true
+num_workers: 0
+pin_memory: false
+num_sanity_val_steps: 0
+log_every_n_steps: 50
