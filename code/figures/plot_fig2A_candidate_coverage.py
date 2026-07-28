@@ -65,7 +65,7 @@ annotate(b2)
 annotate(b3)
 annotate(b4)
 
-ax.set_title("A  Candidate-space coverage", loc="left", color=INK, pad=14)
+ax.set_title("A  Candidate-space coverage", loc="left", color=INK, fontsize=20, fontweight="bold", pad=10)
 ax.set_ylabel("Coverage (%)")
 ax.set_xticks(x)
 ax.set_xticklabels(labels)

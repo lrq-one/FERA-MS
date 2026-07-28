@@ -67,7 +67,7 @@ COLOR_JSS  = "#7E69AC"   # purple
 EDGE = "#2F2F2F"
 GRID = "#D9DDE3"
 
-fig, ax = plt.subplots(figsize=(8.8, 4.8), dpi=300)
+fig, ax = plt.subplots(figsize=(8.8, 4.8), dpi=600)
 
 x = np.arange(len(variants))
 width = 0.34
@@ -110,7 +110,7 @@ ax.set_yticks([0.61, 0.61, 0.61, 0.64, 0.67])
 ax.set_xticks(x)
 ax.set_xticklabels(variants, fontsize=10)
 ax.set_ylabel("Similarity", fontsize=12)
-ax.set_title("D  Key component ablations", loc="left", fontsize=18, fontweight="bold", pad=10)
+ax.set_title("D  Key component ablations", loc="left", fontsize=20, fontweight="bold", pad=10)
 
 # Legend
 ax.legend(
@@ -152,7 +152,7 @@ ax.spines["left"].set_linewidth(1.0)
 ax.spines["bottom"].set_linewidth(1.0)
 
 fig.tight_layout()
-fig.savefig(PNG_PATH, dpi=450, bbox_inches="tight")
+fig.savefig(PNG_PATH, dpi=600, bbox_inches="tight")
 fig.savefig(PDF_PATH, bbox_inches="tight")
 print(f"SAVED PNG: {PNG_PATH}")
 print(f"SAVED PDF: {PDF_PATH}")

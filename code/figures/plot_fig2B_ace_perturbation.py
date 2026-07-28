@@ -67,7 +67,7 @@ annotate(b1)
 annotate(b2)
 annotate(b3)
 
-ax.set_title("B  Collision-energy perturbation", loc="left", color=INK, pad=14)
+ax.set_title("B  Collision-energy perturbation", loc="left", color=INK, fontsize=20, fontweight="bold", pad=10)
 ax.set_ylabel("Similarity")
 ax.set_xticks(x)
 ax.set_xticklabels(metrics, fontweight="bold")

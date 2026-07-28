@@ -1502,41 +1502,19 @@ summary = pd.DataFrame(
     summary_rows
 )
 
-summary["p_holm"] = np.nan
-
-for (
-    metric,
-    aggregation,
-), indices in summary.groupby(
-    [
-        "metric",
-        "aggregation",
-    ]
-).groups.items():
-    group_indices = list(
-        indices
+# Treat all prespecified comparisons as one multiplicity family.
+# 4 baselines × 2 splits × 2 metrics × 2 aggregations = 32 tests.
+if len(summary) != 32:
+    raise RuntimeError(
+        "Expected one 32-comparison Holm family, "
+        f"but found {len(summary)} comparisons."
     )
 
-    if len(group_indices) != 8:
-        raise RuntimeError(
-            f"{metric}/{aggregation}: "
-            f"Holm检验族不是8项，"
-            f"实际={len(group_indices)}"
-        )
-
-    adjusted = holm_adjust(
-        summary.loc[
-            group_indices,
-            "p_bootstrap",
-        ].to_numpy(
-            dtype=np.float64
-        )
+summary["p_holm"] = holm_adjust(
+    summary["p_bootstrap"].to_numpy(
+        dtype=np.float64
     )
-
-    summary.loc[
-        group_indices,
-        "p_holm",
-    ] = adjusted
+)
 
 summary[
     "ci_excludes_zero"

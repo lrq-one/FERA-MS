@@ -35,10 +35,10 @@ w = 0.14
 
 series = [
     ("FERA-MS", NAVY, np.array([0.694, 0.619, 0.530])),
-    ("NEIMS-ACE", TEAL, np.array([0.564, 0.521, 0.424])),
-    ("MassFormer-ACE", PURPLE, np.array([0.515, 0.470, 0.340])),
-    ("FraGNNet-D3-ACE", ORANGE, np.array([0.461, 0.332, 0.250])),
-    ("ICEBERG-core", GRAY, np.array([0.402, 0.313, 0.187])),
+    ("NEIMS", TEAL, np.array([0.564, 0.521, 0.424])),
+    ("MassFormer", PURPLE, np.array([0.515, 0.470, 0.340])),
+    ("FraGNNet-D3", ORANGE, np.array([0.461, 0.332, 0.250])),
+    ("ICEBERG", GRAY, np.array([0.402, 0.313, 0.187])),
 ]
 
 fig, ax = plt.subplots(figsize=(10.0, 6.3), facecolor="white")
@@ -73,7 +73,7 @@ ax.text(
     fontsize=14, color=NAVY, fontweight="bold"
 )
 
-ax.set_title("C  ACE-stratified spectrum prediction", loc="left", color=INK, pad=14)
+ax.set_title("C  ACE-stratified spectrum prediction", loc="left", color=INK, fontsize=20, fontweight="bold", pad=10)
 ax.set_ylabel("Micro CBIN")
 ax.set_xticks(x)
 ax.set_xticklabels(groups)

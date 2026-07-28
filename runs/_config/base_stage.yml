@@ -55,7 +55,8 @@ frag_params:
   - base_formula
   - depth
   - h_formulae_idx
-  pyg_edge_feats: []
+  pyg_edge_feats:
+    - cut_chem
   pyg_edges: true
   pyg_bigraph: false
   num_isotopes: 1
@@ -72,7 +73,7 @@ frag_params:
   energy_nl_ce_scale: 7.5
   frontier_support: false
 model_type: frag_gnn
-frag_gnn_type: NodeMLP
+frag_gnn_type: GINE
 num_depth: 4
 num_hs: 4
 mol_pool_type: mean
