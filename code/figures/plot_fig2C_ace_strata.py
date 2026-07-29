@@ -67,7 +67,7 @@ for name, bars in all_bars:
         )
 
 ax.text(
-    0.02, 0.98, "Best at every ACE stratum",
+    0.02, 0.98, "Highest micro CBIN in all strata",
     transform=ax.transAxes,
     ha="left", va="top",
     fontsize=14, color=NAVY, fontweight="bold"

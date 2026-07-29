@@ -18,7 +18,7 @@ PDF_PATH = OUT_DIR / "Fig2D_component_ablation.pdf"
 variants = [
     "Full\nFERA-MS",
     "w/o local\nm/z expansion",
-    "w/o rendered-\npeak gate",
+    "w/o rendered-\nentry gate",
     "w/o candidate\nreranker",
     "w/o spectrum\nallocator",
 ]
