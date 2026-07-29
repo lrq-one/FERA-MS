@@ -58,12 +58,12 @@ REFERENCE = "#68727D"
 plt.rcParams.update(
     {
         "font.family": "DejaVu Sans",
-        "font.size": 10.5,
-        "axes.titlesize": 13.5,
-        "axes.labelsize": 11.5,
-        "xtick.labelsize": 9.5,
-        "ytick.labelsize": 9.5,
-        "axes.linewidth": 0.8,
+        "font.size": 12.5,
+        "axes.titlesize": 20.5,
+        "axes.labelsize": 14.5,
+        "xtick.labelsize": 12.0,
+        "ytick.labelsize": 12.0,
+        "axes.linewidth": 0.9,
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
     }
@@ -228,7 +228,7 @@ def draw_rank_shift(
 
     segments = [
         {
-            "name": "Large loss",
+            "name": "Large\nloss",
             "value": result["large_loss"],
             "left": -(
                 result["large_loss"]
@@ -239,7 +239,7 @@ def draw_rank_shift(
             "text_colour": "white",
         },
         {
-            "name": "Small loss",
+            "name": "Small\nloss",
             "value": result["small_loss"],
             "left": -(
                 result["small_loss"]
@@ -256,14 +256,14 @@ def draw_rank_shift(
             "text_colour": TEXT,
         },
         {
-            "name": "Small gain",
+            "name": "Small\ngain",
             "value": result["small_gain"],
             "left": tied_half,
             "colour": BLUE_LIGHT,
             "text_colour": TEXT,
         },
         {
-            "name": "Large gain",
+            "name": "Large\ngain",
             "value": result["large_gain"],
             "left": (
                 tied_half
@@ -298,7 +298,7 @@ def draw_rank_shift(
                 f"{value:.1f}%",
                 ha="center",
                 va="center",
-                fontsize=9.5,
+                fontsize=12.6,
                 fontweight="bold",
                 color=segment["text_colour"],
                 zorder=4,
@@ -307,12 +307,15 @@ def draw_rank_shift(
         if value >= 7.0:
             ax.text(
                 centre,
-                0.255,
+                0.335,
                 segment["name"],
                 ha="center",
-                va="bottom",
-                fontsize=8.3,
+                va="center",
+                multialignment="center",
+                linespacing=0.92,
+                fontsize=12.2,
                 color=TEXT,
+                clip_on=False,
             )
 
     ax.axvline(
@@ -325,26 +328,32 @@ def draw_rank_shift(
 
     ax.text(
         0.0,
-        1.02,
+        1.035,
         (
-            f"{result['improved']:.1f}% improved, "
-            f"{result['tied']:.1f}% tied, "
-            f"{result['worsened']:.1f}% worsened; "
-            f"mean Δrank = {result['mean_delta']:.2f}, "
+            f"{result['improved']:.1f}% improved · "
+            f"{result['tied']:.1f}% tied · "
+            f"{result['worsened']:.1f}% worsened"
+            "\n"
+            f"mean Δrank = {result['mean_delta']:.2f} · "
             f"median = {result['median_delta']:.2f}"
         ),
         transform=ax.transAxes,
         ha="left",
         va="bottom",
-        fontsize=9.4,
+        multialignment="left",
+        linespacing=1.15,
+        fontsize=11.7,
         color=TEXT,
+        clip_on=False,
     )
 
     ax.set_title(
         f"{panel_letter}  Query-level rank shifts — {split_label}",
         loc="left",
+        fontsize=20.5,
         fontweight="bold",
-        pad=23,
+        y=1.205,
+        pad=0,
     )
 
     ax.set_xlim(
@@ -383,7 +392,7 @@ def draw_rank_shift(
         "FraGNNet-D3 better",
         ha="left",
         va="center",
-        fontsize=9.5,
+        fontsize=12.5,
         color=ORANGE_DARK,
     )
 
@@ -393,7 +402,7 @@ def draw_rank_shift(
         "FERA-MS better",
         ha="right",
         va="center",
-        fontsize=9.5,
+        fontsize=12.5,
         color=BLUE_DARK,
     )
 
@@ -510,24 +519,30 @@ def draw_molecule_scatter(
 
     ax.text(
         0.0,
-        1.02,
+        1.085,
         (
-            f"{higher_pct:.1f}% of molecules higher with FERA-MS; "
-            f"mean ΔMRR = {mean_delta:.3f}, "
+            f"{higher_pct:.1f}% of molecules higher with FERA-MS"
+            "\n"
+            f"mean ΔMRR = {mean_delta:.3f} · "
             f"median = {median_delta:.3f}"
         ),
         transform=ax.transAxes,
         ha="left",
         va="bottom",
-        fontsize=9.4,
+        multialignment="left",
+        linespacing=1.15,
+        fontsize=11.7,
         color=TEXT,
+        clip_on=False,
     )
 
     ax.set_title(
         f"{panel_letter}  Molecule-level paired MRR — {split_label}",
         loc="left",
+        fontsize=20.5,
         fontweight="bold",
-        pad=23,
+        y=1.205,
+        pad=0,
     )
 
     ax.set_xlabel(
@@ -566,7 +581,7 @@ def draw_molecule_scatter(
         transform=ax.transAxes,
         ha="left",
         va="center",
-        fontsize=9.5,
+        fontsize=12.5,
         color=BLUE_DARK,
     )
 
@@ -577,7 +592,7 @@ def draw_molecule_scatter(
         transform=ax.transAxes,
         ha="right",
         va="center",
-        fontsize=9.5,
+        fontsize=12.5,
         color=ORANGE_DARK,
     )
 
@@ -600,6 +615,7 @@ def draw_molecule_scatter(
 # Main
 # ============================================================
 
+
 def main():
     (
         random_query,
@@ -611,9 +627,9 @@ def main():
     fig, axes = plt.subplots(
         2,
         2,
-        figsize=(12.8, 8.5),
+        figsize=(16.8, 11.6),
         gridspec_kw={
-            "height_ratios": [0.82, 1.18],
+            "height_ratios": [0.78, 1.22],
         },
     )
 
@@ -677,12 +693,12 @@ def main():
     )
 
     fig.subplots_adjust(
-        left=0.065,
+        left=0.070,
         right=0.985,
-        bottom=0.070,
-        top=0.965,
-        wspace=0.20,
-        hspace=0.27,
+        bottom=0.075,
+        top=0.925,
+        wspace=0.285,
+        hspace=0.515,
     )
 
     # Square scatter panels appear optically left-shifted because
@@ -739,18 +755,21 @@ def main():
 
     fig.savefig(
         f"{OUT_PREFIX}.png",
-        dpi=450,
+        dpi=600,
         bbox_inches="tight",
+        pad_inches=0.10,
     )
 
     fig.savefig(
         f"{OUT_PREFIX}.pdf",
         bbox_inches="tight",
+        pad_inches=0.10,
     )
 
     fig.savefig(
         f"{OUT_PREFIX}.svg",
         bbox_inches="tight",
+        pad_inches=0.10,
     )
 
     plt.close(
