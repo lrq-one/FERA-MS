@@ -74,8 +74,21 @@
       }
     }
   },
+  "dag_cache": {
+    "source_content": "safe19659 depth-3 nl_v1 DAGs rebuilt from the formal cohort or restored from the archived formal cache",
+    "formal_name": "nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1",
+    "molecules": 2274,
+    "files": 2274,
+    "manifest_algorithm": "sha256 of UTF-8 '<file_sha256>  <filename>\\n' lines sorted by filename",
+    "manifest_sha256": "517feb7efa747b990f671516eeb88e049599e11cc6d18cb94aaed8c3bffd35b9"
+  },
   "retrieval": {
     "protocol": "frozen_fixed50",
+    "distribution": {
+      "status": "not_distributed",
+      "download_url": null,
+      "live_pubchem_is_exact_replacement": false
+    },
     "unique_targets": 824,
     "formal_queries": {
       "random": {"spectra": 3917, "molecules": 454},

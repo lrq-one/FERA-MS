@@ -361,10 +361,18 @@ def verify_frozen_identity() -> dict[str, Any]:
         "experiment5_query_candidates_fixed50.csv.gz": BASE / "query_candidate_manifest_20260723/experiment5_query_candidates_fixed50.csv.gz",
     }
     audit = {}
+    missing_paths = [path for path in locations.values() if not path.is_file()]
+    if missing_paths:
+        distribution = contract.get("distribution", {})
+        status = distribution.get("status", "unknown")
+        raise FileNotFoundError(
+            "The exact frozen fixed-50 retrieval package is required but missing. "
+            f"Distribution status: {status}; this release has no public replacement. "
+            "Live PubChem output is only a drift audit. See docs/FROZEN_RETRIEVAL_INPUT.md. "
+            f"First missing file: {missing_paths[0]}"
+        )
     for name, expected_sha in contract["files"].items():
         path = locations[name]
-        if not path.is_file():
-            raise FileNotFoundError(f"Required frozen retrieval identity file is missing: {path}")
         actual_sha = sha256(path)
         if actual_sha != expected_sha:
             raise RuntimeError(f"Frozen retrieval SHA-256 mismatch for {name}: {actual_sha} != {expected_sha}")

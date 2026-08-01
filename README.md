@@ -32,11 +32,14 @@ The root editable install compiles only `ms2spectra.frag.compute_frags` from its
 
 NIST20 is licensed data and cannot be redistributed in this repository. Obtain and export the NIST 2020 MS/MS library under your own license. No MSP, MOL, processed pickle, fragment DAG, PubChem cache, checkpoint, prediction array, or result table is included.
 
-Expected local layout after local regeneration (none of these data or split files are tracked):
+Expected local layout for exact paper replay (none of these data or split files are tracked):
 
 ```text
 data/raw/nist_20/hr_nist_msms.MSP
 data/raw/nist_20/hr_nist_msms.MOL/
+data/proc/nist20_qtof_cid_safe19707/{spec_df,mol_df,ann_df}.pkl
+data/split/nist20_qtof_cid_safe19707_qcv1_trainonly/{train,val,test}_ids.csv
+data/frag/nist20_qtof_cid_safe19707_d3_mhp_qtof_cid_base/dags/
 data/proc/nist20_qtof_cid_safe19659/{spec_df,mol_df,ann_df}.pkl
 data/split/nist20_qtof_cid_safe19659_qcv1_trainonly/{train,val,test}_ids.csv
 data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42/{train,val,test}_ids.csv
@@ -47,17 +50,23 @@ See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked
 
 ## Preprocessing, splits, and depth-3 DAGs
 
-The abbreviated build sequence is:
+The first two commands below are general parsing utilities. They reconstruct the method inputs from a licensed export, but do not by themselves recover the archived paper experiment identity:
 
 ```bash
 python preproc_scripts/prepare_dataframes.py --msp_file nist_20/hr_nist_msms.MSP --mol_dir nist_20/hr_nist_msms.MOL --input_format msp+mol --output_format csv --output_dp data/df --output_name nist20_hr
 python preproc_scripts/prepare_processed_data.py --df_dp data/df --dsets nist20_hr --proc_dp data/proc/nist20
-python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19707_d3_mhp_qtof_cid_base --proc_dp data/proc/nist20_qtof_cid_safe19707 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
+```
+
+Exact paper replay starts from the author-held, licensed `safe19707` processed tables, random assignment, and depth-3 DAG cache shown in the expected layout. These archived derived inputs are not distributed and currently have no public download URL; a new random draw is not an exact substitute. The release is therefore not self-contained for raw-to-paper-result replay. With an author-provided archive present, the checked chain is continuous:
+
+```bash
 python preproc_scripts/final/make_random_split.py --source-proc data/proc/nist20_qtof_cid_safe19707 --source-split data/split/nist20_qtof_cid_safe19707_qcv1_trainonly --dag-dir data/frag/nist20_qtof_cid_safe19707_d3_mhp_qtof_cid_base/dags --output-proc data/proc/nist20_qtof_cid_safe19659 --output-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
+python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1_rebuild --proc_dp data/proc/nist20_qtof_cid_safe19659 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
+python preproc_scripts/final/materialize_formal_dag_cache.py --source-dag-dir data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1_rebuild/dags --cohort-ids data/split/nist20_qtof_cid_safe19659_qcv1_trainonly/cohort_ids.csv --output-dag-dir data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags --mode hardlink
 python preproc_scripts/prepare_scaffold_split.py --source-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --mol-df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --output-split data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42 --seed 42
 ```
 
-The paper cohort is the historical `safe19707` population after excluding three training molecules whose required depth-3 DAGs were unavailable. This produces exactly 19,659 spectra and 2,274 molecules. `config/paper_experiment_identity.json` locks the excluded molecular connectivity identities, processed-file hashes, exact random/scaffold counts, and split hashes. The scaffold split is deterministically rebuilt from the resulting `cohort_ids.csv`; the random assignment is preserved from the historical source split. The `qcv1_trainonly` directory name is retained solely as the locked artifact identifier. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
+The paper cohort is the historical `safe19707` population after excluding three training molecules whose required depth-3 DAGs were unavailable. This produces exactly 19,659 spectra and 2,274 molecules. The `safe19707...base` cache validates that exclusion but is not copied as the formal `nl_v1` cache: the latter is rebuilt from the formal cohort (or restored from the archived formal cache) and must pass the locked 2,274-file content manifest. `config/paper_experiment_identity.json` also locks the excluded molecular connectivity identities, processed-file hashes, exact random/scaffold counts, and split hashes. The scaffold split is deterministically rebuilt from the resulting `cohort_ids.csv`; the random assignment is preserved from the historical source split. The `qcv1_trainonly` directory name is retained solely as the locked artifact identifier. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
 
 ## Training
 
@@ -106,7 +115,7 @@ For the paper molecular-identification result, point the evaluator at the frozen
 python test/run_molecular_retrieval.py --retrieval-root /path/to/frozen_pubchem_fixed50 --splits random scaffold --seeds 42 43 44
 ```
 
-The evaluator verifies the frozen target, membership, candidate, and query manifests against the hashes in `config/paper_experiment_identity.json`, then asserts the final 3,917/454 random and 3,949/448 scaffold query identities. `test/build_retrieval_candidates.py` is intentionally isolated under `live_pubchem_drift_audit`; it re-queries current PubChem to test method availability and source drift and cannot replace the frozen paper input. It uses the repository-local structure validation, connectivity deduplication, true-target injection, and Morgan-ranking implementation and has no dependency on a sibling checkout. Candidate caches and retrieval outputs are intentionally not versioned.
+The evaluator verifies the frozen target, membership, candidate, and query manifests against the hashes in `config/paper_experiment_identity.json`, then asserts the final 3,917/454 random and 3,949/448 scaffold query identities. The exact package is not distributed with this release and currently has no public download URL, so Table 3 cannot be exactly replayed without an author-provided copy. See `docs/FROZEN_RETRIEVAL_INPUT.md`. `test/build_retrieval_candidates.py` is intentionally isolated under `live_pubchem_drift_audit`; it re-queries current PubChem to test method availability and source drift and cannot replace the frozen paper input. It uses the repository-local structure validation, connectivity deduplication, true-target injection, and Morgan-ranking implementation and has no dependency on a sibling checkout. Candidate caches and retrieval outputs are intentionally not versioned.
 
 Statistical inference follows the manuscript protocol. Spectrum-prediction metrics are averaged across the three seeds before 20,000 molecule-clustered bootstrap replicates, with one Holm correction over the required 32 comparisons. Retrieval uses 20,000 paired molecule bootstrap replicates and one independent Holm correction over the required 48 comparisons (3 baselines x 2 splits x 4 metrics x 2 aggregations). Both analysis scripts reject incomplete comparison families instead of silently correcting a smaller set.
 

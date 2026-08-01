@@ -10,24 +10,22 @@ from tqdm import tqdm
 
 from ms2spectra.workflow import load_config, init_dataset, init_dataloader
 from ms2spectra.training import FragGNNPL
-
-
-def alias_rich_feature_keys(results, extra_schema):
-    supported = (
-        "fragment_rich_features",
-        "r173_frag_rich_feats",
-        "candidate_reranker_frag_rich_feats",
-    )
-    source = next(
-        (key for key in supported if isinstance(results.get(key), th.Tensor)),
-        None,
-    )
-    if source is None:
-        return results
-    for key, _ in extra_schema:
-        if key in supported and key not in results:
-            results[key] = results[source]
-    return results
+from train._impl.refinement_steps.reranker_feature_schema import (
+    CANONICAL_INTERNAL_KEY,
+    EXPLICIT_DIM,
+    EXPLICIT_FEATURE_NAMES,
+    INTERNAL_COMPONENT_SCHEMA,
+    INTERNAL_DIM,
+    LEGACY_INTERNAL_KEYS,
+    LOCAL_DENSITY_DIM,
+    LOCAL_DENSITY_FEATURE_NAMES,
+    TOTAL_FEATURE_DIM,
+    alias_rich_feature_keys,
+    feature_schema_payload,
+    require_internal_feature_tensor,
+    validate_extra_schema,
+    write_feature_schema,
+)
 
 
 def move_to_device(obj, device):
@@ -597,7 +595,8 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
         agg = agg / denom.clamp_min(1e-12).unsqueeze(1)
         agg = th.nan_to_num(agg, nan=0.0, posinf=20.0, neginf=-20.0).clamp(-20.0, 20.0)
 
-        results["fragment_rich_features"] = agg.to(dtype=dtype)
+        results[CANONICAL_INTERNAL_KEY] = agg.to(dtype=dtype)
+        results["_fragment_rich_feature_components"] = tuple(names)
 
         if not hasattr(base, "_fragment_features_printed"):
             matched_frac = float(ok.float().mean().item())
@@ -622,88 +621,39 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
     return results
 
 def infer_extra_schema(results, max_extra_dims=32):
-    n = int(results["pred_mzs"].numel())
-    schema = []
-    used = 0
-
-    skip_exact = {
-        "pred_mzs", "pred_logprobs", "pred_batch_idxs",
-        "true_mzs", "true_logprobs", "true_batch_idxs",
-        "unique_id", "mean_loss", "loss",
-    }
-
-    good_words = [
-        "joint", "frag", "formula", "depth", "ce_flow", "response",
-        "residual", "score", "logit", "delta", "h"
-    ]
-
-    for k, v in results.items():
-        if k in skip_exact:
-            continue
-        if not isinstance(v, th.Tensor):
-            continue
-        if v.numel() == 0:
-            continue
-        # skip scalar tensors such as mean_loss / loss
-        if v.dim() == 0:
-            continue
-        if v.shape[0] != n:
-            continue
-        lk = str(k).lower()
-        if not any(w in lk for w in good_words):
-            continue
-        if "true" in lk or "batch" in lk or "mzs" in lk or "logprob" in lk:
-            continue
-
-        if v.dim() == 1:
-            dim = 1
-        elif v.dim() == 2:
-            dim = min(int(v.shape[1]), max_extra_dims - used)
-        else:
-            continue
-
-        if dim <= 0:
-            break
-
-        schema.append((k, dim))
-        used += dim
-        if used >= max_extra_dims:
-            break
-
-    return schema
+    if int(max_extra_dims) < INTERNAL_DIM:
+        raise RuntimeError(
+            f"max_extra_dims={max_extra_dims} cannot hold the locked {INTERNAL_DIM}D internal schema"
+        )
+    value = results.get(CANONICAL_INTERNAL_KEY)
+    if not isinstance(value, th.Tensor) or value.dim() != 2:
+        raise RuntimeError("The locked internal backbone feature block was not produced")
+    if int(value.shape[1]) != INTERNAL_DIM:
+        raise RuntimeError(
+            f"Internal backbone feature dimension is {value.shape[1]}; expected {INTERNAL_DIM}"
+        )
+    actual_components = tuple(results.get("_fragment_rich_feature_components", ()))
+    expected_components = tuple(f"{name}:{dim}" for name, dim in INTERNAL_COMPONENT_SCHEMA)
+    if actual_components != expected_components:
+        raise RuntimeError(
+            "Internal backbone feature order differs from the locked paper schema:\n"
+            f"actual={actual_components}\nexpected={expected_components}"
+        )
+    return [(CANONICAL_INTERNAL_KEY, INTERNAL_DIM)]
 
 
 def extra_features_from_schema(results, schema, n, device):
-    cols = []
-    for k, dim in schema:
-        v = results.get(k, None)
-        if (not isinstance(v, th.Tensor)) or v.numel() == 0 or v.dim() == 0 or v.shape[0] != n:
-            cols.append(th.zeros((n, dim), device=device))
-            continue
-
-        x = v.float()
-        if x.dim() == 1:
-            x = x.reshape(-1, 1)
-        elif x.dim() == 2:
-            x = x[:, :dim]
-        else:
-            x = th.zeros((n, dim), device=device)
-
-        x = th.nan_to_num(x, nan=0.0, posinf=20.0, neginf=-20.0)
-        x = x.clamp(-20, 20) / 10.0
-
-        if x.shape[1] < dim:
-            pad = th.zeros((n, dim - x.shape[1]), device=device, dtype=x.dtype)
-            x = th.cat([x, pad], dim=1)
-
-        cols.append(x)
-
-    if not cols:
-        return None
-    return th.cat(cols, dim=1)
+    internal = require_internal_feature_tensor(
+        results,
+        schema,
+        row_count=n,
+        device=device,
+    )
+    return th.nan_to_num(internal, nan=0.0, posinf=20.0, neginf=-20.0).clamp(-20, 20) / 10.0
 
 
 def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
+    extra_schema = validate_extra_schema(extra_schema)
     results = alias_rich_feature_keys(results, extra_schema)
     pred_mz = results["pred_mzs"].float()
     logp = results["pred_logprobs"].float()
@@ -791,14 +741,21 @@ def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
     )
 
     extra = extra_features_from_schema(results, extra_schema, n=n, device=device)
+    if int(base.shape[1]) != EXPLICIT_DIM:
+        raise RuntimeError(f"Explicit feature dimension mismatch: {base.shape[1]} != {EXPLICIT_DIM}")
+    if int(local.shape[1]) != LOCAL_DENSITY_DIM:
+        raise RuntimeError(
+            f"Local-density feature dimension mismatch: {local.shape[1]} != {LOCAL_DENSITY_DIM}"
+        )
+    if int(extra.shape[1]) != INTERNAL_DIM:
+        raise RuntimeError(f"Internal feature dimension mismatch: {extra.shape[1]} != {INTERNAL_DIM}")
 
-    if extra is None:
-        feats = th.cat([base, local], dim=1)
-    else:
-        feats = th.cat([base, local, extra], dim=1)
+    feats = th.cat([base, local, extra], dim=1)
 
     feats = th.nan_to_num(feats, nan=0.0, posinf=10.0, neginf=-10.0)
     feats = feats.clamp(-10, 10)
+    if int(feats.shape[1]) != TOTAL_FEATURE_DIM:
+        raise RuntimeError(f"Total feature dimension mismatch: {feats.shape[1]} != {TOTAL_FEATURE_DIM}")
     return feats
 
 
@@ -1193,7 +1150,7 @@ def main():
     ap.add_argument("--hgb_leaf_nodes", type=int, default=63)
     ap.add_argument("--hgb_l2", type=float, default=0.02)
 
-    ap.add_argument("--max_extra_dims", type=int, default=32)
+    ap.add_argument("--max_extra_dims", type=int, default=64)
     ap.add_argument("--alpha_grid", type=str, default="0,0.1,0.2,0.3,0.4,0.5,0.6,0.75,0.9,1.0,1.25,1.5")
     ap.add_argument("--load_regressor", default=None)
     ap.add_argument("--eval_test", action="store_true")
@@ -1233,12 +1190,14 @@ def main():
     for p in base.parameters():
         p.requires_grad = False
 
+    loaded_pack = None
     if args.load_regressor is not None and str(args.load_regressor).lower() not in ["", "none", "null"]:
         with open(args.load_regressor, "rb") as f:
             pack = pickle.load(f)
+        loaded_pack = pack
         regressor = pack["model"]
         backend = pack.get("backend", "loaded")
-        extra_schema = pack.get("extra_schema", [])
+        extra_schema = validate_extra_schema(pack.get("extra_schema", []))
         print("[candidate reranker] loaded regressor:", args.load_regressor)
         print("[candidate reranker] loaded backend:", backend)
         print("[candidate reranker] loaded extra schema:", extra_schema)
@@ -1257,6 +1216,11 @@ def main():
 
         X, y, w, p = collect_training_samples(base, train_dl, device, extra_schema, args)
 
+        if X.ndim != 2 or int(X.shape[1]) != TOTAL_FEATURE_DIM:
+            raise RuntimeError(
+                f"Refusing to train a non-{TOTAL_FEATURE_DIM}D paper reranker: X.shape={X.shape}"
+            )
+
         np.savez_compressed(
             out_dir / "candidate_reranker_train_sample_stats.npz",
             y=y,
@@ -1266,13 +1230,28 @@ def main():
 
         regressor, backend = train_regressor(X, y, w, args)
 
+        schema_payload = write_feature_schema(out_dir, extra_schema)
         with open(out_dir / "candidate_reranker_regressor.pkl", "wb") as f:
             pickle.dump({
                 "model": regressor,
                 "backend": backend,
                 "extra_schema": extra_schema,
+                "feature_schema_sha256": schema_payload["schema_sha256"],
                 "args": vars(args),
             }, f)
+
+    schema_payload = write_feature_schema(out_dir, extra_schema)
+    if hasattr(regressor, "n_features_in_"):
+        regressor_dim = int(regressor.n_features_in_)
+        if regressor_dim != TOTAL_FEATURE_DIM:
+            raise RuntimeError(
+                f"Loaded regressor has {regressor_dim} features; expected {TOTAL_FEATURE_DIM}"
+            )
+    packed_schema_sha = loaded_pack.get("feature_schema_sha256") if loaded_pack else None
+    if packed_schema_sha and packed_schema_sha != schema_payload["schema_sha256"]:
+        raise RuntimeError(
+            "Loaded regressor feature schema SHA-256 does not match the current locked schema"
+        )
 
     alpha_rows = []
     alpha_values = [float(x) for x in args.alpha_grid.split(",")]

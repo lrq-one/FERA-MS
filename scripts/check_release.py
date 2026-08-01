@@ -38,6 +38,7 @@ REQUIRED = (
     "train/_impl/control_finetuning.py",
     "train/_impl/run_refinement.sh",
     "train/_impl/refinement_steps/candidate_reranker.py",
+    "train/_impl/refinement_steps/reranker_feature_schema.py",
     "train/_impl/refinement_steps/spectrum_allocator.py",
     "test/evaluate.py",
     "test/evaluate_ace_perturbation.py",
@@ -46,10 +47,12 @@ REQUIRED = (
     "preproc_scripts/prepare_dag_features.py",
     "preproc_scripts/prepare_split.py",
     "preproc_scripts/final/make_random_split.py",
+    "preproc_scripts/final/materialize_formal_dag_cache.py",
     "config/paper_experiment_identity.json",
     "ablation_studies/fera_ms_core_ablation/scripts/run_no_spectrum_allocator.sh",
     "docs/PIPELINE.md",
     "docs/REPRODUCIBILITY.md",
+    "docs/FROZEN_RETRIEVAL_INPUT.md",
     "docs/SOURCE_PROVENANCE.md",
     "docs/BASELINE_PROVENANCE.md",
     "data/README.md",
@@ -165,6 +168,7 @@ def main() -> int:
                 continue
             historical_artifact_compatibility = relative in {
                 Path("train/_impl/refinement_steps/candidate_reranker.py"),
+                Path("train/_impl/refinement_steps/reranker_feature_schema.py"),
                 Path("ablation_studies/fera_ms_global_ace_ablation/pipeline_src/refinement_steps/candidate_reranker.py"),
                 Path("ablation_studies/fera_ms_global_ace_ablation/pipeline_src/refinement_steps/spectrum_allocator.py"),
                 Path("test/run_molecular_retrieval.py"),

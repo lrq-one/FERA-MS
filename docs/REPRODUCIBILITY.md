@@ -2,7 +2,7 @@
 
 ## From a licensed NIST20 export
 
-Install the environment and package, place the licensed historical `safe19707` processed tables, random assignment, and depth-3 DAG cache under `data/`, and execute the restoration commands in the root README. The tracked identity contract excludes only the three training molecules whose required DAGs were unavailable and requires byte-identical processed files and random splits. No record-level split CSV is included in this release.
+Install the environment and package, place the licensed historical `safe19707` processed tables, random assignment, and depth-3 DAG cache under `data/`, and execute the restoration commands in the root README. Those archived derived inputs are not distributed and have no public download URL in this release, so raw-to-paper-result replay requires an author-provided copy. The formal DAG materializer selects and verifies the exact 2,274-file `safe19659` cache used by training. The tracked identity contract excludes only the three training molecules whose required DAGs were unavailable and requires byte-identical processed files and random splits. A newly drawn random assignment is not an exact substitute.
 
 ## From processed data
 
@@ -25,7 +25,7 @@ Validation is used for checkpoint selection and stage-level model selection. Tes
 
 ## Ablation and retrieval
 
-The global-only CE dry run is `bash ablation_studies/fera_ms_global_ace_ablation/run_all_seeds.sh --dry-run`; omit `--dry-run` for the full experiment. Rendering controls, the no-reranker control, and the no-spectrum-allocator control use the commands in the root README. Formal molecular retrieval requires the frozen fixed-50 package; the live PubChem builder is a separate drift audit. All generated outputs remain under ignored run directories.
+The global-only CE dry run is `bash ablation_studies/fera_ms_global_ace_ablation/run_all_seeds.sh --dry-run`; omit `--dry-run` for the full experiment. Rendering controls, the no-reranker control, and the no-spectrum-allocator control use the commands in the root README. Formal molecular retrieval requires the frozen fixed-50 package. That package is not distributed and has no public download URL in this release; the live PubChem builder is only a separate drift audit. See `docs/FROZEN_RETRIEVAL_INPUT.md`. All generated outputs remain under ignored run directories.
 
 ## What this release does not claim
 
