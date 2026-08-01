@@ -423,11 +423,11 @@ template:
   spectrum_refiner_use_logit_feature: true
   spectrum_refiner_use_mz_features: false
   spectrum_refiner_use_peak_prior: false
-  use_pre_r54_peak_entry_gate: false
-  pre_r54_peak_entry_hidden_size: 128
-  pre_r54_peak_entry_dropout: 0.1
-  pre_r54_peak_entry_delta_scale: 0.05
-  pre_r54_peak_entry_max_channels: 16
+  use_pre_mz_offset_expansion_peak_entry_gate: false
+  pre_mz_offset_expansion_peak_entry_hidden_size: 128
+  pre_mz_offset_expansion_peak_entry_dropout: 0.1
+  pre_mz_offset_expansion_peak_entry_delta_scale: 0.05
+  pre_mz_offset_expansion_peak_entry_max_channels: 16
   use_frontier_bond_prior: false
   frontier_bond_prior_hidden_size: 128
   frontier_bond_prior_dropout: 0.1
@@ -523,26 +523,26 @@ template:
   refiner_delta_noharm_weight: 0.0
   refiner_delta_noharm_target: 0.01
   refiner_delta_noharm_power: 1.0
-  use_r58c_offset_channel_aux_loss: false
-  r58c_offset_num_channels: 5
-  r58c_offset_aux_weight: 0.0
-  r58c_offset_aux_match_tol: 0.006
-  r58c_offset_aux_global_shift: 0.0005
-  r58c_offset_aux_min_true_prob: 0.0005
-  r58c_offset_aux_weight_gamma: 0.5
-  r58c_offset_aux_max_groups_per_spec: 2048
-  use_r64_true_window_dist_loss: false
-  r64_true_window_loss_weight: 0.02
-  r64_outside_mass_loss_weight: 0.005
-  r64_match_tol: 0.006
-  r64_sigma: 0.002
-  r64_max_pred_per_spec: 1024
-  r64_max_target_pred_per_spec: 512
-  r64_max_true_per_spec: 256
-  r64_min_true_prob: 0.0
-  r64_min_target_mass: 1.0e-12
-  r64_pred_temperature: 1.0
-  r64_chunk_size: 2048
+  use_mz_offset_channel_aux_loss: false
+  mz_offset_num_channels: 5
+  mz_offset_aux_weight: 0.0
+  mz_offset_aux_match_tol: 0.006
+  mz_offset_aux_global_shift: 0.0005
+  mz_offset_aux_min_true_prob: 0.0005
+  mz_offset_aux_weight_gamma: 0.5
+  mz_offset_aux_max_groups_per_spec: 2048
+  use_true_peak_window_true_window_dist_loss: false
+  true_peak_window_true_window_loss_weight: 0.02
+  true_peak_window_outside_mass_loss_weight: 0.005
+  true_peak_window_match_tol: 0.006
+  true_peak_window_sigma: 0.002
+  true_peak_window_max_pred_per_spec: 1024
+  true_peak_window_max_target_pred_per_spec: 512
+  true_peak_window_max_true_per_spec: 256
+  true_peak_window_min_true_prob: 0.0
+  true_peak_window_min_target_mass: 1.0e-12
+  true_peak_window_pred_temperature: 1.0
+  true_peak_window_chunk_size: 2048
   use_rendered_peak_drop_gate: false
   rendered_peak_gate_hidden_size: 128
   rendered_peak_gate_dropout: 0.1
@@ -550,11 +550,11 @@ template:
   rendered_peak_gate_init_bias: 8.0
   rendered_peak_gate_max_channels: 8
   rendered_peak_gate_use_extra_features: false
-  use_r113_rendered_peak_hard_prune: false
-  r113_rendered_peak_hard_prune_mode: delta
-  r113_rendered_peak_hard_prune_min_delta: -0.2
-  r113_rendered_peak_hard_prune_min_prob: 0.5
-  r113_rendered_peak_hard_prune_min_keep_per_spec: 64
+  use_rendered_peak_gate_rendered_peak_hard_prune: false
+  rendered_peak_gate_mode: delta
+  rendered_peak_gate_min_delta: -0.2
+  rendered_peak_gate_min_prob: 0.5
+  rendered_peak_gate_min_keep_per_spec: 64
   use_rendered_peak_gate_loss: false
   rendered_peak_gate_loss_weight: 0.002
   rendered_peak_gate_match_tol: 0.006
@@ -573,32 +573,32 @@ template:
   ce_bin_residual_hidden_size: 128
   ce_bin_residual_dropout: 0.05
   ce_bin_residual_delta_scale: 0.1
-  r107_freeze_base_model: true
-  use_r117_support_oracle_reweight_loss: false
-  r117_support_oracle_weight: 0.02
-  r117_support_oracle_every_n_steps: 1
-  r117_oracle_bin_res: 0.01
-  r117_false_mass_weight: 0.25
-  r117_min_covered_true_mass: 1.0e-06
-  r117_eps: 1.0e-12
-  use_r180_ce_weighted_spectrum_loss: false
-  r180_spectrum_loss_weight: 0.03
-  r180_cos_weight: 1.0
-  r180_jss_weight: 0.35
-  r180_mz_bin_res: 0.01
-  r180_mz_max: 1500.0
-  r180_mid_ce_threshold: 20.0
-  r180_high_ce_threshold: 40.0
-  r180_low_ce_weight: 0.5
-  r180_mid_ce_weight: 2.5
-  r180_high_ce_weight: 5.0
+  freeze_base_model: true
+  use_support_oracle_support_oracle_reweight_loss: false
+  support_oracle_support_oracle_weight: 0.02
+  support_oracle_support_oracle_every_n_steps: 1
+  support_oracle_oracle_bin_res: 0.01
+  support_oracle_false_mass_weight: 0.25
+  support_oracle_min_covered_true_mass: 1.0e-06
+  support_oracle_eps: 1.0e-12
+  use_spectrum_objective_ce_weighted_spectrum_loss: false
+  spectrum_objective_spectrum_loss_weight: 0.03
+  spectrum_objective_cos_weight: 1.0
+  spectrum_objective_jss_weight: 0.35
+  spectrum_objective_mz_bin_res: 0.01
+  spectrum_objective_mz_max: 1500.0
+  spectrum_objective_mid_ce_threshold: 20.0
+  spectrum_objective_high_ce_threshold: 40.0
+  spectrum_objective_low_ce_weight: 0.5
+  spectrum_objective_mid_ce_weight: 2.5
+  spectrum_objective_high_ce_weight: 5.0
 base_stage:
   wandb_name: UNIFIED_V1_renderer_gate_ce_40ep_seed42
   wandb_group: UNIFIED_40EP
   seed: 42
   spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
   mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
-  split_dp: data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
+  split_dp: data/split/nist20_qtof_cid_safe19659_qcbase_model_trainonly
   frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
   ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl
   spec_params:
@@ -805,8 +805,8 @@ base_stage:
   binned_spectrum_renderer_preserve_mass: true
   use_rendered_peak_drop_gate: true
   use_rendered_peak_gate_loss: false
-  use_r64_true_window_dist_loss: false
-  use_r58c_offset_channel_aux_loss: false
+  use_true_peak_window_true_window_dist_loss: false
+  use_mz_offset_channel_aux_loss: false
   use_ce_weighted_binned_aux_loss: true
   use_binned_false_mass_loss: false
   use_ce_bin_residual_head: false
@@ -830,17 +830,17 @@ base_stage:
   ce_binned_aux_low_weight: 0.5
   ce_binned_aux_mid_weight: 2.0
   ce_binned_aux_high_weight: 3.0
-  use_r113_rendered_peak_hard_prune: false
-  use_r117_support_oracle_reweight_loss: false
-  r117_support_oracle_weight: 0.0
+  use_rendered_peak_gate_rendered_peak_hard_prune: false
+  use_support_oracle_support_oracle_reweight_loss: false
+  support_oracle_support_oracle_weight: 0.0
   lr_schedule: false
 continuation_stage:
-  wandb_name: MYMODEL_R119CTRL_scope_all_no_r117
-  wandb_group: MYMODEL_R119_SCOPE_CONTROL
+  wandb_name: MYMODEL_retained_control_scope_all_without_support_oracle
+  wandb_group: MYMODEL_RETAINED_CONTROL_SCOPE_CONTROL
   seed: 42
   spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
   mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
-  split_dp: data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
+  split_dp: data/split/nist20_qtof_cid_safe19659_qcbase_model_trainonly
   frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
   ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl
   spec_params:
@@ -1047,8 +1047,8 @@ continuation_stage:
   binned_spectrum_renderer_preserve_mass: true
   use_rendered_peak_drop_gate: true
   use_rendered_peak_gate_loss: false
-  use_r64_true_window_dist_loss: false
-  use_r58c_offset_channel_aux_loss: false
+  use_true_peak_window_true_window_dist_loss: false
+  use_mz_offset_channel_aux_loss: false
   use_ce_weighted_binned_aux_loss: true
   use_binned_false_mass_loss: false
   use_ce_bin_residual_head: false
@@ -1072,36 +1072,36 @@ continuation_stage:
   ce_binned_aux_low_weight: 0.5
   ce_binned_aux_mid_weight: 2.0
   ce_binned_aux_high_weight: 3.0
-  use_r113_rendered_peak_hard_prune: false
-  use_r117_support_oracle_reweight_loss: false
-  r117_support_oracle_weight: 0.0
+  use_rendered_peak_gate_rendered_peak_hard_prune: false
+  use_support_oracle_support_oracle_reweight_loss: false
+  support_oracle_support_oracle_weight: 0.0
 postprocessing_env:
-  R172_SEED: 3407
-  R172_MAX_TRAIN_ROWS: 1800000
-  R172_NEG_TOPK: 1536
-  R172_NEG_RANDOM: 512
-  R172_RESIDUAL_CLIP: 6.0
-  R172_NEG_RESIDUAL: 4.0
-  R172_SCORE_CLIP: 6.0
-  R172_LOW_W: 0.5
-  R172_MID_W: 2.2
-  R172_HIGH_W: 4.5
-  R172_POS_W: 8.0
-  R172_POS_INTENSITY_W: 14.0
-  R172_NEG_W: 1.0
-  R172_NEG_PROB_W: 28.0
-  R172_N_ESTIMATORS: 1500
-  R172_GBDT_LR: 0.02
-  R172_NUM_LEAVES: 127
-  R172_MAX_DEPTH: -1
-  R172_MIN_CHILD: 120
-  R172_SUBSAMPLE: 0.85
-  R172_COLSAMPLE: 0.9
-  R172_REG_ALPHA: 0.05
-  R172_REG_LAMBDA: 1.5
-  R172_WORKERS: 8
-  R172_EXTRA_DIMS: 64
-  R172_ALPHA_GRID: 0,0.2,0.3,0.4,0.5,0.6,0.7,0.75,0.8,0.9,1.0
+  CANDIDATE_RERANKER_SEED: 3407
+  CANDIDATE_RERANKER_MAX_TRAIN_ROWS: 1800000
+  CANDIDATE_RERANKER_NEG_TOPK: 1536
+  CANDIDATE_RERANKER_NEG_RANDOM: 512
+  CANDIDATE_RERANKER_RESIDUAL_CLIP: 6.0
+  CANDIDATE_RERANKER_NEG_RESIDUAL: 4.0
+  CANDIDATE_RERANKER_SCORE_CLIP: 6.0
+  CANDIDATE_RERANKER_LOW_W: 0.5
+  CANDIDATE_RERANKER_MID_W: 2.2
+  CANDIDATE_RERANKER_HIGH_W: 4.5
+  CANDIDATE_RERANKER_POS_W: 8.0
+  CANDIDATE_RERANKER_POS_INTENSITY_W: 14.0
+  CANDIDATE_RERANKER_NEG_W: 1.0
+  CANDIDATE_RERANKER_NEG_PROB_W: 28.0
+  CANDIDATE_RERANKER_N_ESTIMATORS: 1500
+  CANDIDATE_RERANKER_GBDT_LR: 0.02
+  CANDIDATE_RERANKER_NUM_LEAVES: 127
+  CANDIDATE_RERANKER_MAX_DEPTH: -1
+  CANDIDATE_RERANKER_MIN_CHILD: 120
+  CANDIDATE_RERANKER_SUBSAMPLE: 0.85
+  CANDIDATE_RERANKER_COLSAMPLE: 0.9
+  CANDIDATE_RERANKER_REG_ALPHA: 0.05
+  CANDIDATE_RERANKER_REG_LAMBDA: 1.5
+  CANDIDATE_RERANKER_WORKERS: 8
+  CANDIDATE_RERANKER_EXTRA_DIMS: 64
+  CANDIDATE_RERANKER_ALPHA_GRID: 0,0.2,0.3,0.4,0.5,0.6,0.7,0.75,0.8,0.9,1.0
   B_EPOCHS: 10
   B_LR: 7.0e-05
   B_WEIGHT_DECAY: 0.0001

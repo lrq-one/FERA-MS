@@ -34,7 +34,7 @@ warnings.filterwarnings(
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
-RUN_ROOT = RUNS_ROOT / "v2e_full_063"
+RUN_ROOT = RUNS_ROOT / "full_model_full_063"
 
 OUTPUT_DIR = (
     RUN_ROOT
@@ -52,23 +52,23 @@ TEMPLATE_PATH = (
 
 CONFIG_PATH = (
     RUNS_ROOT
-    / "v2c_ce_trajectory_ablation/"
+    / "global_ace_control_ce_trajectory_ablation/"
     "control/config.yml"
 )
 
 BACKBONE_PATH = (
     RUN_ROOT
-    / "08_R160/r160_best_state.pt"
+    / "08_R160/final_peak_distillation_best_state.pt"
 )
 
 RERANKER_PATH = (
     RUN_ROOT
-    / "09_R172D/r170_regressor.pkl"
+    / "09_candidate_reranker/candidate_reranker_regressor.pkl"
 )
 
 ALLOCATOR_PATH = (
     RUN_ROOT
-    / "11_R184B/r184_allocator_best.pt"
+    / "11_spectrum_allocator/spectrum_allocator_allocator_best.pt"
 )
 
 RERANKER_SCRIPT = (
@@ -377,7 +377,7 @@ config = load_config(
     CONFIG_PATH,
 )
 
-config = candidate_reranker.force_r160_arch(
+config = candidate_reranker.force_final_peak_distillation_arch(
     config
 )
 
@@ -527,7 +527,7 @@ validation_table, validation_detail = (
         extra_schema=extra_schema,
         dl=validation_loader,
         device=device,
-        r170=candidate_reranker,
+        candidate_reranker=candidate_reranker,
         args=allocator_arguments,
         split="val",
     )
@@ -628,7 +628,7 @@ test_table, test_detail = (
         extra_schema=extra_schema,
         dl=test_loader,
         device=device,
-        r170=candidate_reranker,
+        candidate_reranker=candidate_reranker,
         args=allocator_arguments,
         split="test",
     )

@@ -176,9 +176,9 @@ def override_cfg(cfg, args):
     cfg["ce_binned_aux_mid_weight"] = float(args.mid_w)
     cfg["ce_binned_aux_high_weight"] = float(args.high_w)
 
-    # Keep old false-mass aux off in R160. We do our own candidate-level false loss.
-    cfg["use_r117_false_mass_aux_loss"] = False
-    cfg["r117_weight"] = 0.0
+    # Keep old false-mass aux off in final peak distillation. We do our own candidate-level false loss.
+    cfg["use_support_oracle_false_mass_aux_loss"] = False
+    cfg["support_oracle_weight"] = 0.0
 
     return cfg
 
@@ -247,8 +247,8 @@ def freeze_model(model, args):
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
 
-    print(f"[R160] trainable params: {trainable} / {total}")
-    print(f"[R160] allowed prefixes: {allow}")
+    print(f"[final peak distillation] trainable params: {trainable} / {total}")
+    print(f"[final peak distillation] allowed prefixes: {allow}")
 
     shown = 0
     for name, p in model.named_parameters():
@@ -372,12 +372,12 @@ def build_peak_oracle_loss(results, batch, model, args):
     }
 
 
-def build_r180_spectrum_loss(results, batch, model, args):
+def build_spectrum_objective_spectrum_loss(results, batch, model, args):
     """
-    R180B: train-time spectrum-level CE-weighted cosine/JSS loss.
+    spectrum objective: train-time spectrum-level CE-weighted cosine/JSS loss.
 
-    This is intentionally inside the R160 training script so the model architecture
-    stays exactly aligned with R160A/R172E.
+    This is intentionally inside the final peak distillation training script so the model architecture
+    stays exactly aligned with final peak distillation/candidate reranker.
     """
     pred_mzs = results["pred_mzs"]
     pred_logp = results["pred_logprobs"]
@@ -575,7 +575,7 @@ def main():
     ap.add_argument("--mid_w", type=float, default=1.75)
     ap.add_argument("--high_w", type=float, default=2.25)
 
-    # R160 oracle losses.
+    # final peak distillation oracle losses.
     ap.add_argument("--peak_oracle_weight", type=float, default=0.02)
     ap.add_argument("--false_mass_weight", type=float, default=0.015)
     ap.add_argument("--hit_mass_weight", type=float, default=0.003)
@@ -586,7 +586,7 @@ def main():
     ap.add_argument("--oracle_mid_w", type=float, default=2.00)
     ap.add_argument("--oracle_high_w", type=float, default=3.00)
 
-    # R180B spectrum-level CE-weighted loss.
+    # spectrum objective spectrum-level CE-weighted loss.
     ap.add_argument("--spectrum_loss_weight", type=float, default=0.0)
     ap.add_argument("--spectrum_cos_weight", type=float, default=1.0)
     ap.add_argument("--spectrum_jss_weight", type=float, default=0.25)
@@ -625,10 +625,10 @@ def main():
     model = FragGNNPL(**cfg)
     sd = load_state_dict_any(args.ckpt_path)
     missing, unexpected = model.load_state_dict(sd, strict=False)
-    print("[R160] missing keys:", len(missing))
+    print("[final peak distillation] missing keys:", len(missing))
     for x in missing[:30]:
         print("  missing:", x)
-    print("[R160] unexpected keys:", len(unexpected))
+    print("[final peak distillation] unexpected keys:", len(unexpected))
     for x in unexpected[:30]:
         print("  unexpected:", x)
 
@@ -642,8 +642,8 @@ def main():
     )
 
     before_table, _ = eval_split(model, val_dl, device, args, split="val")
-    print_eval("R160 BEFORE VAL", before_table)
-    before_table.to_csv(out_dir / "r160_val_epoch0_before.csv", index=False)
+    print_eval("final peak distillation BEFORE VAL", before_table)
+    before_table.to_csv(out_dir / "final_peak_distillation_val_epoch0_before.csv", index=False)
 
     best_score = -1e18
     best_epoch = -1
@@ -662,14 +662,14 @@ def main():
             "pred_hit_mass": 0.0,
             "pred_false_mass": 0.0,
             "valid_frac": 0.0,
-            "r180_spectrum_loss": 0.0,
-            "r180_spectrum_cos": 0.0,
-            "r180_spectrum_jss": 0.0,
-            "r180_spectrum_ce_weight": 0.0,
+            "spectrum_objective_spectrum_loss": 0.0,
+            "spectrum_objective_spectrum_cos": 0.0,
+            "spectrum_objective_spectrum_jss": 0.0,
+            "spectrum_objective_spectrum_ce_weight": 0.0,
         }
         n_steps = 0
 
-        pbar = tqdm(train_dl, desc=f"R160 train epoch={epoch}")
+        pbar = tqdm(train_dl, desc=f"final peak distillation train epoch={epoch}")
         for step, batch in enumerate(pbar):
             if args.max_train_batches > 0 and step >= args.max_train_batches:
                 break
@@ -690,10 +690,10 @@ def main():
                 + float(args.hit_mass_weight) * oracle["hit_mass_loss"]
             )
 
-            r180 = None
+            spectrum_objective = None
             if float(args.spectrum_loss_weight) > 0:
-                r180 = build_r180_spectrum_loss(res, batch, model, args)
-                loss = loss + float(args.spectrum_loss_weight) * r180["spectrum_loss"]
+                spectrum_objective = build_spectrum_objective_spectrum_loss(res, batch, model, args)
+                loss = loss + float(args.spectrum_loss_weight) * spectrum_objective["spectrum_loss"]
 
             loss.backward()
             th.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], 1.0)
@@ -708,11 +708,11 @@ def main():
             ]:
                 sums[k] += float(oracle[k].detach().cpu())
 
-            if r180 is not None:
-                sums["r180_spectrum_loss"] += float(r180["spectrum_loss"].detach().cpu())
-                sums["r180_spectrum_cos"] += float(r180["spectrum_cos"].detach().cpu())
-                sums["r180_spectrum_jss"] += float(r180["spectrum_jss"].detach().cpu())
-                sums["r180_spectrum_ce_weight"] += float(r180["spectrum_ce_weight"].detach().cpu())
+            if spectrum_objective is not None:
+                sums["spectrum_objective_spectrum_loss"] += float(spectrum_objective["spectrum_loss"].detach().cpu())
+                sums["spectrum_objective_spectrum_cos"] += float(spectrum_objective["spectrum_cos"].detach().cpu())
+                sums["spectrum_objective_spectrum_jss"] += float(spectrum_objective["spectrum_jss"].detach().cpu())
+                sums["spectrum_objective_spectrum_ce_weight"] += float(spectrum_objective["spectrum_ce_weight"].detach().cpu())
 
             postfix = {
                 "loss": f"{float(loss.detach().cpu()):.4f}",
@@ -721,46 +721,46 @@ def main():
                 "false": f"{float(oracle['false_mass_loss'].detach().cpu()):.3f}",
                 "hitP": f"{float(oracle['pred_hit_mass'].detach().cpu()):.3f}",
             }
-            if r180 is not None:
-                postfix["spLoss"] = f"{float(r180['spectrum_loss'].detach().cpu()):.3f}"
-                postfix["spCos"] = f"{float(r180['spectrum_cos'].detach().cpu()):.3f}"
+            if spectrum_objective is not None:
+                postfix["spLoss"] = f"{float(spectrum_objective['spectrum_loss'].detach().cpu()):.3f}"
+                postfix["spCos"] = f"{float(spectrum_objective['spectrum_cos'].detach().cpu()):.3f}"
             pbar.set_postfix(postfix)
 
         row = {"epoch": epoch, "n_steps": n_steps}
         for k, v in sums.items():
             row[k] = v / max(n_steps, 1)
         train_rows.append(row)
-        pd.DataFrame(train_rows).to_csv(out_dir / "r160_train_log.csv", index=False)
-        print("[R160 train]", row)
+        pd.DataFrame(train_rows).to_csv(out_dir / "final_peak_distillation_train_log.csv", index=False)
+        print("[final peak distillation train]", row)
 
         val_table, _ = eval_split(model, val_dl, device, args, split="val")
         g = val_table[val_table["ce_bucket"] == "global"].iloc[0]
         # Stronger than old score: still keeps JSS in selection.
         score = float(g["cos"])
 
-        print_eval(f"R160 VAL epoch={epoch} score={score:.6f}", val_table)
+        print_eval(f"final peak distillation VAL epoch={epoch} score={score:.6f}", val_table)
 
         if score > best_score:
             best_score = score
             best_epoch = epoch
-            th.save(model.state_dict(), out_dir / "r160_best_state.pt")
-            val_table.to_csv(out_dir / "r160_best_val.csv", index=False)
-            print("[R160] saved best:", out_dir / "r160_best_state.pt")
+            th.save(model.state_dict(), out_dir / "final_peak_distillation_best_state.pt")
+            val_table.to_csv(out_dir / "final_peak_distillation_best_val.csv", index=False)
+            print("[final peak distillation] saved best:", out_dir / "final_peak_distillation_best_state.pt")
 
-    print("[R160] loaded best epoch:", best_epoch, "score:", best_score)
-    best_sd = th.load(out_dir / "r160_best_state.pt", map_location="cpu", weights_only=False)
+    print("[final peak distillation] loaded best epoch:", best_epoch, "score:", best_score)
+    best_sd = th.load(out_dir / "final_peak_distillation_best_state.pt", map_location="cpu", weights_only=False)
     model.load_state_dict(best_sd, strict=False)
     model = model.to(device)
     model.eval()
 
     best_val, _ = eval_split(model, val_dl, device, args, split="val")
-    print_eval("R160 BEST VAL", best_val)
-    best_val.to_csv(out_dir / "r160_best_val.csv", index=False)
+    print_eval("final peak distillation BEST VAL", best_val)
+    best_val.to_csv(out_dir / "final_peak_distillation_best_val.csv", index=False)
 
     if args.eval_test:
         best_test, _ = eval_split(model, test_dl, device, args, split="test")
-        print_eval("R160 BEST TEST", best_test)
-        best_test.to_csv(out_dir / "r160_best_test.csv", index=False)
+        print_eval("final peak distillation BEST TEST", best_test)
+        best_test.to_csv(out_dir / "final_peak_distillation_best_test.csv", index=False)
 
     print("wrote", out_dir)
 

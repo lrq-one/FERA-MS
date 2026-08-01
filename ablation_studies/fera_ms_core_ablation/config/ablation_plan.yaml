@@ -11,7 +11,7 @@ experiments:
   no_candidate_reranker:
     formal_name: Without chemical candidate reranking
     implementation:
-      preserve_r160_backbone: true
+      preserve_final_peak_distillation_backbone: true
       reranker_alpha: 0.0
       retrain_allocator: true
       preserve_candidate_features: true

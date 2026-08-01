@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EVALUATOR_PATH = (
     ROOT
     / "test"
-    / "evaluate_chun_10ppm.py"
+    / "evaluate_chun.py"
 )
 
 PROCESS_START_TIME = time.perf_counter()
@@ -160,9 +160,9 @@ def artifact_inventory(
     seed_dir: Path,
 ) -> list[dict[str, Any]]:
     expected_names = (
-        "r160_best_state.pt",
-        "r170_regressor.pkl",
-        "r184_allocator_best.pt",
+        "final_peak_distillation_best_state.pt",
+        "candidate_reranker_regressor.pkl",
+        "spectrum_allocator_allocator_best.pt",
         "config.yml",
     )
 

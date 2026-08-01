@@ -40,8 +40,8 @@ REQUIRED = (
     "train/_impl/refinement_steps/candidate_reranker.py",
     "train/_impl/refinement_steps/spectrum_allocator.py",
     "test/evaluate.py",
-    "preproc_scripts/03_prepare_dag_feats.py",
-    "preproc_scripts/04_prepare_split.py",
+    "preproc_scripts/prepare_dag_features.py",
+    "preproc_scripts/prepare_split.py",
     "docs/PIPELINE.md",
     "docs/REPRODUCIBILITY.md",
     "docs/SOURCE_PROVENANCE.md",
@@ -56,7 +56,7 @@ REQUIRED = (
     "baseline_rebuild/baseline/source/fiora/fiora/cli/predict.py",
     "baseline_rebuild/baseline/neims/UPSTREAM.md",
     "baseline_rebuild/baseline/massformer/UPSTREAM.md",
-    "baseline_rebuild/baseline/fragnnet_d3/UPSTREAM.md",
+    "baseline_rebuild/baseline/fragnnet_depth_three/UPSTREAM.md",
     "baseline_rebuild/baseline/iceberg/UPSTREAM.md",
     "baseline_rebuild/baseline/graff_ms/UPSTREAM.md",
     "baseline_rebuild/baseline/fiora/UPSTREAM.md",
@@ -88,7 +88,10 @@ ABSOLUTE_PATTERNS = (
     re.compile(r"/home/lwh(?:/|\b)"),
     re.compile(r"/mnt(?:/|\b)"),
     re.compile(r"/hy-tmp(?:/|\b)"),
-    re.compile(r"ms2spectra_v1_r119"),
+    re.compile(r"ms2spectra_base_model_r119"),
+)
+NUMBERED_CODENAME_PATTERN = re.compile(
+    r"\b(?:R|V|r|v|stage|experiment)[0-9][A-Za-z0-9_-]*\b"
 )
 
 
@@ -152,6 +155,22 @@ def main() -> int:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
+            relative_parts = relative.parts
+            retained_baseline = relative_parts[:3] == (
+                "baseline_rebuild",
+                "baseline",
+                "source",
+            )
+            locked_baseline_config = (
+                relative_parts[:2] == ("baseline_rebuild", "baseline")
+                and path.name == "locked.yml"
+            )
+            if (
+                not retained_baseline
+                and not locked_baseline_config
+                and NUMBERED_CODENAME_PATTERN.search(text)
+            ):
+                fail(f"numbered internal codename: {relative}", failures)
             for pattern in ABSOLUTE_PATTERNS:
                 if pattern.search(text):
                     fail(f"non-portable path token {pattern.pattern!r}: {relative}", failures)
@@ -173,6 +192,18 @@ def main() -> int:
         if path.exists() and path.stat().st_size > 50 * 1024 * 1024:
             fail(f"tracked file exceeds 50 MB: {path.relative_to(ROOT)}", failures)
         relative = path.relative_to(ROOT)
+        third_party_source = relative.parts[:3] == (
+            "baseline_rebuild",
+            "baseline",
+            "source",
+        )
+        digit_name_allowlist = {"ms2spectra", "ms2c_utils.py"}
+        if not third_party_source and any(
+            any(character.isdigit() for character in part)
+            and part not in digit_name_allowlist
+            for part in relative.parts
+        ):
+            fail(f"numbered first-party path: {relative}", failures)
         if (
             len(relative.parts) >= 2
             and relative.parts[:2] == ("data", "split")

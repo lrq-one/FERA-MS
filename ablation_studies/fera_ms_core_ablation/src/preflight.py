@@ -19,7 +19,7 @@ required_source = (
     ROOT / "config/train.yml",
     ROOT / "train/_impl/refinement_steps/spectrum_allocator.py",
     ABLATION_ROOT / "config/ablation_plan.yaml",
-    ABLATION_ROOT / "scripts/01_run_no_candidate_reranker.sh",
+    ABLATION_ROOT / "scripts/run_no_candidate_reranker.sh",
 )
 
 checks: list[dict[str, object]] = []
@@ -39,9 +39,9 @@ checks.append(
 for seed in (42, 43, 44):
     seed_root = RUNS_ROOT / f"experiments/molecule_disjoint_3seeds/seed_{seed}"
     for relative in (
-        "v2c_ce_trajectory_ablation/control/config.yml",
-        "v2e_full_063/08_R160/r160_best_state.pt",
-        "v2e_full_063/09_R172D/r170_regressor.pkl",
+        "global_ace_control_ce_trajectory_ablation/control/config.yml",
+        "full_model_full_063/08_R160/final_peak_distillation_best_state.pt",
+        "full_model_full_063/09_candidate_reranker/candidate_reranker_regressor.pkl",
     ):
         path = seed_root / relative
         checks.append({"kind": "upstream_artifact", "path": str(path), "ok": path.is_file()})

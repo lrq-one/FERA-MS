@@ -845,7 +845,7 @@ def _frontier_formula_shift_candidates(
 	"""
 	Formula-level fallback candidates.
 
-	This is the robust v0b part:
+	This is the robust robust_fragmentation_base part:
 	If graph internal-cut candidates are unavailable, generate D4-like pseudo
 	support by small chemically plausible losses from D3 frontier formulas.
 
@@ -929,7 +929,7 @@ def compute_frontier_onehop_peak_support(
 	"""
 	D3 frontier -> pseudo D4 support.
 
-	v0b:
+	robust_fragmentation_base:
 	- first tries graph one-hop internal cuts inside D3 frontier fragments;
 	- then adds a robust formula-shift fallback on the D3 frontier parent formula.
 
@@ -1135,12 +1135,12 @@ def compute_frontier_onehop_peak_support(
 					if not np.isfinite(mz) or mz <= 0:
 						continue
 
-					# ===== Frontier ranking v2 =====
+					# ===== Frontier ranking refined_variant =====
 					# Old ranking favored very large child fragments:
 					#   +1000 * len(comp_atom_ids)
 					# That mostly produced parent-near peaks already covered by D3/base/NL.
 					#
-					# v2 prefers complementary mid-size fragments and penalizes parent-near children.
+					# refined_variant prefers complementary mid-size fragments and penalizes parent-near children.
 					parent_size = float(int(cc_mask.sum()))
 					child_size = float(len(comp_atom_ids))
 					child_frac = child_size / max(parent_size, 1.0)
@@ -1213,7 +1213,7 @@ def compute_frontier_onehop_peak_support(
 						"child_formula": str(child_formula),
 					})
 
-		# ===== Frontier ranking v3 graph-first =====
+		# ===== Frontier ranking energy_budget_variant graph-first =====
 		# If graph-cut candidates exist, do not let fallback compete.
 		if len(graph_candidates) > 0:
 			node_candidates = graph_candidates

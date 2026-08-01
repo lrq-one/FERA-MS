@@ -11,6 +11,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from config_store import load_locked_config, locked_config_path
+
 
 BASE = Path(os.environ.get("FERA_MS_BASELINE_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
@@ -30,7 +32,7 @@ SEEDS = [
 JOBS = []
 
 # Complete one model at a time so that an
-# Experiment-5-ready model family becomes
+# molecular-retrieval-ready model family becomes
 # available as early as possible.
 for model in [
     "neims",
@@ -133,15 +135,11 @@ def main() -> None:
     if args.dry_run:
         missing = []
         for job in JOBS:
-            config = (
-                BASE
-                / job["model"]
-                / "configs"
-                / job["split"]
-                / f"seed_{job['seed']}.yml"
-            )
+            config = locked_config_path(BASE, job["model"])
             if not config.is_file():
                 missing.append(str(config))
+                continue
+            load_locked_config(BASE, job["model"], job["split"], job["seed"])
         if missing:
             raise FileNotFoundError("\n".join(missing))
         print("FORMAL_BASELINE_MATRIX_DRY_RUN_OK", len(JOBS))

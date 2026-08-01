@@ -13,7 +13,7 @@ epoch_pattern = re.compile(
 stage_heading_pattern = re.compile(
     r"^(?:"
     r"STAGE\d+_[A-Z0-9_-]+"
-    r"|V2[AC][A-Z0-9 _-]*"
+    r"|refined variant[AC][A-Z0-9 _-]*"
     r"|R(?:146|147|149B|150A|150B|153|154|160|172D|184B)"
     r"[A-Z0-9 _-]*"
     r")$"

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 
-SOURCE = Path("test/evaluate_chun_10ppm.py")
+SOURCE = Path("test/evaluate_chun.py")
 TARGET = Path("test/benchmark_final_model.py")
 
 source = SOURCE.read_text(encoding="utf-8")
@@ -212,9 +212,9 @@ after_test = f'''
 {test_indent}        allocator
 {test_indent}    ),
 {test_indent}    "artifact_bytes": {{
-{test_indent}        "r160": int(backbone_path.stat().st_size),
-{test_indent}        "r172d": int(reranker_path.stat().st_size),
-{test_indent}        "r184b": int(allocator_path.stat().st_size),
+{test_indent}        "final_peak_distillation": int(backbone_path.stat().st_size),
+{test_indent}        "candidate_reranker": int(reranker_path.stat().st_size),
+{test_indent}        "spectrum_allocator": int(allocator_path.stat().st_size),
 {test_indent}    }},
 {test_indent}    "device": str(device),
 {test_indent}    "gpu_name": (

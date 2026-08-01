@@ -206,7 +206,7 @@ class InstModel:
 
 class SpectrumCandidateRefiner(nn.Module):
 	"""
-	R12: Spectrum-level candidate interaction refiner.
+	joint refinement: Spectrum-level candidate interaction refiner.
 
 	It refines top-K node/formula/H candidate logits inside each spectrum.
 	This is not ensemble/retrieval. It is an internal single-model residual
@@ -297,7 +297,7 @@ class SpectrumCandidateRefiner(nn.Module):
 
 			k = min(int(self.topk), int(idx.numel()))
 
-			# Select candidates by the current R3/G2 score.
+			# Select candidates by the current structural backbone/G2 score.
 			# This top-k is an internal routing decision, not ensemble/retrieval.
 			score = base_logits_flat[idx].detach()
 			top_rel = th.topk(score, k=k, largest=True, sorted=True).indices
@@ -472,11 +472,11 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		spectrum_refiner_use_logit_feature: bool = True,
 		spectrum_refiner_use_mz_features: bool = False,
 		spectrum_refiner_use_peak_prior: bool = False,
-		use_pre_r54_peak_entry_gate: bool = False,
-		pre_r54_peak_entry_hidden_size: int = 128,
-		pre_r54_peak_entry_dropout: float = 0.1,
-		pre_r54_peak_entry_delta_scale: float = 0.05,
-		pre_r54_peak_entry_max_channels: int = 16):
+		use_pre_mz_offset_expansion_peak_entry_gate: bool = False,
+		pre_mz_offset_expansion_peak_entry_hidden_size: int = 128,
+		pre_mz_offset_expansion_peak_entry_dropout: float = 0.1,
+		pre_mz_offset_expansion_peak_entry_delta_scale: float = 0.05,
+		pre_mz_offset_expansion_peak_entry_max_channels: int = 16):
 
 		# nn.Module init
 		super().__init__()
@@ -663,7 +663,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		self.ce_peak_channel_delta_scale = float(ce_peak_channel_delta_scale)
 		self.ce_peak_channel_max_channels = int(ce_peak_channel_max_channels)
 		self.ce_peak_channel_allocator_mode = ce_peak_channel_allocator_mode
-		# ===== R54: m/z-offset peak renderer expansion =====
+		# ===== m-z offset expansion: m/z-offset peak renderer expansion =====
 		# This does not regress m/z. It expands each cached peak-entry into
 		# nearby m/z render channels, then lets the peak allocator redistribute
 		# intensity among these channels.
@@ -680,7 +680,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 		if self.use_mz_offset_peak_expansion:
 			print(
-				"[R54 MZOffsetRenderer] enabled=True, "
+				"[m-z offset expansion MZOffsetRenderer] enabled=True, "
 				f"steps={self.mz_offset_peak_steps}, "
 				f"sigma={self.mz_offset_peak_prior_sigma}"
 			)
@@ -690,7 +690,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			assert self.ce_insert_size > 0, self.ce_insert_size
 
 			if self.ce_peak_channel_allocator_mode == "ce_only":
-				# v1: global CE -> channel bias. Kept for ablation.
+				# base_model: global CE -> channel bias. Kept for ablation.
 				self.ce_peak_channel_allocator = nn.Sequential(
 					nn.Linear(self.ce_insert_size, ce_peak_channel_hidden_size),
 					nn.SiLU(),
@@ -699,7 +699,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				)
 
 			elif self.ce_peak_channel_allocator_mode == "entry":
-				# v2: per-peak-entry allocator.
+				# refined_variant: per-peak-entry allocator.
 				# input = CE embedding + channel one-hot + [mz_norm, base_logprob_norm, formula_logprob_norm]
 				entry_input_size = (
 					self.ce_insert_size
@@ -729,48 +729,48 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		else:
 			self.ce_peak_channel_allocator = None
 
-		# ===== R134: pre-R54 peak-entry scorer =====
+		# ===== pre-render peak-entry gate: pre-m-z offset expansion peak-entry scorer =====
 		# This acts before m/z-offset expansion, while original peak-entry source
 		# channel is still available. It is zero-init, so initial behavior is no-op.
-		self.use_pre_r54_peak_entry_gate = bool(use_pre_r54_peak_entry_gate)
-		self.pre_r54_peak_entry_delta_scale = float(pre_r54_peak_entry_delta_scale)
-		self.pre_r54_peak_entry_max_channels = int(pre_r54_peak_entry_max_channels)
+		self.use_pre_mz_offset_expansion_peak_entry_gate = bool(use_pre_mz_offset_expansion_peak_entry_gate)
+		self.pre_mz_offset_expansion_peak_entry_delta_scale = float(pre_mz_offset_expansion_peak_entry_delta_scale)
+		self.pre_mz_offset_expansion_peak_entry_max_channels = int(pre_mz_offset_expansion_peak_entry_max_channels)
 
-		if self.use_pre_r54_peak_entry_gate:
+		if self.use_pre_mz_offset_expansion_peak_entry_gate:
 			assert self.ce_insert_location != "none", (
-				"use_pre_r54_peak_entry_gate=True requires CE embedding"
+				"use_pre_mz_offset_expansion_peak_entry_gate=True requires CE embedding"
 			)
 			assert self.ce_insert_size > 0, self.ce_insert_size
 
 			# input = CE embed + original source channel one-hot
 			#       + [mz_norm, base_logp_norm, formula_logp_norm,
 			#          combined_logp_norm, base_prob_sqrt, formula_prob_sqrt]
-			pre_r54_input_size = self.ce_insert_size + self.pre_r54_peak_entry_max_channels + 6
+			pre_mz_offset_expansion_input_size = self.ce_insert_size + self.pre_mz_offset_expansion_peak_entry_max_channels + 6
 
-			self.pre_r54_peak_entry_gate = nn.Sequential(
-				nn.Linear(pre_r54_input_size, pre_r54_peak_entry_hidden_size),
+			self.pre_mz_offset_expansion_peak_entry_gate = nn.Sequential(
+				nn.Linear(pre_mz_offset_expansion_input_size, pre_mz_offset_expansion_peak_entry_hidden_size),
 				nn.SiLU(),
-				nn.Dropout(pre_r54_peak_entry_dropout),
-				nn.Linear(pre_r54_peak_entry_hidden_size, pre_r54_peak_entry_hidden_size),
+				nn.Dropout(pre_mz_offset_expansion_peak_entry_dropout),
+				nn.Linear(pre_mz_offset_expansion_peak_entry_hidden_size, pre_mz_offset_expansion_peak_entry_hidden_size),
 				nn.SiLU(),
-				nn.Dropout(pre_r54_peak_entry_dropout),
-				nn.Linear(pre_r54_peak_entry_hidden_size, 1),
+				nn.Dropout(pre_mz_offset_expansion_peak_entry_dropout),
+				nn.Linear(pre_mz_offset_expansion_peak_entry_hidden_size, 1),
 			)
 
-			last = self.pre_r54_peak_entry_gate[-1]
+			last = self.pre_mz_offset_expansion_peak_entry_gate[-1]
 			nn.init.zeros_(last.weight)
 			nn.init.zeros_(last.bias)
 		else:
-			self.pre_r54_peak_entry_gate = None
+			self.pre_mz_offset_expansion_peak_entry_gate = None
 
 		print(
-			"[R134 PreR54PeakEntryGate] "
-			f"enabled={self.use_pre_r54_peak_entry_gate}, "
-			f"delta_scale={self.pre_r54_peak_entry_delta_scale}, "
-			f"max_channels={self.pre_r54_peak_entry_max_channels}"
+			"[pre-render peak-entry gate PreRenderPeakEntryGate] "
+			f"enabled={self.use_pre_mz_offset_expansion_peak_entry_gate}, "
+			f"delta_scale={self.pre_mz_offset_expansion_peak_entry_delta_scale}, "
+			f"max_channels={self.pre_mz_offset_expansion_peak_entry_max_channels}"
 		)
 
-		# ===== R71: rendered peak-entry drop gate =====
+		# ===== peak-channel objective: rendered peak-entry drop gate =====
 		# This gate acts after formula/peak rendering, directly on final spectrum entries.
 		# It is different from ce_peak_channel_allocator:
 		# - peak allocator redistributes mass inside an offset group.
@@ -789,12 +789,12 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			# input = CE embed + peak-channel one-hot + numeric features.
 			# Default keeps old 4 numeric features for compatibility.
-			# R111 extra mode adds m/z-shape, channel, and probability-scale features.
-			r71_num_numeric = 14 if self.rendered_peak_gate_use_extra_features else 4
+			# extended peak features extra mode adds m/z-shape, channel, and probability-scale features.
+			peak_channel_num_numeric = 14 if self.rendered_peak_gate_use_extra_features else 4
 			gate_input_size = (
 				self.ce_insert_size
 				+ self.rendered_peak_gate_max_channels
-				+ r71_num_numeric
+				+ peak_channel_num_numeric
 			)
 
 			self.rendered_peak_drop_gate = nn.Sequential(
@@ -818,7 +818,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			self.rendered_peak_drop_gate = None
 
 		print(
-			"[R71 RenderedPeakDropGate] "
+			"[peak-channel objective RenderedPeakDropGate] "
 			f"enabled={self.use_rendered_peak_drop_gate}, "
 			f"delta_scale={self.rendered_peak_gate_delta_scale}, "
 			f"max_channels={self.rendered_peak_gate_max_channels}, "
@@ -942,7 +942,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				nn.Linear(formula_vocab_hidden_size, self.formula_vocab_size + 1),
 			)
 
-			# Zero init: initial behavior equals the R3 backbone.
+			# Zero init: initial behavior equals the structural backbone backbone.
 			last = self.formula_vocab_prior_head[-1]
 			nn.init.zeros_(last.weight)
 			nn.init.zeros_(last.bias)
@@ -972,7 +972,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				nn.Linear(formula_comp_hidden_size, 1),
 			)
 
-			# zero-init: initial behavior equals the R3 backbone
+			# zero-init: initial behavior equals the structural backbone backbone
 			last = self.formula_comp_residual_head[-1]
 			nn.init.zeros_(last.weight)
 			nn.init.zeros_(last.bias)
@@ -1035,7 +1035,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				nn.Linear(ce_response_hidden_size, 1),
 			)
 
-			# zero-init: initial behavior equals the current R3/G2 backbone
+			# zero-init: initial behavior equals the current structural backbone/G2 backbone
 			last = self.ce_response_scorer[-1]
 			nn.init.zeros_(last.weight)
 			nn.init.zeros_(last.bias)
@@ -1092,7 +1092,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				nn.Linear(cutchem_node_hidden_size, 1),
 			)
 
-			# zero-init: initial behavior equals the R3/G2 backbone
+			# zero-init: initial behavior equals the structural backbone/G2 backbone
 			last = self.cutchem_node_residual[-1]
 			nn.init.zeros_(last.weight)
 			nn.init.zeros_(last.bias)
@@ -1109,7 +1109,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			f"h={self.cutchem_node_use_h}"
 		)
 
-		# ===== CE-FlowFrag v2: multi-path node-flow prior =====
+		# ===== CE-FlowFrag refined_variant: multi-path node-flow prior =====
 		self.use_ce_flowfrag = bool(use_ce_flowfrag)
 		self.ce_flowfrag_max_depth = int(ce_flowfrag_max_depth)
 		self.ce_flowfrag_lambda_max = float(ce_flowfrag_lambda_max)
@@ -1119,10 +1119,10 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 		if self.use_ce_flowfrag:
 			assert self.mlp_output_format == "formula", (
-				"CE-FlowFrag v2 currently supports mlp_output_format='formula'"
+				"CE-FlowFrag refined_variant currently supports mlp_output_format='formula'"
 			)
 			assert self.ce_insert_location == "mlp", (
-				"CE-FlowFrag v2 expects CE inside frag_embed via ce_insert_location='mlp'"
+				"CE-FlowFrag refined_variant expects CE inside frag_embed via ce_insert_location='mlp'"
 			)
 
 			# parent, child, child-parent, parent_depth, child_depth, depth_diff
@@ -1180,7 +1180,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			self.ce_flowfrag_mixture_head = None
 
 		print(
-			"[CEFlowFragV2] "
+			"[CEFlowFragment] "
 			f"enabled={self.use_ce_flowfrag}, "
 			f"lambda_max={self.ce_flowfrag_lambda_max}, "
 			f"max_depth={self.ce_flowfrag_max_depth}, "
@@ -1201,7 +1201,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			}
 			self.formula_module = MLPBlocks(**formula_mlp_kwargs)
 
-		# ===== R12: spectrum candidate interaction refiner =====
+		# ===== joint refinement: spectrum candidate interaction refiner =====
 		self.use_spectrum_candidate_refiner = bool(use_spectrum_candidate_refiner)
 		self.spectrum_refiner_topk = int(spectrum_refiner_topk)
 		self.spectrum_refiner_delta_scale = float(spectrum_refiner_delta_scale)
@@ -1212,10 +1212,10 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 		if self.use_spectrum_candidate_refiner:
 			assert self.mlp_output_format == "formula", (
-				"R12 currently supports mlp_output_format='formula' only"
+				"joint refinement currently supports mlp_output_format='formula' only"
 			)
 			assert self.ce_insert_location != "none", (
-				"R12 needs CE embedding. Use ce_insert_location='mlp'."
+				"joint refinement needs CE embedding. Use ce_insert_location='mlp'."
 			)
 			assert self.ce_insert_size > 0, self.ce_insert_size
 
@@ -1249,7 +1249,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			self.spectrum_candidate_refiner = None
 
 		print(
-			"[R12 SpectrumCandidateRefiner] "
+			"[joint refinement SpectrumCandidateRefiner] "
 			f"enabled={self.use_spectrum_candidate_refiner}, "
 			f"topk={self.spectrum_refiner_topk}, "
 			f"hidden={spectrum_refiner_hidden_size}, "
@@ -1309,7 +1309,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					normalization="none",
 				)
 
-				# 最后一层 zero init，让初始 delta=0，等价于 CE-Gate v1
+				# 最后一层 zero init，让初始 delta=0，等价于 CE-Gate base_model
 				last_linear = None
 				for m in self.ce_oos_delta_module.modules():
 					if isinstance(m, nn.Linear):
@@ -1427,7 +1427,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		depth_level = depth_norm * max(float(self.num_depth - 1), 1.0)
 
 		u0 = frag_edge_index[0].long()
-		v0 = frag_edge_index[1].long()
+		original_variant = frag_edge_index[1].long()
 
 		if frag_edge_index.numel() == 0:
 			path_node_logprobs = scatter_logsoftmax(
@@ -1436,17 +1436,17 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			)
 		else:
 			depth_u = depth_level[u0]
-			depth_v = depth_level[v0]
+			depth_v = depth_level[original_variant]
 
 			u_is_parent = depth_u < depth_v
 			v_is_parent = depth_v < depth_u
 
-			parent = th.cat([u0[u_is_parent], v0[v_is_parent]], dim=0)
-			child = th.cat([v0[u_is_parent], u0[v_is_parent]], dim=0)
+			parent = th.cat([u0[u_is_parent], original_variant[v_is_parent]], dim=0)
+			child = th.cat([original_variant[u_is_parent], u0[v_is_parent]], dim=0)
 
 			if not hasattr(self, "_ce_flowfrag_edge_debug_printed"):
 				print(
-					"[CEFlowFragV2EdgeDebug] "
+					"[CEFlowFragmentEdgeDebug] "
 					f"num_nodes={num_nodes}, "
 					f"num_raw_edges={frag_edge_index.shape[1]}, "
 					f"num_forward_edges={parent.numel()}, "
@@ -2908,14 +2908,14 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				)
 				frag_joint_logits = frag_joint_logits + ce_response_joint_delta
 
-			# ===== R56: expose R12 candidate features for offline snap/delta gate =====
-			r56_real_joint_r12_feats = None
+			# ===== joint formula features: expose joint refinement candidate features for offline snap/delta gate =====
+			joint_formula_real_joint_joint_refinement_feats = None
 
-			# ===== R12: spectrum-level candidate interaction refinement =====
+			# ===== joint refinement: spectrum-level candidate interaction refinement =====
 			# This is applied after all local residuals but before scatter_logsoftmax.
 			if self.use_spectrum_candidate_refiner:
 				assert self.spectrum_candidate_refiner is not None
-				assert ce_embed is not None, "R12 requires CE embedding"
+				assert ce_embed is not None, "joint refinement requires CE embedding"
 
 				num_h_channels = 2 * self.num_hs + 1
 
@@ -2962,16 +2962,16 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					dim=1,
 				)
 
-				r12_feats = [
+				joint_refinement_feats = [
 					joint_node_embed,
 					joint_ce_embed,
 					joint_depth,
 					h_feat,
 				]
 
-				# ===== R13: explicit candidate m/z features =====
-				# R12 only saw latent node embedding + CE + depth + H + old logit.
-				# R13 gives the refiner explicit spectrum-coordinate information.
+				# ===== candidate-coordinate features: explicit candidate m/z features =====
+				# joint refinement only saw latent node embedding + CE + depth + H + old logit.
+				# candidate-coordinate features gives the refiner explicit spectrum-coordinate information.
 				if self.spectrum_refiner_use_mz_features:
 					assert frag_joint_formula_idxs.dim() == 1, frag_joint_formula_idxs.shape
 					joint_mz = frag_formula_peak_mzs[
@@ -2988,7 +2988,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					mz_log = th.log1p(joint_mz.clamp_min(0.0)) / th.log1p(mz_max_t)
 					mz_rank_like = mz_norm
 
-					r12_feats.append(
+					joint_refinement_feats.append(
 						th.stack(
 							[
 								mz_norm,
@@ -2999,7 +2999,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 						)
 					)
 
-				# ===== R13: cached formula peak prior =====
+				# ===== candidate-coordinate features: cached formula peak prior =====
 				# formula_peak_probs is already part of the fragment cache.
 				# This tells the refiner which formula candidates were a priori plausible.
 				if self.spectrum_refiner_use_peak_prior:
@@ -3013,37 +3013,37 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 						.log()
 						.unsqueeze(1)
 					)
-					r12_feats.append(joint_peak_prior)
+					joint_refinement_feats.append(joint_peak_prior)
 
 				frag_joint_logits_flat_for_r12 = frag_joint_logits.reshape(-1)
 
 				if self.spectrum_refiner_use_logit_feature:
-					r12_feats.append(
+					joint_refinement_feats.append(
 						frag_joint_logits_flat_for_r12.detach().unsqueeze(1)
 					)
 
-				r12_feats = th.cat(r12_feats, dim=1)
-				r56_real_joint_r12_feats = r12_feats[frag_joint_mask.reshape(-1).bool()].detach()
+				joint_refinement_feats = th.cat(joint_refinement_feats, dim=1)
+				joint_formula_real_joint_joint_refinement_feats = joint_refinement_feats[frag_joint_mask.reshape(-1).bool()].detach()
 
-				r12_delta_flat = self.spectrum_candidate_refiner(
-					cand_feats=r12_feats,
+				joint_refinement_delta_flat = self.spectrum_candidate_refiner(
+					cand_feats=joint_refinement_feats,
 					base_logits_flat=frag_joint_logits_flat_for_r12,
 					cand_batch_idxs=frag_joint_batch_idxs,
 					valid_mask=frag_joint_mask.bool(),
 					batch_size=int(batch_size),
 				)
 
-				r12_delta = r12_delta_flat.reshape(
+				joint_refinement_delta = joint_refinement_delta_flat.reshape(
 					batch_frag_num_nodes,
 					num_h_channels,
 				)
 
-				assert r12_delta.shape == frag_joint_logits.shape, (
-					r12_delta.shape,
+				assert joint_refinement_delta.shape == frag_joint_logits.shape, (
+					joint_refinement_delta.shape,
 					frag_joint_logits.shape,
 				)
 
-				frag_joint_logits = frag_joint_logits + r12_delta
+				frag_joint_logits = frag_joint_logits + joint_refinement_delta
 
 			frag_joint_logits = frag_joint_logits.flatten()
 
@@ -3110,7 +3110,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 				if not hasattr(self, "_ce_flowfrag_debug_printed"):
 					print(
-						"[CEFlowFragV2Debug] "
+						"[CEFlowFragmentDebug] "
 						f"lambda_mean={lambda_flow.detach().mean().item():.6f}, "
 						f"lambda_min={lambda_flow.detach().min().item():.6f}, "
 						f"lambda_max={lambda_flow.detach().max().item():.6f}"
@@ -3261,29 +3261,29 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		# adjust frag_formula_logprobs
 		frag_formula_oos_logprobs = frag_formula_logprobs + \
 			th.repeat_interleave(not_oos_logprobs, frag_formula_sizes, dim=0)
-		# ===== R58B: local offset-channel allocator bookkeeping =====
-		# These tensors are only used when R54 m/z-offset expansion is enabled.
+		# ===== offset-channel bookkeeping: local offset-channel allocator bookkeeping =====
+		# These tensors are only used when m-z offset expansion m/z-offset expansion is enabled.
 		# They let the allocator redistribute probability within each original
 		# cached peak-entry's offset copies, instead of across all peaks of a formula.
-		r58_offset_group_idxs = None
-		r58_old_peak_logprobs = None
-		r58_offset_prior_logprobs = None
+		mz_offset_group_idxs = None
+		original_peak_logprobs = None
+		mz_offset_prior_logprobs = None
 
-		# ===== V8B: preserve original pre-R54 peak-entry identity =====
+		# ===== original-peak identity: preserve original pre-m-z offset expansion peak-entry identity =====
 		# These tensors contain no trainable parameters. They only expose the
 		# source channel, original m/z and original conditional peak prior that
-		# existed before R54 replaced the channel id with the offset id.
-		v8b_original_peak_channels = None
-		v8b_original_peak_mzs = None
-		v8b_original_peak_probs = None
+		# existed before m-z offset expansion replaced the channel id with the offset id.
+		original_peak_original_peak_channels = None
+		original_peak_original_peak_mzs = None
+		original_peak_original_peak_probs = None
 
-		# ===== R134: pre-R54 peak-entry scorer =====
-		pre_r54_peak_entry_gate_logits = None
-		pre_r54_peak_entry_gate_delta = None
+		# ===== pre-render peak-entry gate: pre-m-z offset expansion peak-entry scorer =====
+		pre_mz_offset_expansion_peak_entry_gate_logits = None
+		pre_mz_offset_expansion_peak_entry_gate_delta = None
 
-		if self.use_pre_r54_peak_entry_gate and frag_formula_peak_mzs.numel() > 0:
+		if self.use_pre_mz_offset_expansion_peak_entry_gate and frag_formula_peak_mzs.numel() > 0:
 			assert frag_formula_peak_channels is not None, (
-				"use_pre_r54_peak_entry_gate=True requires original frag_formula_peak_channels"
+				"use_pre_mz_offset_expansion_peak_entry_gate=True requires original frag_formula_peak_channels"
 			)
 
 			pre_spec_batch_idxs = th.repeat_interleave(
@@ -3300,12 +3300,12 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			pre_channels = frag_formula_peak_channels.long().clamp(
 				min=0,
-				max=self.pre_r54_peak_entry_max_channels - 1,
+				max=self.pre_mz_offset_expansion_peak_entry_max_channels - 1,
 			)
 
 			pre_channel_oh = th.nn.functional.one_hot(
 				pre_channels,
-				num_classes=self.pre_r54_peak_entry_max_channels,
+				num_classes=self.pre_mz_offset_expansion_peak_entry_max_channels,
 			).to(dtype=pre_base_logprobs.dtype)
 
 			pre_ce_embed = ce_embed[pre_spec_batch_idxs]
@@ -3342,15 +3342,15 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				dim=1,
 			)
 
-			pre_r54_peak_entry_gate_logits = self.pre_r54_peak_entry_gate(pre_input).squeeze(1)
-			pre_r54_peak_entry_gate_delta = (
-				self.pre_r54_peak_entry_delta_scale
-				* th.tanh(pre_r54_peak_entry_gate_logits)
+			pre_mz_offset_expansion_peak_entry_gate_logits = self.pre_mz_offset_expansion_peak_entry_gate(pre_input).squeeze(1)
+			pre_mz_offset_expansion_peak_entry_gate_delta = (
+				self.pre_mz_offset_expansion_peak_entry_delta_scale
+				* th.tanh(pre_mz_offset_expansion_peak_entry_gate_logits)
 			)
 
 			# Add delta to original peak-entry prior, then renormalize within each
 			# global formula id. This preserves total formula probability mass.
-			pre_new_logprobs = pre_base_logprobs + pre_r54_peak_entry_gate_delta
+			pre_new_logprobs = pre_base_logprobs + pre_mz_offset_expansion_peak_entry_gate_delta
 
 			old_lse = scatter_logsumexp(
 				pre_base_logprobs,
@@ -3371,7 +3371,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			frag_formula_peak_probs = pre_new_logprobs.exp()
 
-		# ===== R54: m/z-offset peak-entry expansion =====
+		# ===== m-z offset expansion: m/z-offset peak-entry expansion =====
 		# Expand each cached formula peak-entry into several nearby m/z copies.
 		# The copies share the same formula idx, but have different rendered m/z.
 		# Their initial probabilities are normalized Gaussian priors, so the total
@@ -3413,36 +3413,36 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					num_old_peak_entries,
 				)
 
-				# Preserve the pre-R54 identity on every expanded offset copy.
-				v8b_original_peak_channels = th.repeat_interleave(
+				# Preserve the pre-m-z offset expansion identity on every expanded offset copy.
+				original_peak_original_peak_channels = th.repeat_interleave(
 					old_peak_channels,
 					num_offset_channels,
 					dim=0,
 				)
 
-				v8b_original_peak_mzs = th.repeat_interleave(
+				original_peak_original_peak_mzs = th.repeat_interleave(
 					old_peak_mzs,
 					num_offset_channels,
 					dim=0,
 				)
 
-				v8b_original_peak_probs = th.repeat_interleave(
+				original_peak_original_peak_probs = th.repeat_interleave(
 					old_peak_probs,
 					num_offset_channels,
 					dim=0,
 				)
 
-				# R58B local offset groups:
+				# offset-channel bookkeeping local offset groups:
 				# group id = original cached peak-entry id.
 				# All 5 offset copies of the same original peak-entry share one group.
-				r58_offset_group_idxs = th.repeat_interleave(
+				mz_offset_group_idxs = th.repeat_interleave(
 					th.arange(num_old_peak_entries, device=device, dtype=th.long),
 					num_offset_channels,
 					dim=0,
 				)
 
 				# old peak-entry probability must be preserved.
-				r58_old_peak_logprobs = th.log(
+				original_peak_logprobs = th.log(
 					th.repeat_interleave(
 						old_peak_probs.clamp_min(1e-12),
 						num_offset_channels,
@@ -3451,7 +3451,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				)
 
 				# offset prior only controls allocation inside the 5 offset copies.
-				r58_offset_prior_logprobs = th.log(
+				mz_offset_prior_logprobs = th.log(
 					offset_priors.repeat(num_old_peak_entries).clamp_min(1e-12)
 				)
 
@@ -3479,7 +3479,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					* offset_priors.repeat(num_old_peak_entries)
 				)
 
-				# For R54, channel id means offset channel.
+				# For m-z offset expansion, channel id means offset channel.
 				# Use ce_peak_channel_max_channels >= num_offset_channels.
 				frag_formula_peak_channels = th.arange(
 					num_offset_channels,
@@ -3489,9 +3489,9 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 				frag_formula_peak_sizes = frag_formula_peak_sizes * num_offset_channels
 
-				if not hasattr(self, "_r54_debug_printed"):
+				if not hasattr(self, "_mz_offset_expansion_debug_printed"):
 					print(
-						"[R54 DEBUG] "
+						"[m-z offset expansion DEBUG] "
 						f"enabled={self.use_mz_offset_peak_expansion}, "
 						f"num_offset_channels={num_offset_channels}, "
 						f"old_peak_entries={num_old_peak_entries}, "
@@ -3499,7 +3499,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 						f"bin_output={self.bin_output}, "
 						f"mz_bin_res={self.mz_bin_res}"
 					)
-					self._r54_debug_printed = True
+					self._mz_offset_expansion_debug_printed = True
 				if self.use_ce_peak_channel_allocator:
 					assert self.ce_peak_channel_max_channels >= num_offset_channels, (
 						self.ce_peak_channel_max_channels,
@@ -3618,26 +3618,26 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				peak_channel_delta
 			)
 
-			# R58B:
-			# For R54 offset expansion, normalize only within each original peak-entry's
+			# offset-channel bookkeeping:
+			# For m-z offset expansion offset expansion, normalize only within each original peak-entry's
 			# offset copies. This preserves the old cached peak-entry probability and
 			# only reallocates it among [-0.002,-0.001,0,+0.001,+0.002].
 			if (
 				self.use_mz_offset_peak_expansion
-				and r58_offset_group_idxs is not None
-				and r58_old_peak_logprobs is not None
-				and r58_offset_prior_logprobs is not None
+				and mz_offset_group_idxs is not None
+				and original_peak_logprobs is not None
+				and mz_offset_prior_logprobs is not None
 			):
-				peak_offset_logits = r58_offset_prior_logprobs + peak_channel_delta
+				peak_offset_logits = mz_offset_prior_logprobs + peak_channel_delta
 				peak_offset_logprobs = scatter_logsoftmax(
 					peak_offset_logits,
-					r58_offset_group_idxs,
+					mz_offset_group_idxs,
 				)
-				peak_logprobs = r58_old_peak_logprobs + peak_offset_logprobs
+				peak_logprobs = original_peak_logprobs + peak_offset_logprobs
 			else:
 				peak_logits = base_peak_logprobs + peak_channel_delta
 
-				# Fallback old behavior for non-R54 cases.
+				# Fallback old behavior for non-m-z offset expansion cases.
 				peak_logprobs = scatter_logsoftmax(
 					peak_logits,
 					spec_formula_global_idxs,
@@ -3650,7 +3650,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			+ peak_logprobs
 		)
 
-		# ===== R71: rendered peak-entry drop gate =====
+		# ===== peak-channel objective: rendered peak-entry drop gate =====
 		# Directly suppress false rendered peaks.
 		# After applying negative gate delta, renormalize inside each spectrum
 		# so the original spectrum probability mass is preserved.
@@ -3664,15 +3664,15 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			ce_peak_embed = ce_embed[spec_batch_idxs]
 
 			if frag_formula_peak_channels is not None:
-				r71_peak_channels = frag_formula_peak_channels.long().clamp(
+				peak_channel_peak_channels = frag_formula_peak_channels.long().clamp(
 					min=0,
 					max=self.rendered_peak_gate_max_channels - 1,
 				)
 			else:
-				r71_peak_channels = th.zeros_like(spec_batch_idxs).long()
+				peak_channel_peak_channels = th.zeros_like(spec_batch_idxs).long()
 
 			peak_channel_oh = F.one_hot(
-				r71_peak_channels,
+				peak_channel_peak_channels,
 				num_classes=self.rendered_peak_gate_max_channels,
 			).to(dtype=spec_logprobs.dtype)
 
@@ -3702,7 +3702,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				is_high_mz = (mz_norm >= 0.50).to(dtype=spec_logprobs.dtype)
 
 				channel_norm = (
-					r71_peak_channels.to(dtype=spec_logprobs.dtype)
+					peak_channel_peak_channels.to(dtype=spec_logprobs.dtype)
 					/ max(float(self.rendered_peak_gate_max_channels - 1), 1.0)
 				).clamp(0.0, 1.0)
 
@@ -3726,7 +3726,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					spec_logprobs.clamp(min=-20.0, max=0.0).exp().sqrt()
 				).clamp(0.0, 1.0)
 
-				r71_numeric = th.stack(
+				peak_channel_numeric = th.stack(
 					[
 						mz_norm,
 						mz2_norm,
@@ -3746,7 +3746,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					dim=1,
 				).to(dtype=spec_logprobs.dtype)
 			else:
-				r71_numeric = th.stack(
+				peak_channel_numeric = th.stack(
 					[
 						mz_norm,
 						base_peak_logprob_norm,
@@ -3756,17 +3756,17 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					dim=1,
 				).to(dtype=spec_logprobs.dtype)
 
-			r71_input = th.cat(
+			peak_channel_input = th.cat(
 				[
 					ce_peak_embed,
 					peak_channel_oh,
-					r71_numeric,
+					peak_channel_numeric,
 				],
 				dim=1,
 			)
 
 			rendered_peak_gate_logits = self.rendered_peak_drop_gate(
-				r71_input
+				peak_channel_input
 			).squeeze(1)
 
 			# log keep-probability, <= 0.
@@ -4080,22 +4080,22 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			"pred_mzs": spec_mzs,
 			"pred_logprobs": spec_logprobs,
 			"pred_batch_idxs": spec_batch_idxs,
-			# ===== R55: expose spec-level candidate identity for offline true-hit gate =====
+			# ===== candidate-identity export: expose spec-level candidate identity for offline true-hit gate =====
 			"pred_spec_formula_global_idxs": spec_formula_global_idxs if spec_formula_global_idxs.shape[0] == spec_mzs.shape[0] else None,
 			"pred_spec_formula_logprobs": frag_formula_oos_logprobs[spec_formula_global_idxs] if spec_formula_global_idxs.shape[0] == spec_mzs.shape[0] else None,
                   "pred_spec_formula_comp_feats": frag_formula_comp_feats[spec_formula_global_idxs] if (frag_formula_comp_feats is not None and spec_formula_global_idxs.shape[0] == spec_mzs.shape[0]) else None,
 			"pred_spec_base_peak_logprobs": base_peak_logprobs if base_peak_logprobs.shape[0] == spec_mzs.shape[0] else None,
 			"pred_spec_peak_logprobs": peak_logprobs if peak_logprobs.shape[0] == spec_mzs.shape[0] else None,
 			"pred_spec_peak_channels": frag_formula_peak_channels.long() if (frag_formula_peak_channels is not None and frag_formula_peak_channels.shape[0] == spec_mzs.shape[0]) else th.zeros_like(spec_batch_idxs),
-			# ===== R58C: expose local offset group id for supervised offset-channel loss =====
-			"pred_spec_offset_group_idxs": r58_offset_group_idxs if (r58_offset_group_idxs is not None and r58_offset_group_idxs.shape[0] == spec_mzs.shape[0]) else None,
+			# ===== m-z offset expansion: expose local offset group id for supervised offset-channel loss =====
+			"pred_spec_offset_group_idxs": mz_offset_group_idxs if (mz_offset_group_idxs is not None and mz_offset_group_idxs.shape[0] == spec_mzs.shape[0]) else None,
 
-			# ===== V8B: original pre-R54 peak-entry metadata =====
-			"pred_spec_original_peak_channels": v8b_original_peak_channels if (v8b_original_peak_channels is not None and v8b_original_peak_channels.shape[0] == spec_mzs.shape[0]) else None,
-			"pred_spec_original_peak_mzs": v8b_original_peak_mzs if (v8b_original_peak_mzs is not None and v8b_original_peak_mzs.shape[0] == spec_mzs.shape[0]) else None,
-			"pred_spec_original_peak_probs": v8b_original_peak_probs if (v8b_original_peak_probs is not None and v8b_original_peak_probs.shape[0] == spec_mzs.shape[0]) else None,
+			# ===== original-peak identity: original pre-m-z offset expansion peak-entry metadata =====
+			"pred_spec_original_peak_channels": original_peak_original_peak_channels if (original_peak_original_peak_channels is not None and original_peak_original_peak_channels.shape[0] == spec_mzs.shape[0]) else None,
+			"pred_spec_original_peak_mzs": original_peak_original_peak_mzs if (original_peak_original_peak_mzs is not None and original_peak_original_peak_mzs.shape[0] == spec_mzs.shape[0]) else None,
+			"pred_spec_original_peak_probs": original_peak_original_peak_probs if (original_peak_original_peak_probs is not None and original_peak_original_peak_probs.shape[0] == spec_mzs.shape[0]) else None,
 
-			# ===== R71: expose rendered peak gate tensors for train-time supervision =====
+			# ===== peak-channel objective: expose rendered peak gate tensors for train-time supervision =====
 			"pred_rendered_peak_gate_logits": rendered_peak_gate_logits,
 			"pred_rendered_peak_gate_delta": rendered_peak_gate_delta,
 			"pred_rendered_peak_gate_batch_idxs": spec_batch_idxs if rendered_peak_gate_logits is not None else None,
@@ -4115,7 +4115,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			"pred_joint_batch_idxs": frag_real_joint_batch_idxs,
 			"pred_joint_h_counts": frag_real_joint_h_counts,
 			"pred_joint_h_idxs": frag_real_joint_h_idxs,
-			"pred_joint_r12_feats": r56_real_joint_r12_feats,
+			"pred_joint_joint_refinement_feats": joint_formula_real_joint_joint_refinement_feats,
 			"pred_null_formula_logprob": frag_null_formula_logprob,
 			"pred_edge_logprobs": frag_edge_logprobs,
 			"pred_edge_h_diffs": frag_edge_h_diffs,
@@ -4140,10 +4140,10 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			"pred_nb_node_node_batch_idxs": frag_nb_node_node_batch_idxs,
 		}
 
-		# ===== R40D: expose internal refiner residual for train-time no-harm loss =====
-		# r12_delta_flat is the internal candidate-logit residual added before scatter_logsoftmax.
-		if "r12_delta_flat" in locals():
-			out_d["pred_refiner_delta"] = r12_delta_flat
+		# ===== no-harm regularizer: expose internal refiner residual for train-time no-harm loss =====
+		# joint_refinement_delta_flat is the internal candidate-logit residual added before scatter_logsoftmax.
+		if "joint_refinement_delta_flat" in locals():
+			out_d["pred_refiner_delta"] = joint_refinement_delta_flat
 			out_d["pred_refiner_delta_batch_idxs"] = frag_joint_batch_idxs
 			out_d["pred_refiner_delta_valid_mask"] = frag_joint_mask.bool()
 

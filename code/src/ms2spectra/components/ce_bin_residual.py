@@ -8,7 +8,7 @@ class CEBinResidualHead(nn.Module):
     """
     CE-conditioned final-bin residual head.
 
-    It operates after R98 binned spectrum rendering.
+    It operates after local m-z renderer binned spectrum rendering.
     The last layer is zero-initialized, so before training it is exactly no-op.
     """
 

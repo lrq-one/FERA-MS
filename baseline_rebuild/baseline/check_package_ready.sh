@@ -7,7 +7,7 @@ SOURCE="${FERA_MS_BASELINE_SOURCE:-$BASELINE_ROOT/source/fragnnet}"
 for script in \
   "$BASELINE_ROOT/neims/run_all.sh" \
   "$BASELINE_ROOT/massformer/run_all.sh" \
-  "$BASELINE_ROOT/fragnnet_d3/run_all.sh" \
+  "$BASELINE_ROOT/fragnnet_depth_three/run_all.sh" \
   "$BASELINE_ROOT/graff_ms/run_all.sh" \
   "$BASELINE_ROOT/iceberg/run_all.sh" \
   "$BASELINE_ROOT/fiora/run_final.sh"; do

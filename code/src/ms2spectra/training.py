@@ -24,7 +24,7 @@ from ms2spectra.losses.candidate import candidate_presence_rank_loss
 from ms2spectra.losses.oracle import setup_oracle_teacher_bins, oracle_teacher_bin_loss
 from ms2spectra.losses.window import true_window_distribution_loss
 from ms2spectra.components.ce_bin_residual import CEBinResidualHead, apply_ce_bin_residual
-from ms2spectra.losses.rendered import r180_ce_weighted_spectrum_loss
+from ms2spectra.losses.rendered import spectrum_objective_ce_weighted_spectrum_loss
 class SpectrumPL(pl.LightningModule):
 
 	def __init__(self,**kwargs):
@@ -50,7 +50,7 @@ class SpectrumPL(pl.LightningModule):
 				dropout=float(getattr(self.hparams, "ce_bin_residual_dropout", 0.05)),
 			)
 
-			if bool(getattr(self.hparams, "r107_freeze_base_model", True)):
+			if bool(getattr(self.hparams, "freeze_base_model", True)):
 				for p in self.model.parameters():
 					p.requires_grad = False
 
@@ -59,16 +59,16 @@ class SpectrumPL(pl.LightningModule):
 			total = sum(p.numel() for p in self.parameters())
 
 			print(
-				"[R107 CEBinResidual] "
+				"[base freeze CEBinResidual] "
 				f"enabled=True, head_params={head_params}, "
 				f"trainable={trainable}, total={total}, "
-				f"freeze_base={bool(getattr(self.hparams, 'r107_freeze_base_model', True))}"
+				f"freeze_base={bool(getattr(self.hparams, 'freeze_base_model', True))}"
 			)
 	def _setup_model(self):
 		raise NotImplementedError
 
 	def _apply_spectrum_refiner_train_scope(self):
-		"""R13: restrict trainable parameters for spectrum refiner experiments.
+		"""candidate-coordinate features: restrict trainable parameters for spectrum refiner experiments.
 
 		Scopes:
 		- all: default old behavior, all parameters trainable.
@@ -158,14 +158,14 @@ class SpectrumPL(pl.LightningModule):
 		scope = getattr(self.hparams, "spectrum_refiner_train_scope", "all")
 
 		if not getattr(self.hparams, "use_spectrum_candidate_refiner", False):
-			print("[R13 train scope] spectrum refiner disabled; all parameters keep default")
+			print("[candidate-coordinate features train scope] spectrum refiner disabled; all parameters keep default")
 			return
 
 		if scope == "all":
 			trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 			total = sum(p.numel() for p in self.model.parameters())
 			print(
-				f"[R13 train scope] scope=all, trainable={trainable}, "
+				f"[candidate-coordinate features train scope] scope=all, trainable={trainable}, "
 				f"total={total}, trainable_frac={trainable / max(total, 1):.4f}"
 			)
 			return
@@ -198,9 +198,9 @@ class SpectrumPL(pl.LightningModule):
 			allowed_prefixes = [
 				"rendered_peak_drop_gate",
 			]
-		elif scope == "pre_r54_peak_entry_gate":
+		elif scope == "pre_mz_offset_expansion_peak_entry_gate":
 			allowed_prefixes = [
-				"pre_r54_peak_entry_gate",
+				"pre_mz_offset_expansion_peak_entry_gate",
 			]
 		elif scope == "refiner_rendered_peak_gate":
 			allowed_prefixes = [
@@ -218,7 +218,7 @@ class SpectrumPL(pl.LightningModule):
 		total = sum(p.numel() for p in self.model.parameters())
 
 		print(
-			f"[R13 train scope] scope={scope}, trainable={trainable}, "
+			f"[candidate-coordinate features train scope] scope={scope}, trainable={trainable}, "
 			f"total={total}, trainable_frac={trainable / max(total, 1):.4f}"
 		)
 
@@ -226,10 +226,10 @@ class SpectrumPL(pl.LightningModule):
 		shown = 0
 		for name, p in self.model.named_parameters():
 			if p.requires_grad:
-				print(f"[R13 trainable] {name} {tuple(p.shape)}")
+				print(f"[candidate-coordinate features trainable] {name} {tuple(p.shape)}")
 				shown += 1
 				if shown >= 20:
-					print("[R13 trainable] ...")
+					print("[candidate-coordinate features trainable] ...")
 					break
 
 	def _setup_tolerance(self):
@@ -1171,7 +1171,7 @@ class SpectrumPL(pl.LightningModule):
 		pred_batch_idxs,
 	):
 		"""
-		R4a: binned intensity auxiliary KL loss.
+		binned-intensity auxiliary: binned intensity auxiliary KL loss.
 
 		This loss is applied only during training.
 		It compares true/pred spectrum distributions after 0.01 Da binning.
@@ -1410,7 +1410,7 @@ class SpectrumPL(pl.LightningModule):
 
 
 
-	def _r117_support_oracle_reweight_loss(
+	def _support_oracle_support_oracle_reweight_loss(
 		self,
 		true_mzs,
 		true_logprobs,
@@ -1421,7 +1421,7 @@ class SpectrumPL(pl.LightningModule):
 		batch_size,
 	):
 		"""
-		R117 train-only support-conditional oracle reweight loss.
+		support oracle train-only support-conditional oracle reweight loss.
 
 		For each spectrum, keep the current predicted m/z support fixed.
 		Use the true spectrum mass on the covered predicted bins as an oracle target.
@@ -1435,16 +1435,16 @@ class SpectrumPL(pl.LightningModule):
 
 		bs = int(batch_size.detach().cpu().item()) if hasattr(batch_size, "detach") else int(batch_size)
 
-		every_n = int(getattr(self.hparams, "r117_support_oracle_every_n_steps", 1))
+		every_n = int(getattr(self.hparams, "support_oracle_support_oracle_every_n_steps", 1))
 		every_n = max(1, every_n)
 		if int(self.global_step) % every_n != 0:
 			z = th.zeros([bs], dtype=dtype, device=device)
 			return z, z.mean(), z.mean(), z.mean(), z.mean()
 
-		bin_res = float(getattr(self.hparams, "r117_oracle_bin_res", 0.01))
-		false_w = float(getattr(self.hparams, "r117_false_mass_weight", 0.25))
-		min_covered = float(getattr(self.hparams, "r117_min_covered_true_mass", 1.0e-6))
-		eps = float(getattr(self.hparams, "r117_eps", 1.0e-12))
+		bin_res = float(getattr(self.hparams, "support_oracle_oracle_bin_res", 0.01))
+		false_w = float(getattr(self.hparams, "support_oracle_false_mass_weight", 0.25))
+		min_covered = float(getattr(self.hparams, "support_oracle_min_covered_true_mass", 1.0e-6))
+		eps = float(getattr(self.hparams, "support_oracle_eps", 1.0e-12))
 
 		loss_vec = th.zeros([bs], dtype=dtype, device=device)
 		valid_vec = th.zeros([bs], dtype=dtype, device=device)
@@ -1527,7 +1527,7 @@ class SpectrumPL(pl.LightningModule):
 		pred_d,
 		batch_size,
 	):
-		"""R71 rendered peak hit/false gate loss."""
+		"""peak-channel objective rendered peak hit/false gate loss."""
 		gate_logits = pred_d.get("pred_rendered_peak_gate_logits", None)
 		base_zero = pred_logprobs.sum() * 0.0
 
@@ -1622,7 +1622,7 @@ class SpectrumPL(pl.LightningModule):
 			used_vec.mean(),
 		)
 
-	def _r58c_offset_channel_aux_loss(
+	def _mz_offset_channel_aux_loss(
 		self,
 		true_mzs,
 		true_logprobs,
@@ -1633,7 +1633,7 @@ class SpectrumPL(pl.LightningModule):
 		pred_d,
 		batch_size,
 	):
-		"""R58C train-only supervised local offset-channel loss.
+		"""m-z offset expansion train-only supervised local offset-channel loss.
 		
 		Each original peak-entry is expanded into 5 offset channels.
 		This loss teaches the allocator which channel is closest to a true peak.
@@ -1654,7 +1654,7 @@ class SpectrumPL(pl.LightningModule):
 		peak_channels = peak_channels.to(device=device).long().reshape(-1)
 		if group_idxs.numel() != pred_mzs.numel():
 			return loss_vec + base_zero, valid_vec.mean(), target_sum_vec.mean()
-		num_channels = int(getattr(self.hparams, "r58c_offset_num_channels", 5))
+		num_channels = int(getattr(self.hparams, "mz_offset_num_channels", 5))
 		if num_channels <= 1:
 			return loss_vec + base_zero, valid_vec.mean(), target_sum_vec.mean()
 		total_n = int(group_idxs.numel())
@@ -1674,11 +1674,11 @@ class SpectrumPL(pl.LightningModule):
 		if not valid_shape.any():
 			return loss_vec + base_zero, valid_vec.mean(), target_sum_vec.mean()
 		group_batch = b_view[:, 0].clamp(0, bs - 1)
-		match_tol = float(getattr(self.hparams, "r58c_offset_aux_match_tol", 0.006))
-		global_shift = float(getattr(self.hparams, "r58c_offset_aux_global_shift", 0.0005))
-		min_true_prob = float(getattr(self.hparams, "r58c_offset_aux_min_true_prob", 0.0005))
-		weight_gamma = float(getattr(self.hparams, "r58c_offset_aux_weight_gamma", 0.5))
-		max_groups_per_spec = int(getattr(self.hparams, "r58c_offset_aux_max_groups_per_spec", 2048))
+		match_tol = float(getattr(self.hparams, "mz_offset_aux_match_tol", 0.006))
+		global_shift = float(getattr(self.hparams, "mz_offset_aux_global_shift", 0.0005))
+		min_true_prob = float(getattr(self.hparams, "mz_offset_aux_min_true_prob", 0.0005))
+		weight_gamma = float(getattr(self.hparams, "mz_offset_aux_weight_gamma", 0.5))
+		max_groups_per_spec = int(getattr(self.hparams, "mz_offset_aux_max_groups_per_spec", 2048))
 		mz_for_label = mz_view + global_shift
 		for b in range(bs):
 			gmask = valid_shape & (group_batch == b)
@@ -1725,7 +1725,7 @@ class SpectrumPL(pl.LightningModule):
 			target_cnt_vec[b] = 1.0
 		target_mean = target_sum_vec.sum() / target_cnt_vec.sum().clamp_min(1.0)
 		return loss_vec + base_zero, valid_vec.mean(), target_mean
-	def _r98_apply_binned_spectrum_renderer(
+	def _local_mz_renderer_apply_binned_spectrum_renderer(
 		self,
 		pred_mzs,
 		pred_logprobs,
@@ -1733,7 +1733,7 @@ class SpectrumPL(pl.LightningModule):
 		batch_size,
 		split,
 	):
-		"""R98: merge final rendered spectrum entries into 0.01-Da bins."""
+		"""local m-z renderer: merge final rendered spectrum entries into 0.01-Da bins."""
 		if not getattr(self.hparams, "use_binned_spectrum_renderer", False):
 			return pred_mzs, pred_logprobs, pred_batch_idxs, None
 		if split == "train" and (not getattr(self.hparams, "binned_spectrum_renderer_apply_train", False)):
@@ -1832,65 +1832,65 @@ class SpectrumPL(pl.LightningModule):
 		pred_logprobs = pred_d.pop("pred_logprobs")
 		pred_batch_idxs = pred_d.pop("pred_batch_idxs")
 		pred_oos_logprobs = pred_d.pop("pred_oos_logprobs",None)
-		# R110B: keep pre-R98 rendered peak entries for rendered-peak gate BCE.
-		r110_rendered_pred_mzs = pred_mzs
-		r110_rendered_pred_logprobs = pred_logprobs
-		r110_rendered_pred_batch_idxs = pred_batch_idxs
+		# preserved rendered predictions: keep pre-local m-z renderer rendered peak entries for rendered-peak gate BCE.
+		rendered_prediction_mzs = pred_mzs
+		rendered_prediction_logprobs = pred_logprobs
+		rendered_prediction_batch_idxs = pred_batch_idxs
 
-		# R113A: optional pre-R98 rendered-entry hard prune.
-		# Eval-only diagnostic: remove low-confidence rendered entries before R98 bin merge.
-		if bool(getattr(self.hparams, "use_r113_rendered_peak_hard_prune", False)):
-			r113_delta = pred_d.get("pred_rendered_peak_gate_delta", None)
-			r113_logits = pred_d.get("pred_rendered_peak_gate_logits", None)
+		# rendered-peak gate: optional pre-local m-z renderer rendered-entry hard prune.
+		# Eval-only diagnostic: remove low-confidence rendered entries before local m-z renderer bin merge.
+		if bool(getattr(self.hparams, "use_rendered_peak_gate_rendered_peak_hard_prune", False)):
+			rendered_peak_gate_delta = pred_d.get("pred_rendered_peak_gate_delta", None)
+			rendered_peak_gate_logits = pred_d.get("pred_rendered_peak_gate_logits", None)
 
-			if r113_delta is not None and r113_delta.numel() == pred_mzs.numel():
-				r113_mode = str(getattr(self.hparams, "r113_rendered_peak_hard_prune_mode", "delta"))
-				r113_min_delta = float(getattr(self.hparams, "r113_rendered_peak_hard_prune_min_delta", -0.20))
-				r113_min_prob = float(getattr(self.hparams, "r113_rendered_peak_hard_prune_min_prob", 0.50))
-				r113_min_keep = int(getattr(self.hparams, "r113_rendered_peak_hard_prune_min_keep_per_spec", 64))
+			if rendered_peak_gate_delta is not None and rendered_peak_gate_delta.numel() == pred_mzs.numel():
+				rendered_peak_gate_mode = str(getattr(self.hparams, "rendered_peak_gate_mode", "delta"))
+				rendered_peak_gate_min_delta = float(getattr(self.hparams, "rendered_peak_gate_min_delta", -0.20))
+				rendered_peak_gate_min_prob = float(getattr(self.hparams, "rendered_peak_gate_min_prob", 0.50))
+				rendered_peak_gate_min_keep = int(getattr(self.hparams, "rendered_peak_gate_min_keep_per_spec", 64))
 
-				if r113_mode == "prob" and r113_logits is not None and r113_logits.numel() == pred_mzs.numel():
-					r113_score = th.sigmoid(r113_logits.reshape(-1).to(device=pred_logprobs.device, dtype=pred_logprobs.dtype))
-					r113_keep = r113_score >= r113_min_prob
+				if rendered_peak_gate_mode == "prob" and rendered_peak_gate_logits is not None and rendered_peak_gate_logits.numel() == pred_mzs.numel():
+					rendered_peak_gate_score = th.sigmoid(rendered_peak_gate_logits.reshape(-1).to(device=pred_logprobs.device, dtype=pred_logprobs.dtype))
+					rendered_peak_gate_keep = rendered_peak_gate_score >= rendered_peak_gate_min_prob
 				else:
-					r113_score = r113_delta.reshape(-1).to(device=pred_logprobs.device, dtype=pred_logprobs.dtype)
-					r113_keep = r113_score >= r113_min_delta
+					rendered_peak_gate_score = rendered_peak_gate_delta.reshape(-1).to(device=pred_logprobs.device, dtype=pred_logprobs.dtype)
+					rendered_peak_gate_keep = rendered_peak_gate_score >= rendered_peak_gate_min_delta
 
 				# Guard: keep at least K entries per spectrum by best gate score.
-				if r113_min_keep > 0 and pred_batch_idxs.numel() > 0:
+				if rendered_peak_gate_min_keep > 0 and pred_batch_idxs.numel() > 0:
 					for _b in pred_batch_idxs.unique(sorted=False):
 						_bmask = pred_batch_idxs == _b
 						_bidx = th.nonzero(_bmask, as_tuple=False).reshape(-1)
 						if _bidx.numel() == 0:
 							continue
-						_need = min(r113_min_keep, int(_bidx.numel()))
-						_have = int(r113_keep[_bidx].sum().detach().cpu().item())
+						_need = min(rendered_peak_gate_min_keep, int(_bidx.numel()))
+						_have = int(rendered_peak_gate_keep[_bidx].sum().detach().cpu().item())
 						if _have < _need:
-							_top = th.topk(r113_score[_bidx], k=_need, largest=True).indices
-							r113_keep[_bidx[_top]] = True
+							_top = th.topk(rendered_peak_gate_score[_bidx], k=_need, largest=True).indices
+							rendered_peak_gate_keep[_bidx[_top]] = True
 
 				# Apply prune only if it removes something and does not empty the batch.
-				if r113_keep.any() and int(r113_keep.sum().detach().cpu().item()) < int(r113_keep.numel()):
-					pred_mzs = pred_mzs[r113_keep]
-					pred_logprobs = pred_logprobs[r113_keep]
-					pred_batch_idxs = pred_batch_idxs[r113_keep]
+				if rendered_peak_gate_keep.any() and int(rendered_peak_gate_keep.sum().detach().cpu().item()) < int(rendered_peak_gate_keep.numel()):
+					pred_mzs = pred_mzs[rendered_peak_gate_keep]
+					pred_logprobs = pred_logprobs[rendered_peak_gate_keep]
+					pred_batch_idxs = pred_batch_idxs[rendered_peak_gate_keep]
 
 					# Renormalize per spectrum after pruning.
-					_r113_norm = scatter_logsumexp(pred_logprobs, pred_batch_idxs)
-					pred_logprobs = pred_logprobs - _r113_norm[pred_batch_idxs]
-		# ===== R98: binned spectrum renderer inside model common_step =====
-		r98_kept_frac = None
-		pred_mzs, pred_logprobs, pred_batch_idxs, r98_kept_frac = self._r98_apply_binned_spectrum_renderer(
+					_rendered_peak_gate_norm = scatter_logsumexp(pred_logprobs, pred_batch_idxs)
+					pred_logprobs = pred_logprobs - _rendered_peak_gate_norm[pred_batch_idxs]
+		# ===== local m-z renderer: binned spectrum renderer inside model common_step =====
+		local_mz_renderer_kept_frac = None
+		pred_mzs, pred_logprobs, pred_batch_idxs, local_mz_renderer_kept_frac = self._local_mz_renderer_apply_binned_spectrum_renderer(
 			pred_mzs=pred_mzs,
 			pred_logprobs=pred_logprobs,
 			pred_batch_idxs=pred_batch_idxs,
 			batch_size=batch_size,
 			split=split,
 		)
-		if r98_kept_frac is not None:
-			pred_d["pred_binned_spectrum_renderer_kept_frac"] = r98_kept_frac
+		if local_mz_renderer_kept_frac is not None:
+			pred_d["pred_binned_spectrum_renderer_kept_frac"] = local_mz_renderer_kept_frac
 			if log:
-				self.log(f"{split}_binned_spectrum_renderer_kept_frac", r98_kept_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log(f"{split}_binned_spectrum_renderer_kept_frac", local_mz_renderer_kept_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
 		if self.ce_bin_residual_head is not None:
 			pred_mzs, pred_logprobs, pred_batch_idxs, ce_bin_residual_stats = apply_ce_bin_residual(
 				head=self.ce_bin_residual_head,
@@ -1958,29 +1958,29 @@ class SpectrumPL(pl.LightningModule):
 		}
 		loss_d = self.loss_fn(**train_d)
 		loss = loss_d["loss"]
-		# ===== R71: rendered peak-entry drop gate BCE =====
+		# ===== peak-channel objective: rendered peak-entry drop gate BCE =====
 		if split == "train" and getattr(self.hparams, "use_rendered_peak_gate_loss", False):
-			r71_loss_vec, r71_valid_frac, r71_pos_rate, r71_used = self._rendered_peak_gate_bce_loss(
+			peak_channel_loss_vec, peak_channel_valid_frac, peak_channel_pos_rate, peak_channel_used = self._rendered_peak_gate_bce_loss(
 				true_mzs=train_true_mzs,
 				true_logprobs=train_true_logprobs,
 				true_batch_idxs=train_true_batch_idxs,
-				pred_mzs=r110_rendered_pred_mzs,
-				pred_logprobs=r110_rendered_pred_logprobs,
-				pred_batch_idxs=r110_rendered_pred_batch_idxs,
+				pred_mzs=rendered_prediction_mzs,
+				pred_logprobs=rendered_prediction_logprobs,
+				pred_batch_idxs=rendered_prediction_batch_idxs,
 				pred_d=pred_d,
 				batch_size=batch_size,
 			)
-			r71_loss_vec = th.nan_to_num(r71_loss_vec, nan=0.0, posinf=10.0, neginf=0.0)
-			r71_w = float(getattr(self.hparams, "rendered_peak_gate_loss_weight", 0.002))
-			loss = loss + r71_w * r71_loss_vec
+			peak_channel_loss_vec = th.nan_to_num(peak_channel_loss_vec, nan=0.0, posinf=10.0, neginf=0.0)
+			peak_channel_w = float(getattr(self.hparams, "rendered_peak_gate_loss_weight", 0.002))
+			loss = loss + peak_channel_w * peak_channel_loss_vec
 			if log:
-				self.log("train_rendered_peak_gate_bce_loss", r71_loss_vec.detach().mean(), batch_size=batch_size, on_step=False, on_epoch=True)
-				self.log("train_rendered_peak_gate_valid_frac", r71_valid_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
-				self.log("train_rendered_peak_gate_pos_rate", r71_pos_rate.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
-				self.log("train_rendered_peak_gate_used", r71_used.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
-		# ===== R64: true-window distribution loss =====
-		if split == "train" and getattr(self.hparams, "use_r64_true_window_dist_loss", False):
-			r64_loss_vec, r64_outside_vec, r64_valid_frac, r64_support_frac, r64_pred_used = (
+				self.log("train_rendered_peak_gate_bce_loss", peak_channel_loss_vec.detach().mean(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_rendered_peak_gate_valid_frac", peak_channel_valid_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_rendered_peak_gate_pos_rate", peak_channel_pos_rate.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_rendered_peak_gate_used", peak_channel_used.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+		# ===== true-peak window objective: true-window distribution loss =====
+		if split == "train" and getattr(self.hparams, "use_true_peak_window_true_window_dist_loss", False):
+			true_peak_window_loss_vec, true_peak_window_outside_vec, true_peak_window_valid_frac, true_peak_window_support_frac, true_peak_window_pred_used = (
 				true_window_distribution_loss(
 					true_mzs=train_true_mzs,
 					true_logprobs=train_true_logprobs,
@@ -1989,75 +1989,75 @@ class SpectrumPL(pl.LightningModule):
 					pred_logprobs=train_pred_logprobs,
 					pred_batch_idxs=train_pred_batch_idxs,
 					batch_size=batch_size,
-					match_tol=float(getattr(self.hparams, "r64_match_tol", 0.006)),
-					sigma=float(getattr(self.hparams, "r64_sigma", 0.002)),
-					max_pred_per_spec=int(getattr(self.hparams, "r64_max_pred_per_spec", 1024)),
-					max_target_pred_per_spec=int(getattr(self.hparams, "r64_max_target_pred_per_spec", 512)),
-					max_true_per_spec=int(getattr(self.hparams, "r64_max_true_per_spec", 256)),
-					min_true_prob=float(getattr(self.hparams, "r64_min_true_prob", 0.0)),
-					min_target_mass=float(getattr(self.hparams, "r64_min_target_mass", 1.0e-12)),
-					pred_temperature=float(getattr(self.hparams, "r64_pred_temperature", 1.0)),
-					chunk_size=int(getattr(self.hparams, "r64_chunk_size", 2048)),
+					match_tol=float(getattr(self.hparams, "true_peak_window_match_tol", 0.006)),
+					sigma=float(getattr(self.hparams, "true_peak_window_sigma", 0.002)),
+					max_pred_per_spec=int(getattr(self.hparams, "true_peak_window_max_pred_per_spec", 1024)),
+					max_target_pred_per_spec=int(getattr(self.hparams, "true_peak_window_max_target_pred_per_spec", 512)),
+					max_true_per_spec=int(getattr(self.hparams, "true_peak_window_max_true_per_spec", 256)),
+					min_true_prob=float(getattr(self.hparams, "true_peak_window_min_true_prob", 0.0)),
+					min_target_mass=float(getattr(self.hparams, "true_peak_window_min_target_mass", 1.0e-12)),
+					pred_temperature=float(getattr(self.hparams, "true_peak_window_pred_temperature", 1.0)),
+					chunk_size=int(getattr(self.hparams, "true_peak_window_chunk_size", 2048)),
 				)
 			)
 
-			r64_loss_vec = th.nan_to_num(
-				r64_loss_vec,
+			true_peak_window_loss_vec = th.nan_to_num(
+				true_peak_window_loss_vec,
 				nan=0.0,
 				posinf=20.0,
 				neginf=0.0,
 			)
-			r64_outside_vec = th.nan_to_num(
-				r64_outside_vec,
+			true_peak_window_outside_vec = th.nan_to_num(
+				true_peak_window_outside_vec,
 				nan=0.0,
 				posinf=1.0,
 				neginf=0.0,
 			)
 
-			r64_w = float(getattr(self.hparams, "r64_true_window_loss_weight", 0.02))
-			r64_out_w = float(getattr(self.hparams, "r64_outside_mass_loss_weight", 0.005))
+			true_peak_window_w = float(getattr(self.hparams, "true_peak_window_true_window_loss_weight", 0.02))
+			true_peak_window_out_w = float(getattr(self.hparams, "true_peak_window_outside_mass_loss_weight", 0.005))
 
-			loss = loss + r64_w * r64_loss_vec + r64_out_w * r64_outside_vec
+			loss = loss + true_peak_window_w * true_peak_window_loss_vec + true_peak_window_out_w * true_peak_window_outside_vec
 
 			if log:
 				self.log(
-					"train_r64_true_window_dist_loss",
-					r64_loss_vec.detach().mean(),
+					"train_true_peak_window_true_window_dist_loss",
+					true_peak_window_loss_vec.detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r64_outside_mass_loss",
-					r64_outside_vec.detach().mean(),
+					"train_true_peak_window_outside_mass_loss",
+					true_peak_window_outside_vec.detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r64_valid_frac",
-					r64_valid_frac.detach(),
+					"train_true_peak_window_valid_frac",
+					true_peak_window_valid_frac.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r64_support_frac",
-					r64_support_frac.detach(),
+					"train_true_peak_window_support_frac",
+					true_peak_window_support_frac.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r64_pred_used",
-					r64_pred_used.detach(),
+					"train_true_peak_window_pred_used",
+					true_peak_window_pred_used.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
-		# ===== R58C: train-only supervised local offset-channel loss =====
-		if split == "train" and getattr(self.hparams, "use_r58c_offset_channel_aux_loss", False):
-			offset_loss_vec, offset_valid_frac, offset_target_mean = self._r58c_offset_channel_aux_loss(
+		# ===== m-z offset expansion: train-only supervised local offset-channel loss =====
+		if split == "train" and getattr(self.hparams, "use_mz_offset_channel_aux_loss", False):
+			offset_loss_vec, offset_valid_frac, offset_target_mean = self._mz_offset_channel_aux_loss(
 				true_mzs=train_true_mzs,
 				true_logprobs=train_true_logprobs,
 				true_batch_idxs=train_true_batch_idxs,
@@ -2068,14 +2068,14 @@ class SpectrumPL(pl.LightningModule):
 				batch_size=batch_size,
 			)
 			offset_loss_vec = th.nan_to_num(offset_loss_vec, nan=0.0, posinf=10.0, neginf=0.0)
-			offset_w = float(getattr(self.hparams, "r58c_offset_aux_weight", 0.02))
+			offset_w = float(getattr(self.hparams, "mz_offset_aux_weight", 0.02))
 			loss = loss + offset_w * offset_loss_vec
 			if log:
-				self.log("train_r58c_offset_channel_loss", offset_loss_vec.detach().mean(), batch_size=batch_size, on_step=False, on_epoch=True)
-				self.log("train_r58c_offset_channel_valid_frac", offset_valid_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
-				self.log("train_r58c_offset_channel_target_mean", offset_target_mean.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_mz_offset_channel_loss", offset_loss_vec.detach().mean(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_mz_offset_channel_valid_frac", offset_valid_frac.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
+				self.log("train_mz_offset_channel_target_mean", offset_target_mean.detach(), batch_size=batch_size, on_step=False, on_epoch=True)
 
-		# ===== R28: oracle/reference teacher bin distillation =====
+		# ===== oracle teacher: oracle/reference teacher bin distillation =====
 		if split == "train" and getattr(self.hparams, "use_oracle_teacher_bin_loss", False):
 			teacher_loss_vec, teacher_valid = oracle_teacher_bin_loss(
 				self,
@@ -2115,7 +2115,7 @@ class SpectrumPL(pl.LightningModule):
 					on_step=False,
 					on_epoch=True,
 				)
-		# ===== R7: CE-weighted binned intensity auxiliary loss =====
+		# ===== CE-weighted intensity auxiliary: CE-weighted binned intensity auxiliary loss =====
 		# Diagnostic result:
 		# CE 20~40 and 40~60 spectra have much lower binned cosine.
 		# This term directly aligns training with binned spectrum similarity.
@@ -2191,7 +2191,7 @@ class SpectrumPL(pl.LightningModule):
 					on_step=False,
 					on_epoch=True,
 				)
-		# ===== R8: binned false-mass penalty =====
+		# ===== false-mass penalty: binned false-mass penalty =====
 		# Directly penalizes probability mass on predicted bins not present in the true spectrum.
 		# This targets spectra with high wrecall but near-zero cosine.
 		if split == "train" and getattr(self.hparams, "use_binned_false_mass_loss", False):
@@ -2266,11 +2266,11 @@ class SpectrumPL(pl.LightningModule):
 					on_epoch=True,
 				)
 
-		# ===== R180: CE-weighted direct spectrum cosine/JSS loss =====
-		# This is the first non-reranker step after R172E.
+		# ===== spectrum objective: CE-weighted direct spectrum cosine/JSS loss =====
+		# This is the first non-reranker step after candidate reranker.
 		# It directly optimizes final binned spectrum similarity and upweights mid/high CE.
-		if split == "train" and getattr(self.hparams, "use_r180_ce_weighted_spectrum_loss", False):
-			r180_d = r180_ce_weighted_spectrum_loss(
+		if split == "train" and getattr(self.hparams, "use_spectrum_objective_ce_weighted_spectrum_loss", False):
+			spectrum_objective_d = spectrum_objective_ce_weighted_spectrum_loss(
 				batch=batch,
 				batch_size=batch_size,
 				hparams=self.hparams,
@@ -2282,46 +2282,46 @@ class SpectrumPL(pl.LightningModule):
 				pred_batch_idxs=train_pred_batch_idxs,
 			)
 
-			r180_loss_vec = r180_d["loss_vec"]
-			r180_w = float(getattr(self.hparams, "r180_spectrum_loss_weight", 0.03))
-			loss = loss + r180_w * r180_loss_vec
+			spectrum_objective_loss_vec = spectrum_objective_d["loss_vec"]
+			spectrum_objective_w = float(getattr(self.hparams, "spectrum_objective_spectrum_loss_weight", 0.03))
+			loss = loss + spectrum_objective_w * spectrum_objective_loss_vec
 
 			if log:
 				self.log(
-					"train_r180_spectrum_loss",
-					r180_loss_vec.detach().mean(),
+					"train_spectrum_objective_spectrum_loss",
+					spectrum_objective_loss_vec.detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r180_cos_dist",
-					r180_d["cos_dist"].detach().mean(),
+					"train_spectrum_objective_cos_dist",
+					spectrum_objective_d["cos_dist"].detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r180_jss_dist",
-					r180_d["jss_dist"].detach().mean(),
+					"train_spectrum_objective_jss_dist",
+					spectrum_objective_d["jss_dist"].detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r180_ce_weight",
-					r180_d["ce_weight"].detach().mean(),
+					"train_spectrum_objective_ce_weight",
+					spectrum_objective_d["ce_weight"].detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 
-		# ===== R117: train-only support-conditional oracle reweight loss =====
-		# R116 ceiling audit showed fixed-support oracle cosine is much higher than current cosine.
+		# ===== support oracle: train-only support-conditional oracle reweight loss =====
+		# support ceiling audit ceiling audit showed fixed-support oracle cosine is much higher than current cosine.
 		# This loss keeps current predicted support fixed and teaches intensity allocation on that support.
-		if split == "train" and getattr(self.hparams, "use_r117_support_oracle_reweight_loss", False):
-			r117_loss_vec, r117_valid_frac, r117_covered_mass, r117_false_mass, r117_target_bins = (
-				self._r117_support_oracle_reweight_loss(
+		if split == "train" and getattr(self.hparams, "use_support_oracle_support_oracle_reweight_loss", False):
+			support_oracle_loss_vec, support_oracle_valid_frac, support_oracle_covered_mass, support_oracle_false_mass, support_oracle_target_bins = (
+				self._support_oracle_support_oracle_reweight_loss(
 					true_mzs=train_true_mzs,
 					true_logprobs=train_true_logprobs,
 					true_batch_idxs=train_true_batch_idxs,
@@ -2332,54 +2332,54 @@ class SpectrumPL(pl.LightningModule):
 				)
 			)
 
-			r117_loss_vec = th.nan_to_num(
-				r117_loss_vec,
+			support_oracle_loss_vec = th.nan_to_num(
+				support_oracle_loss_vec,
 				nan=0.0,
 				posinf=20.0,
 				neginf=0.0,
 			)
 
-			r117_w = float(getattr(self.hparams, "r117_support_oracle_weight", 0.02))
-			loss = loss + r117_w * r117_loss_vec
+			support_oracle_w = float(getattr(self.hparams, "support_oracle_support_oracle_weight", 0.02))
+			loss = loss + support_oracle_w * support_oracle_loss_vec
 
 			if log:
 				self.log(
-					"train_r117_support_oracle_loss",
-					r117_loss_vec.detach().mean(),
+					"train_support_oracle_support_oracle_loss",
+					support_oracle_loss_vec.detach().mean(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r117_support_oracle_valid_frac",
-					r117_valid_frac.detach(),
+					"train_support_oracle_support_oracle_valid_frac",
+					support_oracle_valid_frac.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r117_support_oracle_covered_mass",
-					r117_covered_mass.detach(),
+					"train_support_oracle_support_oracle_covered_mass",
+					support_oracle_covered_mass.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r117_support_oracle_false_mass",
-					r117_false_mass.detach(),
+					"train_support_oracle_support_oracle_false_mass",
+					support_oracle_false_mass.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					"train_r117_support_oracle_target_bins",
-					r117_target_bins.detach(),
+					"train_support_oracle_support_oracle_target_bins",
+					support_oracle_target_bins.detach(),
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 
-		# ===== R5: precursor-mz region weighted loss =====
+		# ===== precursor-region weighting: precursor-mz region weighted loss =====
 		# Region diagnosis shows low precursor-mz spectra dominate the catastrophic tail.
 		# This reweights per-spectrum training loss only; val/test metrics stay unchanged.
 		if split == "train" and getattr(self.hparams, "use_prec_mz_region_weighted_loss", False):
@@ -2417,7 +2417,7 @@ class SpectrumPL(pl.LightningModule):
 					on_epoch=True,
 				)
 
-		# ===== R4c: train-only candidate presence ranking loss =====
+		# ===== candidate-presence ranking: train-only candidate presence ranking loss =====
 		# Only supervises ranking among the model's own predicted candidates.
 		# It is NOT added to val/test loss, so checkpoint selection is not polluted.
 		if split == "train" and getattr(self.hparams, "use_candidate_presence_rank_loss", False):
@@ -2458,8 +2458,8 @@ class SpectrumPL(pl.LightningModule):
 					on_epoch=True,
 				)
 
-		# ===== R40D: train-only no-harm regularization for spectrum refiner residual =====
-		# R40B2/R40C showed selected spectra improve but non-selected/easy spectra can be harmed.
+		# ===== no-harm regularizer: train-only no-harm regularization for spectrum refiner residual =====
+		# selected no-harm regularizer/calibrated no-harm regularizer showed selected spectra improve but non-selected/easy spectra can be harmed.
 		# This regularizer constrains excessive internal refiner movement without changing support.
 		if split == "train" and getattr(self.hparams, "use_refiner_delta_noharm_loss", False):
 			ref_delta = pred_d.get("pred_refiner_delta", None)
@@ -2533,11 +2533,11 @@ class SpectrumPL(pl.LightningModule):
 						)
 
 
-		# ===== R39: auxiliary CE-pair spectrum-delta regularizer =====
+		# ===== CE-pair delta regularizer: auxiliary CE-pair spectrum-delta regularizer =====
 
 
-		# ===== R43: auxiliary CE-pair signed top-bin ranking regularizer =====
-		# Unlike R39 dense delta-MSE, this only supervises bins with the largest
+		# ===== signed top-bin regularizer: auxiliary CE-pair signed top-bin ranking regularizer =====
+		# Unlike CE-pair delta regularizer dense delta-MSE, this only supervises bins with the largest
 		# true CE-induced changes and enforces the direction of high-vs-low CE.
 
 		# ===== G1a: CE-pair predicted-depth ranking regularizer =====
@@ -3293,7 +3293,7 @@ class FragGNNPL(SpectrumPL):
 			ce_peak_channel_max_channels=self.hparams.ce_peak_channel_max_channels,
    			ce_peak_channel_allocator_mode=self.hparams.ce_peak_channel_allocator_mode,
 
-   			# R54: forward m/z-offset renderer flags into FragGNNModel.
+			# m-z offset expansion: forward m/z-offset renderer flags into FragGNNModel.
    			use_rendered_peak_drop_gate=getattr(self.hparams, "use_rendered_peak_drop_gate", False),
    			rendered_peak_gate_hidden_size=getattr(self.hparams, "rendered_peak_gate_hidden_size", 128),
    			rendered_peak_gate_dropout=getattr(self.hparams, "rendered_peak_gate_dropout", 0.1),
@@ -3348,7 +3348,7 @@ class FragGNNPL(SpectrumPL):
 			cutchem_node_use_depth=self.hparams.cutchem_node_use_depth,
 			cutchem_node_use_h=self.hparams.cutchem_node_use_h,
 
-			# CE-FlowFrag v2
+			# CE-FlowFrag refined_variant
 			use_ce_flowfrag=self.hparams.use_ce_flowfrag,
 			ce_flowfrag_hidden_size=self.hparams.ce_flowfrag_hidden_size,
 			ce_flowfrag_dropout=self.hparams.ce_flowfrag_dropout,
@@ -3371,12 +3371,12 @@ class FragGNNPL(SpectrumPL):
 			spectrum_refiner_use_logit_feature=self.hparams.spectrum_refiner_use_logit_feature,
 			spectrum_refiner_use_mz_features=self.hparams.spectrum_refiner_use_mz_features,
 			spectrum_refiner_use_peak_prior=self.hparams.spectrum_refiner_use_peak_prior,
-			# R134: pre-R54 peak-entry scorer
-			use_pre_r54_peak_entry_gate=getattr(self.hparams, "use_pre_r54_peak_entry_gate", False),
-			pre_r54_peak_entry_hidden_size=getattr(self.hparams, "pre_r54_peak_entry_hidden_size", 128),
-			pre_r54_peak_entry_dropout=getattr(self.hparams, "pre_r54_peak_entry_dropout", 0.1),
-			pre_r54_peak_entry_delta_scale=getattr(self.hparams, "pre_r54_peak_entry_delta_scale", 0.05),
-			pre_r54_peak_entry_max_channels=getattr(self.hparams, "pre_r54_peak_entry_max_channels", 16),
+			# pre-render peak-entry gate: pre-m-z offset expansion peak-entry scorer
+			use_pre_mz_offset_expansion_peak_entry_gate=getattr(self.hparams, "use_pre_mz_offset_expansion_peak_entry_gate", False),
+			pre_mz_offset_expansion_peak_entry_hidden_size=getattr(self.hparams, "pre_mz_offset_expansion_peak_entry_hidden_size", 128),
+			pre_mz_offset_expansion_peak_entry_dropout=getattr(self.hparams, "pre_mz_offset_expansion_peak_entry_dropout", 0.1),
+			pre_mz_offset_expansion_peak_entry_delta_scale=getattr(self.hparams, "pre_mz_offset_expansion_peak_entry_delta_scale", 0.05),
+			pre_mz_offset_expansion_peak_entry_max_channels=getattr(self.hparams, "pre_mz_offset_expansion_peak_entry_max_channels", 16),
 		)
 		
 		self._apply_spectrum_refiner_train_scope()
@@ -3757,7 +3757,7 @@ class FragGNNPL(SpectrumPL):
 				loss = loss + aux_w * aux_cosine_loss
 				loss_d["aux_cosine_loss"] = aux_cosine_loss
 
-			# ===== R4a: binned intensity auxiliary KL loss =====
+			# ===== binned-intensity auxiliary: binned intensity auxiliary KL loss =====
 			# This is a small training-only auxiliary objective.
 			# It directly supervises final predicted spectrum intensity distribution
 			# after m/z binning, matching the useful signal found by D2 calibration.

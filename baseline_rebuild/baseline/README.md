@@ -15,11 +15,11 @@ locally from a licensed NIST20 export as described in the root documentation.
 
 | Baseline | Manuscript name | Upstream repository | Exact commit/tag | Upstream/license evidence retained | Executed source | FERA-MS changes | Configs and seeds |
 |---|---|---|---|---|---|---|---|
-| NEIMS | NEIMS-ACE | `https://github.com/brain-research/deep-molecular-massspec` | Local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/model.py`, `pl_model.py`, `dataset.py` | ACE input/config and common export/evaluation adapter | `neims/configs/{random,scaffold}/seed_{42,43,44}.yml` |
-| MassFormer | MassFormer-ACE | `https://github.com/Roestlab/massformer` | Local execution snapshot retained | BSD-2-Clause; Microsoft MIT header retained in `algos.pyx` | `source/fragnnet/src/fragnnet/massformer/` plus shared runtime | ACE input/config and common export/evaluation adapter | `massformer/configs/{random,scaffold}/seed_{42,43,44}.yml` |
-| FraGNNet | FraGNNet-D3-ACE | Historical local remote `https://github.com/lrq-one/fragnnet-main` | Complete local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/frag/`, `model.py`, `pl_model.py`, `dataset.py` and utilities | Depth-3/ACE locked configuration and common protocol adapter | `fragnnet_d3/configs/{random,scaffold}/seed_{42,43,44}.yml` |
-| ICEBERG | ICEBERG-ACE | `https://github.com/coleygroup/ms-pred` | Formal-run source snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/iceberg/` plus shared runtime | ACE cohort/config; formal source difference recorded under `source/fragnnet/patches/` | `iceberg/configs/{random,scaffold}/seed_{42,43,44}.yml` |
-| GrAFF-MS | GrAFF-MS | `https://github.com/murphy17/graff-ms` | Local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/graff/` plus shared runtime | MAGMa annotation/cohort adapter and common export/evaluation adapter | `graff_ms/configs/{random,scaffold}/seed_{42,43,44}.yml` |
+| NEIMS | NEIMS-ACE | `https://github.com/brain-research/deep-molecular-massspec` | Local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/model.py`, `pl_model.py`, `dataset.py` | ACE input/config and common export/evaluation adapter | `neims/configs/locked.yml` |
+| MassFormer | MassFormer-ACE | `https://github.com/Roestlab/massformer` | Local execution snapshot retained | BSD-2-Clause; Microsoft MIT header retained in `algos.pyx` | `source/fragnnet/src/fragnnet/massformer/` plus shared runtime | ACE input/config and common export/evaluation adapter | `massformer/configs/locked.yml` |
+| FraGNNet | FraGNNet-D3-ACE | Historical local remote `https://github.com/lrq-one/fragnnet-main` | Complete local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/frag/`, `model.py`, `pl_model.py`, `dataset.py` and utilities | Depth-3/ACE locked configuration and common protocol adapter | `fragnnet_depth_three/configs/locked.yml` |
+| ICEBERG | ICEBERG-ACE | `https://github.com/coleygroup/ms-pred` | Formal-run source snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/iceberg/` plus shared runtime | ACE cohort/config; formal source difference recorded under `source/fragnnet/patches/` | `iceberg/configs/locked.yml` |
+| GrAFF-MS | GrAFF-MS | `https://github.com/murphy17/graff-ms` | Local execution snapshot retained | `source/fragnnet/LICENSE` (BSD-2-Clause) | `source/fragnnet/src/fragnnet/graff/` plus shared runtime | MAGMa annotation/cohort adapter and common export/evaluation adapter | `graff_ms/configs/locked.yml` |
 | FIORA | FIORA zero-shot control | `https://github.com/BAMeScience/fiora` | Local package version 1.0.1 retained | `source/fiora/LICENSE` (MIT) | `source/fiora/fiora/` | `fiora/build_inputs.py`, launcher and 0.01-Da evaluator | Zero-shot model; seed is not applicable |
 
 Every trained baseline retains its native model class and configured objective.
@@ -95,7 +95,7 @@ All three seeds for one model:
 ```bash
 bash baseline_rebuild/baseline/neims/run_all.sh random
 bash baseline_rebuild/baseline/massformer/run_all.sh scaffold
-bash baseline_rebuild/baseline/fragnnet_d3/run_all.sh random
+bash baseline_rebuild/baseline/fragnnet_depth_three/run_all.sh random
 bash baseline_rebuild/baseline/iceberg/run_all.sh random
 bash baseline_rebuild/baseline/graff_ms/run_all.sh random
 ```
@@ -111,9 +111,9 @@ python baseline_rebuild/baseline/tools_local/aggregate_formal_results.py
 
 The retained fixed-pool adapters are:
 
-- `tools_local/build_experiment5_public_plan.py` for locally generated
+- `tools_local/build_retrieval_public_plan.py` for locally generated
   candidate structures, query spectra and DAGs;
-- `tools_local/run_baseline_experiment5_formal_v1.py` for NEIMS,
+- `tools_local/run_baseline_retrieval_formal.py` for NEIMS,
   MassFormer and FraGNNet-D3 checkpoint inference/ranking;
 - `source/fragnnet/scripts/ms2c/` for the package-native FraGNNet/ICEBERG
   molecular-identification path;
@@ -122,7 +122,7 @@ The retained fixed-pool adapters are:
 Run the scorer/ranker self-test without data or checkpoints:
 
 ```bash
-python baseline_rebuild/baseline/tools_local/run_baseline_experiment5_formal_v1.py --self-test
+python baseline_rebuild/baseline/tools_local/run_baseline_retrieval_formal.py --self-test
 ```
 
 The candidate pools and record-level query/split files are regenerated locally

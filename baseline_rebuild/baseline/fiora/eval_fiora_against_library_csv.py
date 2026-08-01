@@ -100,27 +100,27 @@ def binned_vec(mz, inten, bin_size=0.01):
     return d
 
 
-def cosine(mz1, in1, mz2, in2, bin_size=0.01):
-    v1 = binned_vec(mz1, in1, bin_size)
-    v2 = binned_vec(mz2, in2, bin_size)
+def cosine(predicted_mz, predicted_intensity, library_mz, library_intensity, bin_size=0.01):
+    prediction_bins = binned_vec(predicted_mz, predicted_intensity, bin_size)
+    library_bins = binned_vec(library_mz, library_intensity, bin_size)
 
-    if not v1 or not v2:
+    if not prediction_bins or not library_bins:
         return 0.0
 
     dot = 0.0
-    if len(v1) < len(v2):
-        for k, v in v1.items():
-            dot += v * v2.get(k, 0.0)
+    if len(prediction_bins) < len(library_bins):
+        for key, value in prediction_bins.items():
+            dot += value * library_bins.get(key, 0.0)
     else:
-        for k, v in v2.items():
-            dot += v * v1.get(k, 0.0)
+        for key, value in library_bins.items():
+            dot += value * prediction_bins.get(key, 0.0)
 
-    n1 = math.sqrt(sum(v * v for v in v1.values()))
-    n2 = math.sqrt(sum(v * v for v in v2.values()))
+    prediction_norm = math.sqrt(sum(value * value for value in prediction_bins.values()))
+    library_norm = math.sqrt(sum(value * value for value in library_bins.values()))
 
-    if n1 <= 0 or n2 <= 0:
+    if prediction_norm <= 0 or library_norm <= 0:
         return 0.0
-    return dot / (n1 * n2)
+    return dot / (prediction_norm * library_norm)
 
 
 def main():

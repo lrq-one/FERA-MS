@@ -187,14 +187,14 @@ def main() -> None:
 
     config_path = (
         run_root
-        / "v2c"
+        / "global_ace_control"
         / "control"
         / "config.yml"
     )
 
     checkpoint_path = (
         run_root
-        / "v2c"
+        / "global_ace_control"
         / "control"
         / "model_best.ckpt"
     )

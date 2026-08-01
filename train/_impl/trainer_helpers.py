@@ -56,21 +56,21 @@ TEMPLATE = RUNS_ROOT / "_config/template.yml"
 
 BASE_CONFIG = (
     RUNS_ROOT
-    / "from_scratch_v1_40_r119_10_seed42"
+    / "from_scratch_base_model_40_retained_control_10_seed42"
     / "final"
     / "config.yml"
 )
 
 BASE_CHECKPOINT = (
     RUNS_ROOT
-    / "from_scratch_v1_40_r119_10_seed42"
+    / "from_scratch_base_model_40_retained_control_10_seed42"
     / "final"
     / "model.ckpt"
 )
 
 OUTPUT_ROOT = (
     RUNS_ROOT
-    / "r121_allocation_ablation"
+    / "allocation_ablation"
 )
 
 MONITOR = "val_cos_sim_0.01_epoch/mean"
@@ -78,44 +78,44 @@ MONITOR = "val_cos_sim_0.01_epoch/mean"
 
 VARIANTS = {
     "control": {
-        "use_r117_support_oracle_reweight_loss":
+        "use_support_oracle_support_oracle_reweight_loss":
             False,
 
-        "r117_support_oracle_weight":
+        "support_oracle_support_oracle_weight":
             0.0,
 
-        "r117_false_mass_weight":
+        "support_oracle_false_mass_weight":
             0.0,
 
-        "r117_min_covered_true_mass":
+        "support_oracle_min_covered_true_mass":
             0.75,
     },
 
     "alloc005": {
-        "use_r117_support_oracle_reweight_loss":
+        "use_support_oracle_support_oracle_reweight_loss":
             True,
 
-        "r117_support_oracle_weight":
+        "support_oracle_support_oracle_weight":
             0.005,
 
-        "r117_false_mass_weight":
+        "support_oracle_false_mass_weight":
             0.10,
 
-        "r117_min_covered_true_mass":
+        "support_oracle_min_covered_true_mass":
             0.75,
     },
 
     "alloc010": {
-        "use_r117_support_oracle_reweight_loss":
+        "use_support_oracle_support_oracle_reweight_loss":
             True,
 
-        "r117_support_oracle_weight":
+        "support_oracle_support_oracle_weight":
             0.010,
 
-        "r117_false_mass_weight":
+        "support_oracle_false_mass_weight":
             0.20,
 
-        "r117_min_covered_true_mass":
+        "support_oracle_min_covered_true_mass":
             0.75,
     },
 }
@@ -239,10 +239,10 @@ def verify_inputs() -> None:
     )
 
     markers = [
-        "_r117_support_oracle_reweight_loss",
-        "use_r117_support_oracle_reweight_loss",
-        "train_r117_support_oracle_loss",
-        "_r98_apply_binned_spectrum_renderer",
+        "_support_oracle_support_oracle_reweight_loss",
+        "use_support_oracle_support_oracle_reweight_loss",
+        "train_support_oracle_support_oracle_loss",
+        "_local_mz_renderer_apply_binned_spectrum_renderer",
     ]
 
     absent = [
@@ -332,20 +332,20 @@ def build_config(
             "binned_spectrum_renderer_bin_res":
                 0.01,
 
-            "r117_support_oracle_every_n_steps":
+            "support_oracle_support_oracle_every_n_steps":
                 1,
 
-            "r117_oracle_bin_res":
+            "support_oracle_oracle_bin_res":
                 0.01,
 
-            "r117_eps":
+            "support_oracle_eps":
                 1.0e-12,
 
             "wandb_name":
-                f"R121_{variant}",
+                f"ALLOCATION_ABLATION_{variant}",
 
             "wandb_group":
-                "R121_CURRENT_0627_ALLOCATION_ABLATION",
+                "CURRENT_ALLOCATION_ABLATION",
         }
     )
 
@@ -534,7 +534,7 @@ def train_variant(
     )
 
     print("=" * 88)
-    print("R121 ALLOCATION ABLATION")
+    print("allocation ablation ALLOCATION ABLATION")
     print("=" * 88)
     print("variant        :", variant)
     print("base config    :", BASE_CONFIG)
@@ -543,27 +543,27 @@ def train_variant(
     print("epochs         :", epochs)
     print("lr             :", learning_rate)
     print(
-        "R117 enabled   :",
+        "support oracle enabled   :",
         config[
-            "use_r117_support_oracle_reweight_loss"
+            "use_support_oracle_support_oracle_reweight_loss"
         ],
     )
     print(
-        "R117 weight    :",
+        "support oracle weight    :",
         config[
-            "r117_support_oracle_weight"
+            "support_oracle_support_oracle_weight"
         ],
     )
     print(
         "false weight   :",
         config[
-            "r117_false_mass_weight"
+            "support_oracle_false_mass_weight"
         ],
     )
     print(
         "min coverage   :",
         config[
-            "r117_min_covered_true_mass"
+            "support_oracle_min_covered_true_mass"
         ],
     )
     print("=" * 88)
@@ -806,10 +806,10 @@ def make_leaderboard() -> None:
         "rank",
         "variant",
         "best_val_cosine",
-        "use_r117_support_oracle_reweight_loss",
-        "r117_support_oracle_weight",
-        "r117_false_mass_weight",
-        "r117_min_covered_true_mass",
+        "use_support_oracle_support_oracle_reweight_loss",
+        "support_oracle_support_oracle_weight",
+        "support_oracle_false_mass_weight",
+        "support_oracle_min_covered_true_mass",
         "best_checkpoint",
     ]
 
@@ -842,24 +842,24 @@ def make_leaderboard() -> None:
                             "best_val_cosine"
                         ],
 
-                    "use_r117_support_oracle_reweight_loss":
+                    "use_support_oracle_support_oracle_reweight_loss":
                         row[
-                            "use_r117_support_oracle_reweight_loss"
+                            "use_support_oracle_support_oracle_reweight_loss"
                         ],
 
-                    "r117_support_oracle_weight":
+                    "support_oracle_support_oracle_weight":
                         row[
-                            "r117_support_oracle_weight"
+                            "support_oracle_support_oracle_weight"
                         ],
 
-                    "r117_false_mass_weight":
+                    "support_oracle_false_mass_weight":
                         row[
-                            "r117_false_mass_weight"
+                            "support_oracle_false_mass_weight"
                         ],
 
-                    "r117_min_covered_true_mass":
+                    "support_oracle_min_covered_true_mass":
                         row[
-                            "r117_min_covered_true_mass"
+                            "support_oracle_min_covered_true_mass"
                         ],
 
                     "best_checkpoint":

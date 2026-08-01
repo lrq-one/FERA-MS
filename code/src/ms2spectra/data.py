@@ -900,7 +900,7 @@ class SpecMolFragDataset(SpecMolDataset):
                 )
             )
 
-            # ===== Frontier v3: high-CE deterministic energy budget =====
+            # ===== Frontier energy_budget_variant: high-CE deterministic energy budget =====
             # Previous fixed frontier budget helped support/OOS but hurt cos/JSS
             # because frontier pseudo-D4 peaks also entered mid/low CE spectra.
             #

@@ -15,6 +15,8 @@ from pathlib import Path
 
 import yaml
 
+from config_store import load_locked_config, locked_config_path
+
 
 BASE = Path(os.environ.get("FERA_MS_BASELINE_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
@@ -69,20 +71,16 @@ DATA_PATH_KEYS = (
 
 
 def make_config(
-    source: Path,
+    config: dict,
     target: Path,
     split: str,
     seed: int,
 ) -> None:
-    config = yaml.safe_load(
-        source.read_text(
-            encoding="utf-8"
-        )
-    )
+    config = dict(config)
 
     if int(config["seed"]) != seed:
         raise ValueError(
-            f"Locked config seed mismatch: {source}"
+            "Locked config seed mismatch"
         )
 
     expected_split = {
@@ -91,7 +89,7 @@ def make_config(
     }[split]
     if expected_split not in str(config["split_dp"]):
         raise ValueError(
-            f"Locked config split mismatch: {source}"
+            "Locked config split mismatch"
         )
 
     for key in DATA_PATH_KEYS:
@@ -239,16 +237,8 @@ def run() -> None:
 
     args = parser.parse_args()
 
-    info = MODEL_INFO[
-        args.model
-    ]
-
     repo = SOURCE
-    source_config = (
-        info["config_dir"]
-        / args.split
-        / f"seed_{args.seed}.yml"
-    )
+    source_config = locked_config_path(BASE, args.model)
 
     if not source_config.is_file():
         raise FileNotFoundError(source_config)
@@ -309,15 +299,13 @@ def run() -> None:
         / "config.yml"
     )
 
+    locked_config = load_locked_config(BASE, args.model, args.split, args.seed)
+
     make_config(
-        source=source_config,
+        config=locked_config,
         target=config_path,
         split=args.split,
         seed=args.seed,
-    )
-
-    locked_config = yaml.safe_load(
-        source_config.read_text(encoding="utf-8")
     )
     epochs = int(locked_config["max_epochs"])
 

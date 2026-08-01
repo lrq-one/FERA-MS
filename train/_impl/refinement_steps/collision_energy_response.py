@@ -28,9 +28,9 @@ def override_cfg_r147(cfg, args):
     cfg["frag_params"]["formula_comp_feats"] = True
     cfg["frag_params"]["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
-    # ===== R147: CE-response joint residual =====
+    # ===== collision-energy response refinement: CE-response joint residual =====
     # This is the important new part:
-    # delta(node, formula/H, CE) is added to frag_joint_logits before R12 / softmax / rendering.
+    # delta(node, formula/H, CE) is added to frag_joint_logits before joint refinement / softmax / rendering.
     cfg["use_ce_response_scorer"] = True
     cfg["ce_response_hidden_size"] = int(args.ce_hidden)
     cfg["ce_response_dropout"] = float(args.ce_dropout)
@@ -40,7 +40,7 @@ def override_cfg_r147(cfg, args):
     cfg["ce_response_use_depth"] = bool(args.ce_use_depth)
     cfg["ce_response_use_h"] = bool(args.ce_use_h)
 
-    # ===== R154: CEFlowFrag v2 =====
+    # ===== bounded residual flow: CEFlowFrag refined_variant =====
     # Multi-path CE-conditioned fragmentation flow prior.
     cfg["use_ce_flowfrag"] = bool(getattr(args, "use_ce_flowfrag", False))
     cfg["ce_flowfrag_lambda_max"] = float(getattr(args, "ce_flowfrag_lambda_max", 0.0))
@@ -72,12 +72,12 @@ def override_cfg_r147(cfg, args):
 
     # Optional fixed-support intensity allocation loss.
     # First round keep off. It can be enabled later if CE-response is stable.
-    cfg["use_r117_support_oracle_reweight_loss"] = bool(args.r117_weight > 0)
-    cfg["r117_support_oracle_weight"] = float(args.r117_weight)
-    cfg["r117_oracle_bin_res"] = float(args.bin_res)
-    cfg["r117_false_mass_weight"] = float(args.r117_false_weight)
-    cfg["r117_min_covered_true_mass"] = 1.0e-8
-    cfg["r117_eps"] = 1.0e-12
+    cfg["use_support_oracle_support_oracle_reweight_loss"] = bool(args.support_oracle_weight > 0)
+    cfg["support_oracle_support_oracle_weight"] = float(args.support_oracle_weight)
+    cfg["support_oracle_oracle_bin_res"] = float(args.bin_res)
+    cfg["support_oracle_false_mass_weight"] = float(args.support_oracle_false_weight)
+    cfg["support_oracle_min_covered_true_mass"] = 1.0e-8
+    cfg["support_oracle_eps"] = 1.0e-12
 
     return cfg
 
@@ -121,9 +121,9 @@ def freeze_for_r147(model, train_k3b=False, train_refiner=False, train_formula_m
     n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_total = sum(p.numel() for p in model.parameters())
 
-    print("[R147] trainable params:", n_train, "/", n_total)
-    print("[R147] trainable prefixes:", allow)
-    print("[R147] first trainable names:")
+    print("[collision-energy response refinement] trainable params:", n_train, "/", n_total)
+    print("[collision-energy response refinement] trainable prefixes:", allow)
+    print("[collision-energy response refinement] first trainable names:")
     for n in train_names[:40]:
         print("  ", n)
     if len(train_names) > 40:
@@ -133,7 +133,7 @@ def freeze_for_r147(model, train_k3b=False, train_refiner=False, train_formula_m
         raise RuntimeError("No trainable params. ce_response_scorer not found.")
 
 
-def set_r147_train_mode(model, train_k3b=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
+def set_collision_energy_response_train_mode(model, train_k3b=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
     # Frozen backbone eval mode, only selected residual heads in train mode.
     model.eval()
 
@@ -177,7 +177,7 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--weight_decay", type=float, default=1e-5)
 
-    # K3b config must match the checkpoint if loading from R146 best.
+    # K3b config must match the checkpoint if loading from formula-composition refinement best.
     ap.add_argument("--k3b_hidden", type=int, default=128)
     ap.add_argument("--k3b_dropout", type=float, default=0.05)
     ap.add_argument("--k3b_delta_scale", type=float, default=0.05)
@@ -191,7 +191,7 @@ def main():
     ap.add_argument("--ce_use_depth", action="store_true")
     ap.add_argument("--ce_use_h", action="store_true")
 
-    # CEFlowFrag v2.
+    # CEFlowFrag refined_variant.
     ap.add_argument("--use_ce_flowfrag", action="store_true")
     ap.add_argument("--ce_flowfrag_lambda_max", type=float, default=0.0)
     ap.add_argument("--ce_flowfrag_hidden", type=int, default=128)
@@ -208,10 +208,10 @@ def main():
     ap.add_argument("--max_bins", type=int, default=0)
 
     ap.add_argument("--ce_binned_aux_weight", type=float, default=0.0015)
-    ap.add_argument("--r117_weight", type=float, default=0.0)
-    ap.add_argument("--r117_false_weight", type=float, default=0.20)
+    ap.add_argument("--support_oracle_weight", type=float, default=0.0)
+    ap.add_argument("--support_oracle_false_weight", type=float, default=0.20)
 
-    # Slightly stronger mid/high emphasis than R146.
+    # Slightly stronger mid/high emphasis than formula-composition refinement.
     ap.add_argument("--low_w", type=float, default=0.25)
     ap.add_argument("--mid_w", type=float, default=1.75)
     ap.add_argument("--high_w", type=float, default=2.25)
@@ -229,7 +229,7 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([vars(args)]).to_csv(out_dir / "r147_args.csv", index=False)
+    pd.DataFrame([vars(args)]).to_csv(out_dir / "collision_energy_response_args.csv", index=False)
 
     cfg = load_config(args.template, args.config)
     cfg = override_cfg_r147(cfg, args)
@@ -245,12 +245,12 @@ def main():
     sd = formula_composition.load_state_dict(args.ckpt_path)
     missing, unexpected = model.load_state_dict(sd, strict=False)
 
-    print("[R147] missing keys:", len(missing))
+    print("[collision-energy response refinement] missing keys:", len(missing))
     for k in missing[:40]:
         print("  missing:", k)
     if len(missing) > 40:
         print("  ...")
-    print("[R147] unexpected keys:", len(unexpected))
+    print("[collision-energy response refinement] unexpected keys:", len(unexpected))
     for k in unexpected[:20]:
         print("  unexpected:", k)
 
@@ -270,19 +270,19 @@ def main():
     opt = th.optim.AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
 
     baseline_val = formula_composition.eval_buckets(model, val_dl, device, "val")
-    baseline_val.to_csv(out_dir / "r147_val_epoch0_before.csv", index=False)
+    baseline_val.to_csv(out_dir / "collision_energy_response_val_epoch0_before.csv", index=False)
 
-    print("\n===== R147 BEFORE VAL =====")
-    print("[R147] global cos:", formula_composition.global_metric(baseline_val, "cos"))
-    print("[R147] global jss:", formula_composition.global_metric(baseline_val, "jss"))
+    print("\n===== collision-energy response refinement BEFORE VAL =====")
+    print("[collision-energy response refinement] global cos:", formula_composition.global_metric(baseline_val, "cos"))
+    print("[collision-energy response refinement] global jss:", formula_composition.global_metric(baseline_val, "jss"))
     print(baseline_val.to_string(index=False))
 
     best_score = -1e18
-    best_path = out_dir / "r147_best_state.pt"
+    best_path = out_dir / "collision_energy_response_best_state.pt"
     logs = []
 
     for epoch in range(1, args.epochs + 1):
-        set_r147_train_mode(
+        set_collision_energy_response_train_mode(
             model,
             train_k3b=args.train_k3b,
             train_refiner=args.train_refiner,
@@ -290,7 +290,7 @@ def main():
         )
 
         losses = []
-        pbar = tqdm(train_dl, desc=f"R147 train epoch={epoch}")
+        pbar = tqdm(train_dl, desc=f"collision-energy response refinement train epoch={epoch}")
 
         for bi, batch in enumerate(pbar):
             if args.max_train_batches > 0 and bi >= args.max_train_batches:
@@ -317,15 +317,15 @@ def main():
             "n_steps": len(losses),
         }
         logs.append(row)
-        print("[R147 train]", row)
+        print("[collision-energy response refinement train]", row)
 
         val_sum = formula_composition.eval_buckets(model, val_dl, device, "val")
-        val_sum.to_csv(out_dir / f"r147_val_epoch{epoch}.csv", index=False)
+        val_sum.to_csv(out_dir / f"collision_energy_response_val_epoch{epoch}.csv", index=False)
 
         score = formula_composition.score_val(val_sum, baseline_val)
-        print(f"[R147] epoch={epoch} score={score:.6f}")
-        print("[R147] global cos:", formula_composition.global_metric(val_sum, "cos"))
-        print("[R147] global jss:", formula_composition.global_metric(val_sum, "jss"))
+        print(f"[collision-energy response refinement] epoch={epoch} score={score:.6f}")
+        print("[collision-energy response refinement] global cos:", formula_composition.global_metric(val_sum, "cos"))
+        print("[collision-energy response refinement] global jss:", formula_composition.global_metric(val_sum, "jss"))
         print(val_sum.to_string(index=False))
 
         if score > best_score:
@@ -339,30 +339,30 @@ def main():
                 },
                 best_path,
             )
-            print("[R147] saved best:", best_path)
+            print("[collision-energy response refinement] saved best:", best_path)
 
-    pd.DataFrame(logs).to_csv(out_dir / "r147_train_log.csv", index=False)
+    pd.DataFrame(logs).to_csv(out_dir / "collision_energy_response_train_log.csv", index=False)
 
     if best_path.exists():
         ckpt = th.load(best_path, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["state_dict"], strict=True)
-        print("[R147] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
+        print("[collision-energy response refinement] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
 
     best_val = formula_composition.eval_buckets(model, val_dl, device, "val")
-    best_val.to_csv(out_dir / "r147_best_val.csv", index=False)
+    best_val.to_csv(out_dir / "collision_energy_response_best_val.csv", index=False)
 
-    print("\n===== R147 BEST VAL =====")
-    print("[R147] best global cos:", formula_composition.global_metric(best_val, "cos"))
-    print("[R147] best global jss:", formula_composition.global_metric(best_val, "jss"))
+    print("\n===== collision-energy response refinement BEST VAL =====")
+    print("[collision-energy response refinement] best global cos:", formula_composition.global_metric(best_val, "cos"))
+    print("[collision-energy response refinement] best global jss:", formula_composition.global_metric(best_val, "jss"))
     print(best_val.to_string(index=False))
 
     if args.eval_test:
         best_test = formula_composition.eval_buckets(model, test_dl, device, "test")
-        best_test.to_csv(out_dir / "r147_best_test.csv", index=False)
+        best_test.to_csv(out_dir / "collision_energy_response_best_test.csv", index=False)
 
-        print("\n===== R147 BEST TEST =====")
-        print("[R147] best global cos:", formula_composition.global_metric(best_test, "cos"))
-        print("[R147] best global jss:", formula_composition.global_metric(best_test, "jss"))
+        print("\n===== collision-energy response refinement BEST TEST =====")
+        print("[collision-energy response refinement] best global cos:", formula_composition.global_metric(best_test, "cos"))
+        print("[collision-energy response refinement] best global jss:", formula_composition.global_metric(best_test, "jss"))
         print(best_test.to_string(index=False))
 
     print("\nwrote", out_dir)

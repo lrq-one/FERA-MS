@@ -20,9 +20,9 @@ def candidate_presence_rank_loss(
     pos_weight_gamma: float = 0.5,
 ):
     """
-    R4c-v2: tolerance-aware, intensity-weighted candidate ranking loss.
+    candidate-presence ranking-refined_variant: tolerance-aware, intensity-weighted candidate ranking loss.
 
-    Compared with v1:
+    Compared with base_model:
     1. positive/negative is decided by abs m/z tolerance, not floor-bin equality.
     2. positives are weighted by matched true intensity.
     3. weak true peaks can be filtered by min_true_prob.

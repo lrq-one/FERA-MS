@@ -11,6 +11,8 @@ from pathlib import Path
 
 import yaml
 
+from config_store import load_locked_config, locked_config_path
+
 
 BASE = Path(
     os.environ.get(
@@ -57,10 +59,10 @@ def check_locked_configs(model: str, require_data: bool) -> None:
             "scaffold": "scaffold60_20_20_seed42",
         }[split]
         for seed in (42, 43, 44):
-            path = BASE / model / "configs" / split / f"seed_{seed}.yml"
+            path = locked_config_path(BASE, model)
             if not path.is_file():
                 raise FileNotFoundError(path)
-            config = yaml.safe_load(path.read_text(encoding="utf-8"))
+            config = load_locked_config(BASE, model, split, seed)
             if int(config["seed"]) != seed:
                 raise RuntimeError(f"Seed mismatch in {path}")
             if config["model_type"] != expected_model_type:

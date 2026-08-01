@@ -36,7 +36,7 @@ from train._impl import control_finetuning
 
 RANDOM_SPLIT = (
     "data/split/"
-    "nist20_qtof_cid_safe19659_qcv1_trainonly"
+    "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
 )
 
 VARIANTS: dict[str, dict[str, Any]] = {
@@ -386,14 +386,14 @@ def inspect_real_model(
         torch.cuda.empty_cache()
 
 
-def write_final_v2a(
+def write_final_backbone(
     final_dir: Path,
     checkpoint: Path,
     config: dict[str, Any],
     selected_stage: str,
     selected_score: float,
-    stage1_score: float,
-    stage2_score: float,
+    initial_training_score: float,
+    continuation_score: float,
 ) -> None:
     final_dir.mkdir(
         parents=True,
@@ -422,11 +422,11 @@ def write_final_v2a(
         "selected_validation_cosine":
             selected_score,
 
-        "stage1_validation_cosine":
-            stage1_score,
+        "initial_training_validation_cosine":
+            initial_training_score,
 
-        "stage2_validation_cosine":
-            stage2_score,
+        "continuation_validation_cosine":
+            continuation_score,
 
         "checkpoint":
             str(final_checkpoint),
@@ -501,24 +501,24 @@ def main() -> None:
             f"{run_root}"
         )
 
-    v2a_root = run_root / "v2a"
-    stage1_dir = (
-        v2a_root
-        / "stage1_v1_40ep"
+    structural_backbone_root = run_root / "structural_backbone"
+    initial_training_dir = (
+        structural_backbone_root
+        / "initial_training_base_model_40ep"
     )
-    stage2_dir = (
-        v2a_root
-        / "stage2_r119_10ep"
+    continuation_dir = (
+        structural_backbone_root
+        / "continuation_retained_control_10ep"
     )
     final_dir = (
-        v2a_root
+        structural_backbone_root
         / "final"
     )
     audit_root = run_root / "audit"
 
     for path in (
-        stage1_dir,
-        stage2_dir,
+        initial_training_dir,
+        continuation_dir,
         final_dir,
         audit_root,
     ):
@@ -534,106 +534,106 @@ def main() -> None:
     print("test used during training: False")
     print("=" * 100)
 
-    # 构建与正式V2A完全一致的两个阶段。
-    stage1_reference, stage2_reference = (
+    # 构建与正式structural backbone完全一致的两个阶段。
+    initial_training_reference, continuation_reference = (
         base_training.build_stage_configs()
     )
 
-    stage1_config = apply_variant(
-        stage1_reference,
+    initial_training_config = apply_variant(
+        initial_training_reference,
         variant,
         seed,
-        "v2a_stage1",
+        "structural_backbone_stage1",
     )
 
-    stage2_config = apply_variant(
-        stage2_reference,
+    continuation_config = apply_variant(
+        continuation_reference,
         variant,
         seed,
-        "v2a_stage2",
+        "structural_backbone_stage2",
     )
 
     inspect_real_model(
-        stage1_config,
+        initial_training_config,
         variant,
-        "v2a_stage1",
+        "structural_backbone_stage1",
         audit_root
-        / "v2a_stage1_preflight.json",
+        / "structural_backbone_initial_training_preflight.json",
     )
 
     inspect_real_model(
-        stage2_config,
+        continuation_config,
         variant,
-        "v2a_stage2",
+        "structural_backbone_stage2",
         audit_root
-        / "v2a_stage2_preflight.json",
+        / "structural_backbone_continuation_preflight.json",
     )
 
-    stage1_score, stage1_checkpoint = (
+    initial_training_score, initial_training_checkpoint = (
         base_training.train_stage(
             name=(
                 "PANELB_ABLATION_"
-                "V2A_STAGE1"
+                "STRUCTURAL_BACKBONE_STAGE1"
             ),
-            run_dir=stage1_dir,
-            config=stage1_config,
+            run_dir=initial_training_dir,
+            config=initial_training_config,
             initialization_checkpoint=None,
             patience=1000,
             min_delta=0.0,
         )
     )
 
-    stage2_score, stage2_checkpoint = (
+    continuation_score, continuation_checkpoint = (
         base_training.train_stage(
             name=(
                 "PANELB_ABLATION_"
-                "V2A_STAGE2"
+                "STRUCTURAL_BACKBONE_STAGE2"
             ),
-            run_dir=stage2_dir,
-            config=stage2_config,
+            run_dir=continuation_dir,
+            config=continuation_config,
             initialization_checkpoint=(
-                stage1_checkpoint
+                initial_training_checkpoint
             ),
             patience=4,
             min_delta=1.0e-4,
         )
     )
 
-    if stage2_score >= stage1_score:
-        selected_stage = "stage2_r119"
-        selected_score = stage2_score
+    if continuation_score >= initial_training_score:
+        selected_stage = "continuation_r119"
+        selected_score = continuation_score
         selected_checkpoint = (
-            stage2_checkpoint
+            continuation_checkpoint
         )
-        selected_config = stage2_config
+        selected_config = continuation_config
     else:
-        selected_stage = "stage1_v1"
-        selected_score = stage1_score
+        selected_stage = "initial_training_v1"
+        selected_score = initial_training_score
         selected_checkpoint = (
-            stage1_checkpoint
+            initial_training_checkpoint
         )
-        selected_config = stage1_config
+        selected_config = initial_training_config
 
-    write_final_v2a(
+    write_final_backbone(
         final_dir=final_dir,
         checkpoint=selected_checkpoint,
         config=selected_config,
         selected_stage=selected_stage,
         selected_score=selected_score,
-        stage1_score=stage1_score,
-        stage2_score=stage2_score,
+        initial_training_score=initial_training_score,
+        continuation_score=continuation_score,
     )
 
     # 再次从最终保存配置实例化检查。
     inspect_real_model(
         selected_config,
         variant,
-        "v2a_selected_final",
+        "structural_backbone_selected_final",
         audit_root
-        / "v2a_selected_final_preflight.json",
+        / "structural_backbone_selected_final_preflight.json",
     )
 
-    # 将原V2C代码的输入和输出全部改到当前消融目录。
+    # 将原global ACE control代码的输入和输出全部改到当前消融目录。
     control_finetuning.BASE_CONFIG = (
         final_dir
         / "config.yml"
@@ -644,9 +644,9 @@ def main() -> None:
     )
     control_finetuning.OUTPUT_ROOT = (
         run_root
-        / "v2c"
+        / "global_ace_control"
     )
-    control_finetuning.V2A_BASELINE = (
+    control_finetuning.STRUCTURAL_BACKBONE_BASELINE = (
         selected_score
     )
     control_finetuning.VARIANTS = {
@@ -657,21 +657,21 @@ def main() -> None:
         control_finetuning.OUTPUT_ROOT
     )
 
-    v2c_config = (
+    global_ace_control_config = (
         control_finetuning.build_config(
             "control"
         )
     )
 
     inspect_real_model(
-        v2c_config,
+        global_ace_control_config,
         variant,
-        "v2c_control",
+        "global_ace_control_control",
         audit_root
-        / "v2c_control_preflight.json",
+        / "global_ace_control_control_preflight.json",
     )
 
-    v2c_summary = (
+    global_ace_control_summary = (
         control_finetuning.train_variant(
             "control"
         )
@@ -687,24 +687,24 @@ def main() -> None:
         "split":
             RANDOM_SPLIT,
 
-        "v2a_selected_stage":
+        "structural_backbone_selected_stage":
             selected_stage,
 
-        "v2a_validation_cosine":
+        "structural_backbone_validation_cosine":
             selected_score,
 
-        "v2c_validation_cosine":
-            v2c_summary[
+        "global_ace_control_validation_cosine":
+            global_ace_control_summary[
                 "best_val_cosine"
             ],
 
-        "v2c_delta_vs_v2a":
-            v2c_summary[
-                "delta_vs_v2a"
+        "global_ace_control_delta_vs_backbone":
+            global_ace_control_summary[
+                "delta_vs_backbone"
             ],
 
-        "v2c_checkpoint":
-            v2c_summary[
+        "global_ace_control_checkpoint":
+            global_ace_control_summary[
                 "checkpoint"
             ],
 

@@ -120,7 +120,7 @@ def formula_losses(raw, target_formula, ce_np, low_w, mid_w, high_w, kl_weight, 
 
 def build_official_bins_and_raw_contrib_hard(model, batch, raw, bin_res=0.01):
     """
-    Rebuild R98 official bins and keep raw contributor:
+    Rebuild local m-z renderer official bins and keep raw contributor:
       raw_mz
       raw_prob
       raw_formula_id
@@ -241,9 +241,9 @@ def build_target_formula_hard(model, batch, raw, tol=0.01, bin_res=0.01, mz_sigm
     """
     Harder formula target.
 
-    Difference from R143:
-      R143 distributes target intensity by current raw probability.
-      R144 distributes target intensity by m/z proximity to the true peak.
+    Difference from probability-weighted formula supervision:
+      probability-weighted formula supervision distributes target intensity by current raw probability.
+      mass-proximity formula supervision distributes target intensity by m/z proximity to the true peak.
 
     For each matched true peak:
       official bin -> raw contributors inside that bin

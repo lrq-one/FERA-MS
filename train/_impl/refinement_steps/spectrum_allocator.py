@@ -15,9 +15,9 @@ from ms2spectra.workflow import load_config, init_dataset, init_dataloader
 from ms2spectra.training import FragGNNPL
 
 
-def load_r170_module():
+def load_candidate_reranker_module():
     fp = Path(__file__).with_name("candidate_reranker.py")
-    spec = importlib.util.spec_from_file_location("r170_mod", str(fp))
+    spec = importlib.util.spec_from_file_location("candidate_reranker_mod", str(fp))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -31,7 +31,7 @@ class ResidualAllocator(nn.Module):
         residual = 0
         new_logp = softmax(old_logp + alpha * LGBM_score)
 
-    So BEFORE VAL/TEST should match R172E.
+    So BEFORE VAL/TEST should match candidate reranker.
     """
     def __init__(self, input_dim, hidden=256, layers=3, dropout=0.10, score_clip=4.0):
         super().__init__()
@@ -129,19 +129,19 @@ def normalize_target_mass_per_spec(target_mass, bidx, batch_size):
 
 def alias_rich_feature_keys(res, extra_schema):
     """
-    当前 diagnostics/87 可能输出 r173_frag_rich_feats；
-    老的 R172D regressor pack 可能记录的是 r172_frag_rich_feats。
+    当前 diagnostics/87 可能输出 fragment_rich_features；
+    老的 candidate reranker regressor pack 可能记录的是 fragment_rich_features。
     这里做别名，避免 regressor 输入 60D 里 26D rich features 变成全 0。
     """
     keys = {k for k, _ in extra_schema}
 
-    if "r172_frag_rich_feats" in keys:
-        if "r172_frag_rich_feats" not in res and "r173_frag_rich_feats" in res:
-            res["r172_frag_rich_feats"] = res["r173_frag_rich_feats"]
+    if "fragment_rich_features" in keys:
+        if "fragment_rich_features" not in res and "fragment_rich_features" in res:
+            res["fragment_rich_features"] = res["fragment_rich_features"]
 
-    if "r173_frag_rich_feats" in keys:
-        if "r173_frag_rich_feats" not in res and "r172_frag_rich_feats" in res:
-            res["r173_frag_rich_feats"] = res["r172_frag_rich_feats"]
+    if "fragment_rich_features" in keys:
+        if "fragment_rich_features" not in res and "fragment_rich_features" in res:
+            res["fragment_rich_features"] = res["fragment_rich_features"]
 
     return res
 
@@ -153,11 +153,11 @@ def lgbm_predict(regressor, feats, device, dtype, score_clip):
     return th.from_numpy(s).to(device=device, dtype=dtype)
 
 
-def build_batch_tensors(base, batch, r170, regressor, extra_schema, args, split):
+def build_batch_tensors(base, batch, candidate_reranker, regressor, extra_schema, args, split):
     with th.no_grad():
         res = base._common_step(batch, split=split, log=False)
 
-        res = r170.attach_raw_rich_features(
+        res = candidate_reranker.attach_raw_rich_features(
             base,
             batch,
             res,
@@ -166,7 +166,7 @@ def build_batch_tensors(base, batch, r170, regressor, extra_schema, args, split)
         )
         res = alias_rich_feature_keys(res, extra_schema)
 
-        feats = r170.candidate_features(
+        feats = candidate_reranker.candidate_features(
             res,
             batch,
             mz_max=float(base.hparams.mz_max),
@@ -175,7 +175,7 @@ def build_batch_tensors(base, batch, r170, regressor, extra_schema, args, split)
         )
 
         args.mz_max = float(base.hparams.mz_max)
-        residual_target, pos, target_mass, pred_prob = r170.build_targets(res, args)
+        residual_target, pos, target_mass, pred_prob = candidate_reranker.build_targets(res, args)
 
         lgbm_score = lgbm_predict(
             regressor,
@@ -188,7 +188,7 @@ def build_batch_tensors(base, batch, r170, regressor, extra_schema, args, split)
     return res, feats.float(), lgbm_score.float(), target_mass.float(), pos.float()
 
 
-def forward_allocator(base, allocator, batch, res, feats, lgbm_score, target_mass, r170, args):
+def forward_allocator(base, allocator, batch, res, feats, lgbm_score, target_mass, candidate_reranker, args):
     pred_mz = res["pred_mzs"].float()
     old_logp = res["pred_logprobs"].float()
     bidx = res["pred_batch_idxs"].long()
@@ -226,7 +226,7 @@ def forward_allocator(base, allocator, batch, res, feats, lgbm_score, target_mas
     cos = cosine_dense(true_dense, pred_dense).clamp(0.0, 1.0)
     jss = jss_dense(true_dense, pred_dense).clamp(0.0, 1.0)
 
-    ce, _ = r170.find_ce(batch)
+    ce, _ = candidate_reranker.find_ce(batch)
     ce = ce.to(pred_mz.device).reshape(-1).float()
     spec_w = ce_weights(ce, args.low_w, args.mid_w, args.high_w)
 
@@ -236,7 +236,7 @@ def forward_allocator(base, allocator, batch, res, feats, lgbm_score, target_mas
     )
     spec_loss = (spec_w * spec_loss_vec).sum() / spec_w.sum().clamp_min(1e-12)
 
-    # target CE is now small. R183A failed partly because target CE dominated.
+    # target CE is now small. allocator precursor failed partly because target CE dominated.
     target_dist = normalize_target_mass_per_spec(target_mass, bidx, batch_size)
     target_ce_per_entry = -(target_dist.detach() * new_logp)
     target_ce_per_spec = group_sum(target_ce_per_entry, bidx, batch_size)
@@ -299,19 +299,19 @@ def summarize_rows(rows):
 
 
 @th.no_grad()
-def eval_split(base, allocator, regressor, extra_schema, dl, device, r170, args, split):
+def eval_split(base, allocator, regressor, extra_schema, dl, device, candidate_reranker, args, split):
     base.eval()
     allocator.eval()
 
     rows = []
 
     for batch in tqdm(dl, desc=f"eval {split}"):
-        batch = r170.move_to_device(batch, device)
+        batch = candidate_reranker.move_to_device(batch, device)
 
         res, feats, lgbm_score, target_mass, pos = build_batch_tensors(
             base,
             batch,
-            r170,
+            candidate_reranker,
             regressor,
             extra_schema,
             args,
@@ -326,13 +326,13 @@ def eval_split(base, allocator, regressor, extra_schema, dl, device, r170, args,
             feats,
             lgbm_score,
             target_mass,
-            r170,
+            candidate_reranker,
             args,
         )
 
-        ce, _ = r170.find_ce(batch)
+        ce, _ = candidate_reranker.find_ce(batch)
         ce_cpu = ce.detach().cpu().reshape(-1)
-        buckets = r170.ce_bucket_names(ce_cpu)
+        buckets = candidate_reranker.ce_bucket_names(ce_cpu)
 
         for i, sid in enumerate(res["unique_id"].detach().cpu().reshape(-1).numpy().astype(int)):
             rows.append({
@@ -346,7 +346,7 @@ def eval_split(base, allocator, regressor, extra_schema, dl, device, r170, args,
     return summarize_rows(rows)
 
 
-def train_one_epoch(base, allocator, regressor, extra_schema, train_dl, opt, device, r170, args, epoch):
+def train_one_epoch(base, allocator, regressor, extra_schema, train_dl, opt, device, candidate_reranker, args, epoch):
     base.eval()
     allocator.train()
 
@@ -363,18 +363,18 @@ def train_one_epoch(base, allocator, regressor, extra_schema, train_dl, opt, dev
         "n": 0,
     }
 
-    pbar = tqdm(train_dl, desc=f"R184 train epoch={epoch}")
+    pbar = tqdm(train_dl, desc=f"spectrum allocator train epoch={epoch}")
 
     for step, batch in enumerate(pbar, start=1):
         if int(args.max_train_batches) > 0 and step > int(args.max_train_batches):
             break
 
-        batch = r170.move_to_device(batch, device)
+        batch = candidate_reranker.move_to_device(batch, device)
 
         res, feats, lgbm_score, target_mass, pos = build_batch_tensors(
             base,
             batch,
-            r170,
+            candidate_reranker,
             regressor,
             extra_schema,
             args,
@@ -389,7 +389,7 @@ def train_one_epoch(base, allocator, regressor, extra_schema, train_dl, opt, dev
             feats,
             lgbm_score,
             target_mass,
-            r170,
+            candidate_reranker,
             args,
         )
 
@@ -504,7 +504,7 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    r170 = load_r170_module()
+    candidate_reranker = load_candidate_reranker_module()
 
     with open(args.regressor_path, "rb") as f:
         reg_pack = pickle.load(f)
@@ -513,12 +513,12 @@ def main():
     extra_schema = reg_pack.get("extra_schema", [])
     backend = reg_pack.get("backend", "unknown")
 
-    print("[R184] loaded regressor:", args.regressor_path)
-    print("[R184] regressor backend:", backend)
-    print("[R184] regressor extra_schema:", extra_schema)
+    print("[spectrum allocator] loaded regressor:", args.regressor_path)
+    print("[spectrum allocator] regressor backend:", backend)
+    print("[spectrum allocator] regressor extra_schema:", extra_schema)
 
     cfg = load_config(args.template, args.config)
-    cfg = r170.force_r160_arch(cfg)
+    cfg = candidate_reranker.force_final_peak_distillation_arch(cfg)
 
     train_ds, val_ds, test_ds = init_dataset(cfg, splits=("train", "val", "test"))
     train_dl = init_dataloader(train_ds, cfg)
@@ -528,13 +528,13 @@ def main():
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
     base = FragGNNPL(**cfg)
-    sd = r170.load_state_dict_any(args.ckpt_path)
+    sd = candidate_reranker.load_state_dict_any(args.ckpt_path)
     missing, unexpected = base.load_state_dict(sd, strict=False)
 
-    print("[R184] base missing:", len(missing))
+    print("[spectrum allocator] base missing:", len(missing))
     for x in missing[:20]:
         print("  missing:", x)
-    print("[R184] base unexpected:", len(unexpected))
+    print("[spectrum allocator] base unexpected:", len(unexpected))
     for x in unexpected[:20]:
         print("  unexpected:", x)
 
@@ -544,11 +544,11 @@ def main():
         p.requires_grad = False
 
     first_batch = next(iter(train_dl))
-    first_batch = r170.move_to_device(first_batch, device)
+    first_batch = candidate_reranker.move_to_device(first_batch, device)
 
     with th.no_grad():
         first_res = base._common_step(first_batch, split="train", log=False)
-        first_res = r170.attach_raw_rich_features(
+        first_res = candidate_reranker.attach_raw_rich_features(
             base,
             first_batch,
             first_res,
@@ -557,7 +557,7 @@ def main():
         )
         first_res = alias_rich_feature_keys(first_res, extra_schema)
 
-        first_feats = r170.candidate_features(
+        first_feats = candidate_reranker.candidate_features(
             first_res,
             first_batch,
             mz_max=float(base.hparams.mz_max),
@@ -566,10 +566,10 @@ def main():
         )
 
     input_dim = int(first_feats.shape[1])
-    print("[R184] input_dim:", input_dim)
+    print("[spectrum allocator] input_dim:", input_dim)
 
     if hasattr(regressor, "n_features_in_"):
-        print("[R184] regressor n_features_in_:", int(regressor.n_features_in_))
+        print("[spectrum allocator] regressor n_features_in_:", int(regressor.n_features_in_))
         if int(regressor.n_features_in_) != input_dim:
             raise RuntimeError(
                 f"feature dim mismatch: allocator/input_dim={input_dim}, "
@@ -621,18 +621,18 @@ def main():
         )
 
         print(
-            "[R184 RESUME]",
+            "[spectrum allocator RESUME]",
             resume_path,
         )
         print(
-            "[R184 RESUME] previous best val cosine:",
+            "[spectrum allocator RESUME] previous best val cosine:",
             resume_pack.get(
                 "best_val_cos",
                 "unknown",
             ),
         )
         print(
-            "[R184 RESUME] start epoch:",
+            "[spectrum allocator RESUME] start epoch:",
             args.start_epoch,
         )
 
@@ -644,7 +644,7 @@ def main():
 
     train_log_path = (
         out_dir
-        / "r184_train_log.csv"
+        / "spectrum_allocator_train_log.csv"
     )
 
     if (
@@ -666,7 +666,7 @@ def main():
         extra_schema,
         val_dl,
         device,
-        r170,
+        candidate_reranker,
         args,
         split="val",
     )
@@ -681,12 +681,12 @@ def main():
     if resume_pack is None:
         before_val.to_csv(
             out_dir
-            / "r184_val_epoch0_before.csv",
+            / "spectrum_allocator_val_epoch0_before.csv",
             index=False,
         )
 
         print(
-            "\n===== R184 BEFORE VAL ====="
+            "\n===== spectrum allocator BEFORE VAL ====="
         )
         print(
             before_val.to_string(
@@ -698,7 +698,7 @@ def main():
 
         save_pack(
             out_dir
-            / "r184_allocator_best.pt",
+            / "spectrum_allocator_allocator_best.pt",
             allocator,
             input_dim,
             extra_schema,
@@ -708,12 +708,12 @@ def main():
 
         before_val.to_csv(
             out_dir
-            / "r184_best_val.csv",
+            / "spectrum_allocator_best_val.csv",
             index=False,
         )
 
         print(
-            "[R184] saved initial best:",
+            "[spectrum allocator] saved initial best:",
             best_val_cos,
         )
 
@@ -721,14 +721,14 @@ def main():
         before_val.to_csv(
             out_dir
             / (
-                "r184_resume_before_epoch"
+                "spectrum_allocator_resume_before_epoch"
                 f"{int(args.start_epoch)}.csv"
             ),
             index=False,
         )
 
         print(
-            "\n===== R184 RESUME BEFORE VAL ====="
+            "\n===== spectrum allocator RESUME BEFORE VAL ====="
         )
         print(
             before_val.to_string(
@@ -748,7 +748,7 @@ def main():
 
             save_pack(
                 out_dir
-                / "r184_allocator_best.pt",
+                / "spectrum_allocator_allocator_best.pt",
                 allocator,
                 input_dim,
                 extra_schema,
@@ -758,16 +758,16 @@ def main():
 
             before_val.to_csv(
                 out_dir
-                / "r184_best_val.csv",
+                / "spectrum_allocator_best_val.csv",
                 index=False,
             )
 
         print(
-            "[R184 RESUME] current val cosine:",
+            "[spectrum allocator RESUME] current val cosine:",
             current_val_cos,
         )
         print(
-            "[R184 RESUME] retained best:",
+            "[spectrum allocator RESUME] retained best:",
             best_val_cos,
         )
 
@@ -783,13 +783,13 @@ def main():
             train_dl,
             opt,
             device,
-            r170,
+            candidate_reranker,
             args,
             epoch,
         )
         tr["epoch"] = epoch
         train_rows.append(tr)
-        pd.DataFrame(train_rows).to_csv(out_dir / "r184_train_log.csv", index=False)
+        pd.DataFrame(train_rows).to_csv(out_dir / "spectrum_allocator_train_log.csv", index=False)
 
         val_table, val_detail = eval_split(
             base,
@@ -798,32 +798,32 @@ def main():
             extra_schema,
             val_dl,
             device,
-            r170,
+            candidate_reranker,
             args,
             split="val",
         )
-        val_table.to_csv(out_dir / f"r184_val_epoch{epoch}.csv", index=False)
+        val_table.to_csv(out_dir / f"spectrum_allocator_val_epoch{epoch}.csv", index=False)
 
         g = val_table[val_table["ce_bucket"] == "global"].iloc[0]
         val_cos = float(g["cos"])
 
-        print(f"\n===== R184 VAL epoch={epoch} score={val_cos:.6f} =====")
+        print(f"\n===== spectrum allocator VAL epoch={epoch} score={val_cos:.6f} =====")
         print(val_table.to_string(index=False))
 
         if val_cos > best_val_cos:
             best_val_cos = val_cos
             save_pack(
-                out_dir / "r184_allocator_best.pt",
+                out_dir / "spectrum_allocator_allocator_best.pt",
                 allocator,
                 input_dim,
                 extra_schema,
                 args,
                 best_val_cos,
             )
-            val_table.to_csv(out_dir / "r184_best_val.csv", index=False)
-            print("[R184] saved best:", out_dir / "r184_allocator_best.pt")
+            val_table.to_csv(out_dir / "spectrum_allocator_best_val.csv", index=False)
+            print("[spectrum allocator] saved best:", out_dir / "spectrum_allocator_allocator_best.pt")
 
-    pack = th.load(out_dir / "r184_allocator_best.pt", map_location=device, weights_only=False)
+    pack = th.load(out_dir / "spectrum_allocator_allocator_best.pt", map_location=device, weights_only=False)
     allocator.load_state_dict(pack["model"])
     allocator.eval()
 
@@ -834,13 +834,13 @@ def main():
         extra_schema,
         val_dl,
         device,
-        r170,
+        candidate_reranker,
         args,
         split="val",
     )
-    best_val.to_csv(out_dir / "r184_best_val.csv", index=False)
+    best_val.to_csv(out_dir / "spectrum_allocator_best_val.csv", index=False)
 
-    print("\n===== R184 BEST VAL =====")
+    print("\n===== spectrum allocator BEST VAL =====")
     print(best_val.to_string(index=False))
 
     if args.eval_test:
@@ -851,14 +851,14 @@ def main():
             extra_schema,
             test_dl,
             device,
-            r170,
+            candidate_reranker,
             args,
             split="test",
         )
-        best_test.to_csv(out_dir / "r184_best_test.csv", index=False)
-        best_test_detail.to_csv(out_dir / "r184_best_test_detail.csv", index=False)
+        best_test.to_csv(out_dir / "spectrum_allocator_best_test.csv", index=False)
+        best_test_detail.to_csv(out_dir / "spectrum_allocator_best_test_detail.csv", index=False)
 
-        print("\n===== R184 BEST TEST =====")
+        print("\n===== spectrum allocator BEST TEST =====")
         print(best_test.to_string(index=False))
 
     print("wrote", out_dir)

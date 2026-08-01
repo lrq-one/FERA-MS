@@ -48,7 +48,7 @@ def override_cfg(cfg, args):
     cfg["frag_params"]["formula_comp_feats"] = True
     cfg["frag_params"]["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
-    # ===== 训练也走 R98 0.01Da official-style renderer，而不是 train/eval mismatch =====
+    # ===== 训练也走 local m-z renderer 0.01Da official-style renderer，而不是 train/eval mismatch =====
     cfg["use_binned_spectrum_renderer"] = True
     cfg["binned_spectrum_renderer_apply_train"] = True
     cfg["binned_spectrum_renderer_bin_res"] = float(args.bin_res)
@@ -64,13 +64,13 @@ def override_cfg(cfg, args):
     cfg["ce_binned_aux_mid_weight"] = float(args.mid_w)
     cfg["ce_binned_aux_high_weight"] = float(args.high_w)
 
-    # ===== R117 是 fixed-support intensity allocation，先允许小权重 =====
-    cfg["use_r117_support_oracle_reweight_loss"] = bool(args.r117_weight > 0)
-    cfg["r117_support_oracle_weight"] = float(args.r117_weight)
-    cfg["r117_oracle_bin_res"] = float(args.bin_res)
-    cfg["r117_false_mass_weight"] = float(args.r117_false_weight)
-    cfg["r117_min_covered_true_mass"] = 1.0e-8
-    cfg["r117_eps"] = 1.0e-12
+    # ===== support oracle 是 fixed-support intensity allocation，先允许小权重 =====
+    cfg["use_support_oracle_support_oracle_reweight_loss"] = bool(args.support_oracle_weight > 0)
+    cfg["support_oracle_support_oracle_weight"] = float(args.support_oracle_weight)
+    cfg["support_oracle_oracle_bin_res"] = float(args.bin_res)
+    cfg["support_oracle_false_mass_weight"] = float(args.support_oracle_false_weight)
+    cfg["support_oracle_min_covered_true_mass"] = 1.0e-8
+    cfg["support_oracle_eps"] = 1.0e-12
 
     return cfg
 
@@ -94,9 +94,9 @@ def freeze_for_k3b(model, train_formula_module=False, train_refiner=False):
     n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_total = sum(p.numel() for p in model.parameters())
 
-    print("[R146] trainable params:", n_train, "/", n_total)
-    print("[R146] trainable prefixes:", allow)
-    print("[R146] first trainable names:")
+    print("[formula-composition refinement] trainable params:", n_train, "/", n_total)
+    print("[formula-composition refinement] trainable prefixes:", allow)
+    print("[formula-composition refinement] first trainable names:")
     for n in names[:30]:
         print("  ", n)
     if len(names) > 30:
@@ -267,7 +267,7 @@ def score_val(summary, baseline):
     mid_drop = max(0.0, mid0 - mid)
     jss_drop = max(0.0, jss0 - jss)
 
-    # 不允许像 R145 那样 cos 微涨但 JSS 大掉。
+    # 不允许像 prior formula attempt 那样 cos 微涨但 JSS 大掉。
     return g + 0.50 * mid + 0.05 * high - 5.0 * low_drop - 4.0 * mid_drop - 3.0 * jss_drop
 
 
@@ -292,8 +292,8 @@ def main():
     ap.add_argument("--max_bins", type=int, default=0)
 
     ap.add_argument("--ce_binned_aux_weight", type=float, default=0.0015)
-    ap.add_argument("--r117_weight", type=float, default=0.0)
-    ap.add_argument("--r117_false_weight", type=float, default=0.25)
+    ap.add_argument("--support_oracle_weight", type=float, default=0.0)
+    ap.add_argument("--support_oracle_false_weight", type=float, default=0.25)
 
     ap.add_argument("--low_w", type=float, default=0.30)
     ap.add_argument("--mid_w", type=float, default=1.50)
@@ -306,7 +306,7 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([vars(args)]).to_csv(out_dir / "r146_args.csv", index=False)
+    pd.DataFrame([vars(args)]).to_csv(out_dir / "formula_composition_args.csv", index=False)
 
     cfg = load_config(args.template, args.config)
     cfg = override_cfg(cfg, args)
@@ -321,10 +321,10 @@ def main():
     model = FragGNNPL(**cfg)
     sd = load_state_dict(args.ckpt_path)
     missing, unexpected = model.load_state_dict(sd, strict=False)
-    print("[R146] missing keys:", len(missing))
+    print("[formula-composition refinement] missing keys:", len(missing))
     for k in missing[:20]:
         print("  missing:", k)
-    print("[R146] unexpected keys:", len(unexpected))
+    print("[formula-composition refinement] unexpected keys:", len(unexpected))
 
     model = model.to(device)
 
@@ -341,15 +341,15 @@ def main():
     )
 
     baseline_val = eval_buckets(model, val_dl, device, "val")
-    baseline_val.to_csv(out_dir / "r146_val_epoch0_before.csv", index=False)
+    baseline_val.to_csv(out_dir / "formula_composition_val_epoch0_before.csv", index=False)
 
-    print("\n===== R146 BEFORE VAL =====")
-    print("[R146] global cos:", global_metric(baseline_val, "cos"))
-    print("[R146] global jss:", global_metric(baseline_val, "jss"))
+    print("\n===== formula-composition refinement BEFORE VAL =====")
+    print("[formula-composition refinement] global cos:", global_metric(baseline_val, "cos"))
+    print("[formula-composition refinement] global jss:", global_metric(baseline_val, "jss"))
     print(baseline_val.to_string(index=False))
 
     best_score = -1e18
-    best_path = out_dir / "r146_best_state.pt"
+    best_path = out_dir / "formula_composition_best_state.pt"
     train_logs = []
 
     for epoch in range(1, args.epochs + 1):
@@ -360,7 +360,7 @@ def main():
         )
 
         losses = []
-        pbar = tqdm(train_dl, desc=f"R146 train epoch={epoch}")
+        pbar = tqdm(train_dl, desc=f"formula-composition refinement train epoch={epoch}")
         for bi, batch in enumerate(pbar):
             if args.max_train_batches > 0 and bi >= args.max_train_batches:
                 break
@@ -389,15 +389,15 @@ def main():
             "n_steps": len(losses),
         }
         train_logs.append(row)
-        print("[R146 train]", row)
+        print("[formula-composition refinement train]", row)
 
         val_sum = eval_buckets(model, val_dl, device, "val")
-        val_sum.to_csv(out_dir / f"r146_val_epoch{epoch}.csv", index=False)
+        val_sum.to_csv(out_dir / f"formula_composition_val_epoch{epoch}.csv", index=False)
 
         score = score_val(val_sum, baseline_val)
-        print(f"[R146] epoch={epoch} score={score:.6f}")
-        print("[R146] global cos:", global_metric(val_sum, "cos"))
-        print("[R146] global jss:", global_metric(val_sum, "jss"))
+        print(f"[formula-composition refinement] epoch={epoch} score={score:.6f}")
+        print("[formula-composition refinement] global cos:", global_metric(val_sum, "cos"))
+        print("[formula-composition refinement] global jss:", global_metric(val_sum, "jss"))
         print(val_sum.to_string(index=False))
 
         if score > best_score:
@@ -408,30 +408,30 @@ def main():
                 "args": vars(args),
                 "best_score": best_score,
             }, best_path)
-            print("[R146] saved best:", best_path)
+            print("[formula-composition refinement] saved best:", best_path)
 
-    pd.DataFrame(train_logs).to_csv(out_dir / "r146_train_log.csv", index=False)
+    pd.DataFrame(train_logs).to_csv(out_dir / "formula_composition_train_log.csv", index=False)
 
     if best_path.exists():
         ckpt = th.load(best_path, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["state_dict"], strict=True)
-        print("[R146] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
+        print("[formula-composition refinement] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
 
     best_val = eval_buckets(model, val_dl, device, "val")
-    best_val.to_csv(out_dir / "r146_best_val.csv", index=False)
+    best_val.to_csv(out_dir / "formula_composition_best_val.csv", index=False)
 
-    print("\n===== R146 BEST VAL =====")
-    print("[R146] best global cos:", global_metric(best_val, "cos"))
-    print("[R146] best global jss:", global_metric(best_val, "jss"))
+    print("\n===== formula-composition refinement BEST VAL =====")
+    print("[formula-composition refinement] best global cos:", global_metric(best_val, "cos"))
+    print("[formula-composition refinement] best global jss:", global_metric(best_val, "jss"))
     print(best_val.to_string(index=False))
 
     if args.eval_test:
         best_test = eval_buckets(model, test_dl, device, "test")
-        best_test.to_csv(out_dir / "r146_best_test.csv", index=False)
+        best_test.to_csv(out_dir / "formula_composition_best_test.csv", index=False)
 
-        print("\n===== R146 BEST TEST =====")
-        print("[R146] best global cos:", global_metric(best_test, "cos"))
-        print("[R146] best global jss:", global_metric(best_test, "jss"))
+        print("\n===== formula-composition refinement BEST TEST =====")
+        print("[formula-composition refinement] best global cos:", global_metric(best_test, "cos"))
+        print("[formula-composition refinement] best global jss:", global_metric(best_test, "jss"))
         print(best_test.to_string(index=False))
 
     print("\nwrote", out_dir)

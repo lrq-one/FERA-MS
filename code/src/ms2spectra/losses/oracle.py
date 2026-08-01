@@ -27,7 +27,7 @@ def setup_oracle_teacher_bins(pl_module):
     pl_module._oracle_teacher_meta = payload.get("meta", {})
 
     print(
-        "[R28 OracleTeacher] enabled: "
+        "[oracle teacher OracleTeacher] enabled: "
         f"pt={pt}, specs={len(pl_module._oracle_teacher_bins)}, "
         f"meta={pl_module._oracle_teacher_meta}, "
         f"weight={getattr(pl_module.hparams, 'oracle_teacher_bin_loss_weight', None)}"
@@ -141,7 +141,7 @@ def oracle_teacher_bin_loss(
         p_probs = pred_bin_probs[p_mask]
         p_probs = p_probs / p_probs.sum().clamp_min(eps)
 
-        # R28C: soft/tolerance-aware bin matching.
+        # tolerance-aware oracle teacher: soft/tolerance-aware bin matching.
         # Exact 0.01-bin matching is too harsh for this task:
         # audit shows model/reference agreement is much better under tolerance.
         tol_bins = int(getattr(pl_module.hparams, "oracle_teacher_bin_tolerance_bins", 1))
@@ -166,8 +166,8 @@ def oracle_teacher_bin_loss(
 
         raw_loss = th.clamp(ce - ent, min=0.0)
 
-        # R35A: confidence-weighted true-anchored teacher.
-        # Older R28 used target_value only for filtering.
+        # confidence-weighted oracle teacher: confidence-weighted true-anchored teacher.
+        # Older oracle teacher used target_value only for filtering.
         # Here we also allow each teacher item to carry a loss_weight,
         # so high-gain / high-CE samples can contribute more while noisy
         # low-gain references stay weak.

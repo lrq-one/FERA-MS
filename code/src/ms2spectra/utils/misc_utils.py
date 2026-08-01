@@ -92,7 +92,7 @@ def wandb_symlink(run_dir,wandb_symlink_dp,job_id):
 		os.unlink(symlink_dst)
 	os.symlink(symlink_src,symlink_dst)
 
-def list_str2float(str_list):
+def list_str_to_float(str_list):
 	return [float(str_item) for str_item in str_list]
 
 # https://stackoverflow.com/a/58936697/6937913

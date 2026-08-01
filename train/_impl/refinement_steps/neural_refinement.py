@@ -36,7 +36,7 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-5)
     ap.add_argument("--weight_decay", type=float, default=1e-5)
 
-    # Must match loaded R147/R146 architecture.
+    # Must match loaded collision-energy response refinement/formula-composition refinement architecture.
     ap.add_argument("--k3b_hidden", type=int, default=128)
     ap.add_argument("--k3b_dropout", type=float, default=0.05)
     ap.add_argument("--k3b_delta_scale", type=float, default=0.05)
@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--ce_use_depth", action="store_true")
     ap.add_argument("--ce_use_h", action="store_true")
 
-    # CEFlowFrag v2.
+    # CEFlowFrag refined_variant.
     ap.add_argument("--use_ce_flowfrag", action="store_true")
     ap.add_argument("--ce_flowfrag_lambda_max", type=float, default=0.0)
     ap.add_argument("--ce_flowfrag_hidden", type=int, default=128)
@@ -67,8 +67,8 @@ def main():
 
     # Official-path spectrum loss settings.
     ap.add_argument("--ce_binned_aux_weight", type=float, default=0.0015)
-    ap.add_argument("--r117_weight", type=float, default=0.0)
-    ap.add_argument("--r117_false_weight", type=float, default=0.20)
+    ap.add_argument("--support_oracle_weight", type=float, default=0.0)
+    ap.add_argument("--support_oracle_false_weight", type=float, default=0.20)
 
     ap.add_argument("--low_w", type=float, default=0.25)
     ap.add_argument("--mid_w", type=float, default=1.75)
@@ -108,7 +108,7 @@ def main():
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([vars(args)]).to_csv(out_dir / "r148_args.csv", index=False)
+    pd.DataFrame([vars(args)]).to_csv(out_dir / "neural_refinement_args.csv", index=False)
 
     cfg = load_config(args.template, args.config)
     cfg = energy_response.override_cfg_r147(cfg, args)
@@ -124,12 +124,12 @@ def main():
     sd = formula_composition.load_state_dict(args.ckpt_path)
     missing, unexpected = model.load_state_dict(sd, strict=False)
 
-    print("[R148] missing keys:", len(missing))
+    print("[neural refinement] missing keys:", len(missing))
     for k in missing[:40]:
         print("  missing:", k)
     if len(missing) > 40:
         print("  ...")
-    print("[R148] unexpected keys:", len(unexpected))
+    print("[neural refinement] unexpected keys:", len(unexpected))
     for k in unexpected[:20]:
         print("  unexpected:", k)
 
@@ -149,19 +149,19 @@ def main():
     opt = th.optim.AdamW(trainable, lr=args.lr, weight_decay=args.weight_decay)
 
     baseline_val = formula_composition.eval_buckets(model, val_dl, device, "val")
-    baseline_val.to_csv(out_dir / "r148_val_epoch0_before.csv", index=False)
+    baseline_val.to_csv(out_dir / "neural_refinement_val_epoch0_before.csv", index=False)
 
-    print("\n===== R148 BEFORE VAL =====")
-    print("[R148] global cos:", formula_composition.global_metric(baseline_val, "cos"))
-    print("[R148] global jss:", formula_composition.global_metric(baseline_val, "jss"))
+    print("\n===== neural refinement BEFORE VAL =====")
+    print("[neural refinement] global cos:", formula_composition.global_metric(baseline_val, "cos"))
+    print("[neural refinement] global jss:", formula_composition.global_metric(baseline_val, "jss"))
     print(baseline_val.to_string(index=False))
 
     best_score = -1e18
-    best_path = out_dir / "r148_best_state.pt"
+    best_path = out_dir / "neural_refinement_best_state.pt"
     logs = []
 
     for epoch in range(1, args.epochs + 1):
-        energy_response.set_r147_train_mode(
+        energy_response.set_collision_energy_response_train_mode(
             model,
             train_k3b=args.train_k3b,
             train_refiner=args.train_refiner,
@@ -177,7 +177,7 @@ def main():
         valid_fracs = []
         n_events = []
 
-        pbar = tqdm(train_dl, desc=f"R148 train epoch={epoch}")
+        pbar = tqdm(train_dl, desc=f"neural refinement train epoch={epoch}")
 
         for bi, batch in enumerate(pbar):
             if args.max_train_batches > 0 and bi >= args.max_train_batches:
@@ -273,15 +273,15 @@ def main():
             "n_steps": len(losses),
         }
         logs.append(row)
-        print("[R148 train]", row)
+        print("[neural refinement train]", row)
 
         val_sum = formula_composition.eval_buckets(model, val_dl, device, "val")
-        val_sum.to_csv(out_dir / f"r148_val_epoch{epoch}.csv", index=False)
+        val_sum.to_csv(out_dir / f"neural_refinement_val_epoch{epoch}.csv", index=False)
 
         score = formula_composition.score_val(val_sum, baseline_val)
-        print(f"[R148] epoch={epoch} score={score:.6f}")
-        print("[R148] global cos:", formula_composition.global_metric(val_sum, "cos"))
-        print("[R148] global jss:", formula_composition.global_metric(val_sum, "jss"))
+        print(f"[neural refinement] epoch={epoch} score={score:.6f}")
+        print("[neural refinement] global cos:", formula_composition.global_metric(val_sum, "cos"))
+        print("[neural refinement] global jss:", formula_composition.global_metric(val_sum, "jss"))
         print(val_sum.to_string(index=False))
 
         if score > best_score:
@@ -295,30 +295,30 @@ def main():
                 },
                 best_path,
             )
-            print("[R148] saved best:", best_path)
+            print("[neural refinement] saved best:", best_path)
 
-    pd.DataFrame(logs).to_csv(out_dir / "r148_train_log.csv", index=False)
+    pd.DataFrame(logs).to_csv(out_dir / "neural_refinement_train_log.csv", index=False)
 
     if best_path.exists():
         ckpt = th.load(best_path, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["state_dict"], strict=True)
-        print("[R148] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
+        print("[neural refinement] loaded best epoch:", ckpt["epoch"], "score:", ckpt["best_score"])
 
     best_val = formula_composition.eval_buckets(model, val_dl, device, "val")
-    best_val.to_csv(out_dir / "r148_best_val.csv", index=False)
+    best_val.to_csv(out_dir / "neural_refinement_best_val.csv", index=False)
 
-    print("\n===== R148 BEST VAL =====")
-    print("[R148] best global cos:", formula_composition.global_metric(best_val, "cos"))
-    print("[R148] best global jss:", formula_composition.global_metric(best_val, "jss"))
+    print("\n===== neural refinement BEST VAL =====")
+    print("[neural refinement] best global cos:", formula_composition.global_metric(best_val, "cos"))
+    print("[neural refinement] best global jss:", formula_composition.global_metric(best_val, "jss"))
     print(best_val.to_string(index=False))
 
     if args.eval_test:
         best_test = formula_composition.eval_buckets(model, test_dl, device, "test")
-        best_test.to_csv(out_dir / "r148_best_test.csv", index=False)
+        best_test.to_csv(out_dir / "neural_refinement_best_test.csv", index=False)
 
-        print("\n===== R148 BEST TEST =====")
-        print("[R148] best global cos:", formula_composition.global_metric(best_test, "cos"))
-        print("[R148] best global jss:", formula_composition.global_metric(best_test, "jss"))
+        print("\n===== neural refinement BEST TEST =====")
+        print("[neural refinement] best global cos:", formula_composition.global_metric(best_test, "cos"))
+        print("[neural refinement] best global jss:", formula_composition.global_metric(best_test, "jss"))
         print(best_test.to_string(index=False))
 
     print("\nwrote", out_dir)

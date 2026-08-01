@@ -50,12 +50,12 @@ See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked
 The abbreviated build sequence is:
 
 ```bash
-python preproc_scripts/01_prepare_df.py --msp_file nist_20/hr_nist_msms.MSP --mol_dir nist_20/hr_nist_msms.MOL --input_format msp+mol --output_format csv --output_dp data/df --output_name nist20_hr
-python preproc_scripts/02_prepare_proc.py --df_dp data/df --dsets nist20_hr --proc_dp data/proc/nist20
-python preproc_scripts/03_prepare_dag_feats.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --proc_dp data/proc/nist20_qtof_cid_safe19659 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
-python preproc_scripts/04_prepare_split.py --split_type random --split_key inchikey_s --primary_dsets nist20_hr --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --ces ace --proc_dp data/proc/nist20_qtof_cid_safe19659 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --split_dp data/split/nist20_qtof_cid_safe19659_random_base
-python preproc_scripts/final/16_make_random_qcv1_trainonly_split.py --base_split_dp data/split/nist20_qtof_cid_safe19659_random_base --qc_csv /path/to/licensed_local_train_qc.csv --out_split_dp data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
-python preproc_scripts/05_prepare_scaffold_split_safe19659.py --source-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --mol-df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --output-split data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42 --seed 42
+python preproc_scripts/prepare_dataframes.py --msp_file nist_20/hr_nist_msms.MSP --mol_dir nist_20/hr_nist_msms.MOL --input_format msp+mol --output_format csv --output_dp data/df --output_name nist20_hr
+python preproc_scripts/prepare_processed_data.py --df_dp data/df --dsets nist20_hr --proc_dp data/proc/nist20
+python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --proc_dp data/proc/nist20_qtof_cid_safe19659 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
+python preproc_scripts/prepare_split.py --split_type random --split_key inchikey_s --primary_dsets nist20_hr --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --ces ace --proc_dp data/proc/nist20_qtof_cid_safe19659 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --split_dp data/split/nist20_qtof_cid_safe19659_random_base
+python preproc_scripts/final/make_random_split.py --base_split_dp data/split/nist20_qtof_cid_safe19659_random_base --qc_csv /path/to/licensed_local_train_qc.csv --out_split_dp data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
+python preproc_scripts/prepare_scaffold_split.py --source-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --mol-df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --output-split data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42 --seed 42
 ```
 
 The QC script only filters the random training partition; validation and test IDs remain unchanged. The exact cohort and QC inputs must come from the same licensed export. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
@@ -79,8 +79,8 @@ python train/train.py evaluation
 Three paired seeds for the molecule-disjoint and scaffold-disjoint protocols:
 
 ```bash
-bash train/run_molecule_disjoint_3seeds.sh
-bash train/run_scaffold_disjoint_3seeds.sh
+bash train/run_molecule_disjoint_three_seeds.sh
+bash train/run_scaffold_disjoint_three_seeds.sh
 ```
 
 Both scripts set `MS2_GLOBAL_SEED` to 42, 43, and 44 and archive each completed seed beneath `$FERA_MS_RUNS_DIR/experiments/`. `MS2_SPLIT_DP` selects the scaffold split without changing the locked scientific configuration.
@@ -90,7 +90,7 @@ Both scripts set `MS2_GLOBAL_SEED` to 42, 43, and 44 and archive each completed 
 The mainline command is `python train/train.py evaluation`. With a completed seed directory, additional formal evaluations are:
 
 ```bash
-python test/evaluate_chun_10ppm.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42
+python test/evaluate_chun.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42
 python test/evaluate_ace_perturbation.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42 --ace-mode shuffled
 python test/evaluate_metric_robustness.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42
 python test/run_candidate_space_coverage.py
@@ -99,10 +99,10 @@ python test/run_cumulative_refinement_analysis.py
 
 Each evaluator reads model artifacts from the supplied seed directory and writes under that directory or `runs/experiments/`; it does not train or select a checkpoint on the test set.
 
-For molecular identification, first build the licensed/local PubChem candidate pools with `test/build_experiment5_pubchem_candidates.py`, then run:
+For molecular identification, first build the licensed/local PubChem candidate pools with `test/build_retrieval_candidates.py`, then run:
 
 ```bash
-python test/run_experiment5_ours.py --splits random scaffold --seeds 42 43 44
+python test/run_molecular_retrieval.py --splits random scaffold --seeds 42 43 44
 ```
 
 Set `FERA_MS_RETRIEVAL_ROOT` if the candidate pools are outside the default run directory. Candidate caches and retrieval outputs are intentionally not versioned.
@@ -112,8 +112,8 @@ Set `FERA_MS_RETRIEVAL_ROOT` if the candidate pools are outside the default run 
 Global-only CE (global ACE embedding retained; local/multi-level neural ACE controls disabled):
 
 ```bash
-bash ablation_studies/fera_ms_global_ace_ablation_20260730/run_all_seeds.sh --dry-run
-bash ablation_studies/fera_ms_global_ace_ablation_20260730/run_all_seeds.sh
+bash ablation_studies/fera_ms_global_ace_ablation/run_all_seeds.sh --dry-run
+bash ablation_studies/fera_ms_global_ace_ablation/run_all_seeds.sh
 ```
 
 The first command is a non-training wiring check. The second performs the formal seeds 42/43/44 run.
@@ -122,7 +122,7 @@ The two rendering-component controls and the candidate-reranker control are:
 
 ```bash
 bash ablation_studies/fera_ms_panelb_ablation/scripts/run_remaining_panelb_ablation.sh
-bash ablation_studies/fera_ms_core_ablation/scripts/01_run_no_candidate_reranker.sh
+bash ablation_studies/fera_ms_core_ablation/scripts/run_no_candidate_reranker.sh
 ```
 
 These scripts preserve the locked split, seed, upstream checkpoints, losses, and evaluation metrics; only their documented ablation switch is changed.

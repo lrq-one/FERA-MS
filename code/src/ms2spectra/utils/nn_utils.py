@@ -375,7 +375,7 @@ class MPNN(nn.Module):
 
 class GAT(nn.Module):
 	""" Graph attention networks. https://arxiv.org/abs/1710.10903 
-		Graph attention networks v2. (How Attentive are Graph Attention Networks?  https://arxiv.org/abs/2105.14491)
+		Graph attention networks refined_variant. (How Attentive are Graph Attention Networks?  https://arxiv.org/abs/2105.14491)
 	"""
 
 	def __init__(
@@ -402,7 +402,7 @@ class GAT(nn.Module):
 			output_dim (int): _description_
 			gat_heads (int, optional): _description_. Defaults to 1.
 			gat_dropout (float, optional): _description_. Defaults to 0.0.
-			is_v2 (bool, optional). use v2 GATConv, Defaults to True
+			is_v2 (bool, optional). use refined_variant GATConv, Defaults to True
 			is_concat (bool, optional). concatenated multihead attetion, Defaults to True
 		"""
 		super().__init__()

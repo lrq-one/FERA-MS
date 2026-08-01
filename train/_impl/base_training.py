@@ -69,19 +69,19 @@ RUNTIME_CONFIG = materialize_training_config(
 )
 
 TEMPLATE = RUNTIME_CONFIG["template"]
-V1_CUSTOM = RUNTIME_CONFIG["base_stage"]
-R119_CUSTOM = RUNTIME_CONFIG["continuation_stage"]
+BASE_MODEL_CUSTOM = RUNTIME_CONFIG["base_stage"]
+RETAINED_CONTROL_CUSTOM = RUNTIME_CONFIG["continuation_stage"]
 
-OUTPUT_ROOT = RUNS_ROOT / "v2a_gine_cutchem_only"
+OUTPUT_ROOT = RUNS_ROOT / "structural_backbone_gine_cutchem_only"
 
-STAGE1_DIR = OUTPUT_ROOT / "stage1_v1_40ep"
-STAGE2_DIR = OUTPUT_ROOT / "stage2_r119_10ep"
+INITIAL_TRAINING_DIR = OUTPUT_ROOT / "initial_training_base_model_40ep"
+CONTINUATION_DIR = OUTPUT_ROOT / "continuation_retained_control_10ep"
 FINAL_DIR = OUTPUT_ROOT / "final"
 
 MONITOR = "val_cos_sim_0.01_epoch/mean"
 
-V1_STAGE1_BASELINE = 0.5897715092
-FORMAL_R119_BASELINE = 0.5927286148
+BASE_MODEL_INITIAL_TRAINING_BASELINE = 0.5897715092
+FORMAL_RETAINED_CONTROL_BASELINE = 0.5927286148
 
 
 def sha256_file(
@@ -152,22 +152,22 @@ def build_stage_configs() -> tuple[
         dict(
             workflow.load_config(
                 str(TEMPLATE),
-                str(V1_CUSTOM),
+                str(BASE_MODEL_CUSTOM),
             )
         )
     )
 
-    stage1 = copy.deepcopy(
+    initial_training = copy.deepcopy(
         original_v1
     )
 
     # ==========================================================
-    # V2A唯一两个模型变化。
+    # structural backbone唯一两个模型变化。
     # ==========================================================
-    stage1["frag_gnn_type"] = "GINE"
+    initial_training["frag_gnn_type"] = "GINE"
 
     frag_params = copy.deepcopy(
-        stage1["frag_params"]
+        initial_training["frag_params"]
     )
 
     frag_params[
@@ -176,12 +176,12 @@ def build_stage_configs() -> tuple[
         "cut_chem",
     ]
 
-    stage1["frag_params"] = frag_params
+    initial_training["frag_params"] = frag_params
 
     # ==========================================================
     # 仅运行控制，不改变训练目标。
     # ==========================================================
-    stage1.update(
+    initial_training.update(
         {
             "seed":
                 GLOBAL_SEED,
@@ -214,10 +214,10 @@ def build_stage_configs() -> tuple[
                 "max",
 
             "wandb_name":
-                "V2A_GINE_CUTCHEM_STAGE1",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_STAGE1",
 
             "wandb_group":
-                "V2A_GINE_CUTCHEM_ONLY",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_ONLY",
         }
     )
 
@@ -225,16 +225,16 @@ def build_stage_configs() -> tuple[
         TEMPLATE
     )
 
-    modified_v1_custom = load_yaml(
-        V1_CUSTOM
+    modified_base_model_custom = load_yaml(
+        BASE_MODEL_CUSTOM
     )
 
-    modified_v1_custom[
+    modified_base_model_custom[
         "frag_gnn_type"
     ] = "GINE"
 
     modified_frag_params = copy.deepcopy(
-        modified_v1_custom[
+        modified_base_model_custom[
             "frag_params"
         ]
     )
@@ -245,24 +245,24 @@ def build_stage_configs() -> tuple[
         "cut_chem",
     ]
 
-    modified_v1_custom[
+    modified_base_model_custom[
         "frag_params"
     ] = modified_frag_params
 
-    r119_custom = load_yaml(
-        R119_CUSTOM
+    retained_control_custom = load_yaml(
+        RETAINED_CONTROL_CUSTOM
     )
 
-    stage2, copied_training = (
+    continuation, copied_training = (
         prepare_effective_config(
             template_cfg=template_custom,
-            v1_custom=modified_v1_custom,
-            r119_custom=r119_custom,
+            base_model_custom=modified_base_model_custom,
+            retained_control_custom=retained_control_custom,
             epochs=10,
         )
     )
 
-    stage2.update(
+    continuation.update(
         {
             "seed":
                 GLOBAL_SEED,
@@ -289,10 +289,10 @@ def build_stage_configs() -> tuple[
                 "max",
 
             "wandb_name":
-                "V2A_GINE_CUTCHEM_STAGE2",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_STAGE2",
 
             "wandb_group":
-                "V2A_GINE_CUTCHEM_ONLY",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_ONLY",
         }
     )
 
@@ -301,8 +301,8 @@ def build_stage_configs() -> tuple[
     )
 
     if split_override:
-        stage1["split_dp"] = split_override
-        stage2["split_dp"] = split_override
+        initial_training["split_dp"] = split_override
+        continuation["split_dp"] = split_override
 
         print(
             "[SPLIT OVERRIDE]",
@@ -310,126 +310,126 @@ def build_stage_configs() -> tuple[
         )
 
     # ==========================================================
-    # 防止上次失败V2的设置混入。
+    # 防止上次失败refined variant的设置混入。
     # ==========================================================
     assertions = {
-        "stage1_frag_gnn_type":
-            stage1["frag_gnn_type"],
+        "initial_training_frag_gnn_type":
+            initial_training["frag_gnn_type"],
 
-        "stage2_frag_gnn_type":
-            stage2["frag_gnn_type"],
+        "continuation_frag_gnn_type":
+            continuation["frag_gnn_type"],
 
-        "stage1_edge_feats":
-            stage1[
+        "initial_training_edge_feats":
+            initial_training[
                 "frag_params"
             ][
                 "pyg_edge_feats"
             ],
 
-        "stage2_edge_feats":
-            stage2[
+        "continuation_edge_feats":
+            continuation[
                 "frag_params"
             ][
                 "pyg_edge_feats"
             ],
 
-        "stage1_ce_insert_type":
-            stage1["ce_insert_type"],
+        "initial_training_ce_insert_type":
+            initial_training["ce_insert_type"],
 
-        "stage2_ce_insert_type":
-            stage2["ce_insert_type"],
-
-        
+        "continuation_ce_insert_type":
+            continuation["ce_insert_type"],
 
         
 
-        "stage1_ce_depth_rank":
-            stage1[
+        
+
+        "initial_training_ce_depth_rank":
+            initial_training[
                 "use_ce_depth_rank_loss"
             ],
 
-        "stage2_ce_depth_rank":
-            stage2[
+        "continuation_ce_depth_rank":
+            continuation[
                 "use_ce_depth_rank_loss"
             ],
 
-        "stage1_lr":
-            stage1["lr"],
+        "initial_training_lr":
+            initial_training["lr"],
 
-        "stage1_weight_decay":
-            stage1["weight_decay"],
+        "initial_training_weight_decay":
+            initial_training["weight_decay"],
 
-        "stage1_frag_layers":
-            stage1["frag_num_layers"],
+        "initial_training_frag_layers":
+            initial_training["frag_num_layers"],
 
-        "stage1_frag_hidden":
-            stage1["frag_hidden_size"],
+        "initial_training_frag_hidden":
+            initial_training["frag_hidden_size"],
 
-        "stage1_batch_size":
-            stage1["train_batch_size"],
+        "initial_training_batch_size":
+            initial_training["train_batch_size"],
     }
 
     assert (
-        stage1["frag_gnn_type"]
+        initial_training["frag_gnn_type"]
         == "GINE"
     )
 
     assert (
-        stage2["frag_gnn_type"]
+        continuation["frag_gnn_type"]
         == "GINE"
     )
 
     assert (
-        stage1["frag_params"][
+        initial_training["frag_params"][
             "pyg_edge_feats"
         ]
         == ["cut_chem"]
     )
 
     assert (
-        stage2["frag_params"][
+        continuation["frag_params"][
             "pyg_edge_feats"
         ]
         == ["cut_chem"]
     )
 
     assert (
-        stage1["ce_insert_type"]
+        initial_training["ce_insert_type"]
         == "embed"
     )
 
     assert (
-        stage2["ce_insert_type"]
+        continuation["ce_insert_type"]
         == "embed"
     )
 
 
 
     assert not bool(
-        stage1[
+        initial_training[
             "use_ce_depth_rank_loss"
         ]
     )
 
     assert not bool(
-        stage2[
+        continuation[
             "use_ce_depth_rank_loss"
         ]
     )
 
     assert (
         "use_v2_metric_aligned_loss"
-        not in stage1
+        not in initial_training
     )
 
     assert (
         "use_v2_metric_aligned_loss"
-        not in stage2
+        not in continuation
     )
 
     assert (
         int(
-            stage1[
+            initial_training[
                 "frag_num_layers"
             ]
         )
@@ -437,13 +437,13 @@ def build_stage_configs() -> tuple[
     )
 
     assert (
-        float(stage1["lr"])
+        float(initial_training["lr"])
         == float(original_v1["lr"])
     )
 
     assert (
         float(
-            stage1[
+            initial_training[
                 "weight_decay"
             ]
         )
@@ -456,7 +456,7 @@ def build_stage_configs() -> tuple[
 
     print()
     print("=" * 96)
-    print("V2A CONFIG AUDIT")
+    print("structural backbone CONFIG AUDIT")
     print("=" * 96)
 
     print(
@@ -469,7 +469,7 @@ def build_stage_configs() -> tuple[
 
     print()
     print(
-        "[R119 TRAINING SETTINGS]"
+        "[retained control TRAINING SETTINGS]"
     )
 
     print(
@@ -482,15 +482,15 @@ def build_stage_configs() -> tuple[
 
     print("=" * 96)
 
-    stage1[
+    initial_training[
         "eval_test_split"
     ] = False
 
-    stage2[
+    continuation[
         "eval_test_split"
     ] = False
 
-    return stage1, stage2
+    return initial_training, continuation
 
 
 def architecture_preflight(
@@ -540,7 +540,7 @@ def architecture_preflight(
 
     print()
     print("=" * 96)
-    print("V2A ARCHITECTURE PREFLIGHT")
+    print("structural backbone ARCHITECTURE PREFLIGHT")
     print("=" * 96)
 
     print(
@@ -575,7 +575,7 @@ def architecture_preflight(
         or ce_type != "embed"
     ):
         raise RuntimeError(
-            "V2A结构检查失败："
+            "structural backbone结构检查失败："
             f"wrapper={wrapper_class}, "
             f"gnn_type={gnn_type}, "
             f"inner={inner_class}, "
@@ -749,7 +749,7 @@ def train_stage(
 
     if (
         resume_ckpt_path
-        and "stage1_v1_40ep"
+        and "initial_training_base_model_40ep"
         not in checkpoint_dir
     ):
         resume_ckpt_path = None
@@ -869,8 +869,8 @@ def train_stage(
 def main() -> None:
     required = [
         TEMPLATE,
-        V1_CUSTOM,
-        R119_CUSTOM,
+        BASE_MODEL_CUSTOM,
+        RETAINED_CONTROL_CUSTOM,
         ROOT
         / "code/src/ms2spectra/model.py",
         ROOT
@@ -921,19 +921,19 @@ def main() -> None:
     except Exception:
         pass
 
-    stage1_config, stage2_config = (
+    initial_training_config, continuation_config = (
         build_stage_configs()
     )
 
     architecture_preflight(
-        stage1_config
+        initial_training_config
     )
 
-    stage1_score, stage1_checkpoint = (
+    initial_training_score, initial_training_checkpoint = (
         train_stage(
-            name="STAGE1_V2A_GINE_40EP",
-            run_dir=STAGE1_DIR,
-            config=stage1_config,
+            name="INITIAL_TRAINING_STRUCTURAL_BACKBONE_GINE_40EP",
+            run_dir=INITIAL_TRAINING_DIR,
+            config=initial_training_config,
             initialization_checkpoint=None,
             # 保证完整跑满40轮。
             patience=1000,
@@ -941,33 +941,33 @@ def main() -> None:
         )
     )
 
-    stage2_score, stage2_checkpoint = (
+    continuation_score, continuation_checkpoint = (
         train_stage(
-            name="STAGE2_V2A_R119_10EP",
-            run_dir=STAGE2_DIR,
-            config=stage2_config,
+            name="CONTINUATION_STRUCTURAL_BACKBONE_RETAINED_CONTROL_10EP",
+            run_dir=CONTINUATION_DIR,
+            config=continuation_config,
             initialization_checkpoint=(
-                stage1_checkpoint
+                initial_training_checkpoint
             ),
             patience=4,
             min_delta=1.0e-4,
         )
     )
 
-    if stage2_score >= stage1_score:
-        selected_stage = "stage2_r119"
-        selected_score = stage2_score
+    if continuation_score >= initial_training_score:
+        selected_stage = "continuation_r119"
+        selected_score = continuation_score
         selected_checkpoint = (
-            stage2_checkpoint
+            continuation_checkpoint
         )
-        selected_config = stage2_config
+        selected_config = continuation_config
     else:
-        selected_stage = "stage1_v1"
-        selected_score = stage1_score
+        selected_stage = "initial_training_v1"
+        selected_score = initial_training_score
         selected_checkpoint = (
-            stage1_checkpoint
+            initial_training_checkpoint
         )
-        selected_config = stage1_config
+        selected_config = initial_training_config
 
     FINAL_DIR.mkdir(
         parents=True,
@@ -992,7 +992,7 @@ def main() -> None:
 
     if (
         selected_score
-        >= FORMAL_R119_BASELINE
+        >= FORMAL_RETAINED_CONTROL_BASELINE
     ):
         decision = (
             "PASS_OR_EXCEED_FORMAL_BASELINE"
@@ -1005,11 +1005,11 @@ def main() -> None:
 
     elif (
         selected_score
-        >= V1_STAGE1_BASELINE
+        >= BASE_MODEL_INITIAL_TRAINING_BASELINE
     ):
         decision = (
             "GINE_CUTCHEM_NEUTRAL_BUT_"
-            "R119_GAIN_NOT_RECOVERED"
+            "RETAINED_CONTROL_GAIN_NOT_RECOVERED"
         )
 
         next_action = (
@@ -1029,7 +1029,7 @@ def main() -> None:
 
     summary = {
         "experiment":
-            "V2A_GINE_CUTCHEM_ONLY",
+            "STRUCTURAL_BACKBONE_GINE_CUTCHEM_ONLY",
 
         "only_model_changes": {
             "frag_gnn_type":
@@ -1040,11 +1040,11 @@ def main() -> None:
                 "[] -> [cut_chem]",
         },
 
-        "stage1_best_val_cosine":
-            stage1_score,
+        "initial_training_best_val_cosine":
+            initial_training_score,
 
-        "stage2_best_val_cosine":
-            stage2_score,
+        "continuation_best_val_cosine":
+            continuation_score,
 
         "selected_stage":
             selected_stage,
@@ -1052,22 +1052,22 @@ def main() -> None:
         "selected_best_val_cosine":
             selected_score,
 
-        "v1_stage1_baseline":
-            V1_STAGE1_BASELINE,
+        "base_model_initial_training_baseline":
+            BASE_MODEL_INITIAL_TRAINING_BASELINE,
 
-        "formal_r119_baseline":
-            FORMAL_R119_BASELINE,
+        "formal_retained_control_baseline":
+            FORMAL_RETAINED_CONTROL_BASELINE,
 
-        "delta_vs_v1_stage1":
+        "delta_vs_base_model_stage1":
             (
                 selected_score
-                - V1_STAGE1_BASELINE
+                - BASE_MODEL_INITIAL_TRAINING_BASELINE
             ),
 
         "delta_vs_formal_r119":
             (
                 selected_score
-                - FORMAL_R119_BASELINE
+                - FORMAL_RETAINED_CONTROL_BASELINE
             ),
 
         "decision":
@@ -1106,17 +1106,17 @@ def main() -> None:
 
     print()
     print("=" * 100)
-    print("V2A FINAL VALIDATION RESULT")
+    print("structural backbone FINAL VALIDATION RESULT")
     print("=" * 100)
 
     print(
-        "stage1 best cosine :",
-        f"{stage1_score:.10f}",
+        "initial_training best cosine :",
+        f"{initial_training_score:.10f}",
     )
 
     print(
-        "stage2 best cosine :",
-        f"{stage2_score:.10f}",
+        "continuation best cosine :",
+        f"{continuation_score:.10f}",
     )
 
     print(
@@ -1130,13 +1130,13 @@ def main() -> None:
     )
 
     print(
-        "delta vs V1 stage1 :",
-        f"{selected_score - V1_STAGE1_BASELINE:+.10f}",
+        "delta vs base model initial_training :",
+        f"{selected_score - BASE_MODEL_INITIAL_TRAINING_BASELINE:+.10f}",
     )
 
     print(
         "delta vs formal    :",
-        f"{selected_score - FORMAL_R119_BASELINE:+.10f}",
+        f"{selected_score - FORMAL_RETAINED_CONTROL_BASELINE:+.10f}",
     )
 
     print(
