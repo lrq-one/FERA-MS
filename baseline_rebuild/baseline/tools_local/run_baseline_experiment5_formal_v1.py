@@ -29,7 +29,12 @@ BASELINE = (
 )
 
 REPO = (
-    Path(os.environ.get("FERA_MS_BASELINE_SOURCE", BASELINE / "shared/fragnnet_main"))
+    Path(
+        os.environ.get(
+            "FERA_MS_BASELINE_SOURCE",
+            BASELINE / "source" / "fragnnet",
+        )
+    )
 )
 
 SRC = REPO / "src"

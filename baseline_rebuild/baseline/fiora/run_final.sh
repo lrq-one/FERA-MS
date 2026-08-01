@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASELINE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="${FERA_MS_FIORA_WORKSPACE:-$BASELINE_ROOT/shared/fiora_work}"
-FIORA_PREDICT="${FIORA_PREDICT:-fiora-predict}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASELINE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE="$BASELINE_ROOT/source/fiora"
+INPUT="${FERA_MS_FIORA_INPUT:?Set FERA_MS_FIORA_INPUT to the local test-query CSV}"
+REFERENCE="${FERA_MS_FIORA_REFERENCE:?Set FERA_MS_FIORA_REFERENCE to the local reference CSV}"
+MODEL="${FERA_MS_FIORA_MODEL:?Set FERA_MS_FIORA_MODEL to the external FIORA .pt model}"
+OUTPUT_DIR="${FERA_MS_BASELINE_OUTPUT_DIR:-$BASELINE_ROOT/results_local}/fiora"
 
-cd "$WORK/fiora-main"
+mkdir -p "$OUTPUT_DIR"
 
-mkdir -p "$WORK/fiora_audit/preds"
-mkdir -p "$WORK/fiora_audit/summaries"
+PRED="$OUTPUT_DIR/fiora_os_qtof_final.mgf"
+OUT="$OUTPUT_DIR/fiora_os_qtof_final_test.csv"
 
-PRED="$WORK/fiora_audit/preds/fiora_os_qtof_final.mgf"
-OUT="$WORK/fiora_audit/summaries/fiora_os_qtof_final_test.csv"
-
-echo "============================================================"
 echo "Running FIORA official zero-shot QTOF baseline"
-echo "WORK: $WORK"
-echo "PRED: $PRED"
-echo "OUT:  $OUT"
-echo "============================================================"
+echo "SOURCE: $SOURCE"
+echo "MODEL:  $MODEL"
+echo "PRED:   $PRED"
+echo "OUT:    $OUT"
 
-"$FIORA_PREDICT" \
-  -i "$WORK/safe19659/fiora_safe19659_test_qtof_ace_FROM_FULL.csv" \
+PYTHONPATH="$SOURCE${PYTHONPATH:+:$PYTHONPATH}" python -m fiora.cli.predict \
+  -i "$INPUT" \
   -o "$PRED" \
-  --dev cuda:0 \
+  --model "$MODEL" \
+  --dev "${FIORA_DEVICE:-cpu}" \
   --min_prob 0 \
   --no-rt \
   --no-ccs \
   --no-annotation
 
-python \
-  "$WORK/fiora_audit/scripts/eval_fiora_against_library_csv.py" \
+python "$SCRIPT_DIR/eval_fiora_against_library_csv.py" \
   --pred_mgf "$PRED" \
-  --ref_csv "$WORK/safe19659/fiora_safe19659_library_qtof_ace.csv" \
+  --ref_csv "$REFERENCE" \
   --split test \
   --top_k 0 \
   --rel_thresh 0.0 \

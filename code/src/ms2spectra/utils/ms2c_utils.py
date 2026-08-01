@@ -7,14 +7,11 @@ import multiprocessing
 import os
 from tqdm import tqdm
 
-from ms2spectra.training import FragGNNPL, NeimsPL, GNNPL
-from ms2spectra.massformer.pl_model import MassFormerPL
-from ms2spectra.iceberg.pl_model import IcebergGenPL, IcebergIntenPL
-from ms2spectra.iceberg.dataset import SpecMolMagmaIntenDataset,SpecMolMagmaGenDataset
+from ms2spectra.training import FragGNNPL
 from ms2spectra.workflow import init_dataloader, load_config
 from ms2spectra.utils.misc_utils import to_device
 from ms2spectra.utils.nn_utils import get_pl_hparams, decompile_jit_ckpt
-from ms2spectra.data import SpecMolFragDataset, SpecMolDataset
+from ms2spectra.data import SpecMolFragDataset
 
 class MolCandidateDB():
 
@@ -179,11 +176,7 @@ class MolCandidateDB():
 
 #
 model_type_to_model_cls = {
-	"neims": NeimsPL,
-	"gnn": GNNPL,
 	"frag_gnn": FragGNNPL,
-	"massformer": MassFormerPL,
-	"iceberg_inten": IcebergIntenPL
 }
 
 def load_model_and_init_config(
@@ -334,23 +327,11 @@ def run_spectra_prediction(model,
 		print("> num of spec before filtering by dag", len(spec_df))
 		spec_df = spec_df[spec_df['mol_id'].isin(mol_df['mol_id'].to_list())]
 		print("> num of spec after filtering by dag", len(spec_df))
-	elif isinstance(model,NeimsPL) or isinstance(model,MassFormerPL) or isinstance(model, GNNPL):
-		mz_max = local_config_d['mz_max']
-		spec_df = spec_df[spec_df['prec_mz'] <= mz_max]
-		#print("> [NeimsPL] num of spec after prec_mz filtering", len(spec_df))
-		model_ds_cls = SpecMolDataset
-	elif isinstance(model,IcebergIntenPL):
-		assert os.path.isdir(magma_dp)
-		model_ds_cls = SpecMolMagmaIntenDataset
-		print(f">> filtering input without magma. magma_dp: {magma_dp}")
-		magma_jsons = set([f.split('.')[0] for f in os.listdir(os.path.join(magma_dp,'magma_tree')) if f.endswith('.json')])
-		print(">> num of magma jsons: ", len(magma_jsons))
-		print("> num of spec before filtering by magma", len(spec_df))
-		spec_df = spec_df[spec_df['group_id'].astype(str).isin(magma_jsons)]
-		print("> num of spec after filtering by magma", len(spec_df))		
-		local_config_d['magma_dp'] = magma_dp
 	else:
-		print(f"Not supported model: {model}")
+		raise TypeError(
+			"Only the FERA-MS FragGNNPL runtime is supported here; baseline "
+			"inference utilities are under baseline_rebuild/baseline/."
+		)
   
 
 	if len(spec_df) == 0:

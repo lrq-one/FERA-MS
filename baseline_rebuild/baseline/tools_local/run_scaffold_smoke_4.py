@@ -15,8 +15,12 @@ import yaml
 
 BASE = Path(os.environ.get("FERA_MS_BASELINE_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
-MAIN = Path(os.environ.get("FERA_MS_BASELINE_SOURCE", BASE / "shared/fragnnet_main")).resolve()
-ICEBERG = Path(os.environ.get("FERA_MS_ICEBERG_SOURCE", BASE / "shared/iceberg_core")).resolve()
+SOURCE = Path(
+    os.environ.get(
+        "FERA_MS_BASELINE_SOURCE",
+        BASE / "source" / "fragnnet",
+    )
+).resolve()
 
 RESULT_ROOT = (
     Path(os.environ.get("FERA_MS_BASELINE_OUTPUT_DIR", BASE / "results_local"))
@@ -34,35 +38,27 @@ OLD_ROOT = os.environ.get("FERA_MS_LEGACY_BASELINE_ROOT", str(BASE))
 JOBS = [
     {
         "model": "neims",
-        "repo": MAIN,
+        "repo": SOURCE,
         "source_config":
-            MAIN
-            / "benchmark_audit/configs_clean/"
-            "neims_ace_reference.yml",
+            BASE / "neims/configs/scaffold/seed_42.yml",
     },
     {
         "model": "massformer",
-        "repo": MAIN,
+        "repo": SOURCE,
         "source_config":
-            MAIN
-            / "benchmark_audit/configs_clean/"
-            "massformer_ace_reference.yml",
+            BASE / "massformer/configs/scaffold/seed_42.yml",
     },
     {
         "model": "fragnnet_d3",
-        "repo": MAIN,
+        "repo": SOURCE,
         "source_config":
-            MAIN
-            / "benchmark_audit/configs_clean/"
-            "fragnnet_fragmentation_ace_reference.yml",
+            BASE / "fragnnet_d3/configs/scaffold/seed_42.yml",
     },
     {
         "model": "iceberg",
-        "repo": ICEBERG,
+        "repo": SOURCE,
         "source_config":
-            ICEBERG
-            / "benchmark_audit/configs_clean/"
-            "iceberg_core_reference.yml",
+            BASE / "iceberg/configs/scaffold/seed_42.yml",
     },
 ]
 

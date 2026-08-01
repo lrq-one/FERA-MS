@@ -18,13 +18,19 @@ import yaml
 
 BASE = Path(os.environ.get("FERA_MS_BASELINE_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
-MAIN = (
-    Path(os.environ.get("FERA_MS_BASELINE_SOURCE", BASE / "shared/fragnnet_main"))
-)
+SOURCE = Path(
+    os.environ.get(
+        "FERA_MS_BASELINE_SOURCE",
+        BASE / "source" / "fragnnet",
+    )
+).resolve()
 
-ICEBERG = (
-    Path(os.environ.get("FERA_MS_ICEBERG_SOURCE", BASE / "shared/iceberg_core"))
-)
+DATA_ROOT = Path(
+    os.environ.get(
+        "FERA_MS_BASELINE_DATA_DIR",
+        BASE.parents[1] / "data",
+    )
+).resolve()
 
 RESULT_ROOT = (
     Path(os.environ.get("FERA_MS_BASELINE_OUTPUT_DIR", BASE / "results_local"))
@@ -35,55 +41,31 @@ TOOLS = BASE / "tools_local"
 
 MODEL_INFO = {
     "neims": {
-        "repo": MAIN,
-        "config":
-            MAIN
-            / "benchmark_audit/"
-            "configs_clean/"
-            "neims_ace_reference.yml",
-        "epochs": 60,
+        "config_dir": BASE / "neims" / "configs",
     },
     "massformer": {
-        "repo": MAIN,
-        "config":
-            MAIN
-            / "benchmark_audit/"
-            "configs_clean/"
-            "massformer_ace_reference.yml",
-        "epochs": 80,
+        "config_dir": BASE / "massformer" / "configs",
     },
     "fragnnet_d3": {
-        "repo": MAIN,
-        "config":
-            MAIN
-            / "benchmark_audit/"
-            "configs_clean/"
-            "fragnnet_fragmentation_ace_reference.yml",
-        "epochs": 80,
+        "config_dir": BASE / "fragnnet_d3" / "configs",
     },
     "iceberg": {
-        "repo": ICEBERG,
-        "config":
-            ICEBERG
-            / "benchmark_audit/"
-            "configs_clean/"
-            "iceberg_core_reference.yml",
-        "epochs": 60,
+        "config_dir": BASE / "iceberg" / "configs",
+    },
+    "graff_ms": {
+        "config_dir": BASE / "graff_ms" / "configs",
     },
 }
 
-SPLITS = {
-    "random": (
-        "data/split/"
-        "nist20_qtof_cid_safe19659_"
-        "qcv1_trainonly"
-    ),
-    "scaffold": (
-        "data/split/"
-        "nist20_qtof_cid_safe19659_"
-        "scaffold60_20_20_seed42"
-    ),
-}
+SPLITS = ("random", "scaffold")
+DATA_PATH_KEYS = (
+    "spec_fp",
+    "mol_fp",
+    "split_dp",
+    "frag_dp",
+    "magma_dp",
+    "ann_fp",
+)
 
 
 def make_config(
@@ -91,7 +73,6 @@ def make_config(
     target: Path,
     split: str,
     seed: int,
-    epochs: int,
 ) -> None:
     config = yaml.safe_load(
         source.read_text(
@@ -99,32 +80,29 @@ def make_config(
         )
     )
 
-    config["seed"] = int(seed)
-    config["split_dp"] = SPLITS[
-        split
-    ]
+    if int(config["seed"]) != seed:
+        raise ValueError(
+            f"Locked config seed mismatch: {source}"
+        )
 
-    config["min_epochs"] = 1
-    config["max_epochs"] = int(
-        epochs
-    )
+    expected_split = {
+        "random": "qcv1_trainonly",
+        "scaffold": "scaffold60_20_20_seed42",
+    }[split]
+    if expected_split not in str(config["split_dp"]):
+        raise ValueError(
+            f"Locked config split mismatch: {source}"
+        )
 
-    config["eval_test_split"] = True
-
-    config["auxiliary_scores"] = [
-        "cos_sim",
-        "jss",
-    ]
-
-    config["eval_mz_bin_res"] = [
-        0.01,
-    ]
-
-    config[
-        "sparse_cosine_similarity"
-    ] = True
-
-    config["compile"] = False
+    for key in DATA_PATH_KEYS:
+        value = config.get(key)
+        if not isinstance(value, str):
+            continue
+        path = Path(value)
+        if path.parts and path.parts[0] == "data":
+            config[key] = str(
+                DATA_ROOT.joinpath(*path.parts[1:])
+            )
 
     target.write_text(
         yaml.safe_dump(
@@ -265,10 +243,15 @@ def run() -> None:
         args.model
     ]
 
-    repo = info["repo"]
-    epochs = int(
-        info["epochs"]
+    repo = SOURCE
+    source_config = (
+        info["config_dir"]
+        / args.split
+        / f"seed_{args.seed}.yml"
     )
+
+    if not source_config.is_file():
+        raise FileNotFoundError(source_config)
 
     result_dir = (
         RESULT_ROOT
@@ -327,12 +310,16 @@ def run() -> None:
     )
 
     make_config(
-        source=info["config"],
+        source=source_config,
         target=config_path,
         split=args.split,
         seed=args.seed,
-        epochs=epochs,
     )
+
+    locked_config = yaml.safe_load(
+        source_config.read_text(encoding="utf-8")
+    )
+    epochs = int(locked_config["max_epochs"])
 
     clean_temp(repo)
 

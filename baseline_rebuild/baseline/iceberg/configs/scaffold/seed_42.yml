@@ -1,0 +1,97 @@
+wandb_name: nist20_inchikey_iceberg_s0
+wandb_group: nist20_inchikey_iceberg
+seed: 42
+spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
+mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
+split_dp: data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42
+magma_dp: data/magma/gen/nist20_qtof_cid_safe19659_mhp_qtof_cid_v1
+spec_params:
+  preprocess: true
+  merge: false
+  merge_keep_ces: false
+  prec_type: true
+  prec_type_str: false
+  prec_types:
+  - '[M+H]+'
+  inst_type: true
+  inst_types:
+  - QTOF
+  prec_mz: true
+  prec_mass_diff: true
+  ace: true
+  nce: false
+  sparse: true
+  unique_id: true
+  counts: true
+mol_params:
+  smiles: true
+  fingerprint: false
+  pyg: false
+  preprocess: false
+magma_params:
+  pe_embed_k: 0
+  root_encode: gnn
+  add_hs: true
+  binned_targs: false
+  mz_bin_res: 0.01
+  mz_max: 1500.0
+  sum_ints: true
+  preprocess: true
+model_type: iceberg_inten
+iceberg_hidden_size: 512
+iceberg_num_mlp_layers: 3
+iceberg_num_gnn_layers: 3
+iceberg_num_set_layers: 0
+iceberg_num_frag_set_layers: 3
+iceberg_dropout: 0.3
+iceberg_gnn_type: GGNN
+iceberg_pool_type: attn
+iceberg_inject_early: false
+iceberg_embed_adduct: true
+iceberg_encode_forms: true
+iceberg_fix_batch_bug: true
+output_formula_str: false
+loss_type: cosine_distance
+oos_tolerance_multiple: 1
+oos_loss: false
+sparse_cosine_similarity: true
+ints_transform: sqrt
+train_batch_size: 32
+eval_batch_size: 32
+accumulate_grad_batches: 1
+gradient_clip_val: 5.0
+lr: 0.0004645
+weight_decay: 1.0e-07
+accelerator: gpu
+devices: 1
+min_epochs: 1
+max_epochs: 60
+lr_schedule: true
+lr_decay_rate: 0.8147
+lr_warmup_steps: 1000
+lr_decay_steps: 5000
+debug_overfit: false
+upload_checkpoints: true
+checkpoint_metric: val_cos_sim_0.01_epoch/mean
+checkpoint_metric_mode: max
+auxiliary_scores:
+- cos_sim
+- jss
+eval_mz_bin_res:
+- 0.01
+precision: 32
+use_tensor_float32: true
+automatic_optimization: true
+compile: false
+mz_bin_res: 0.01
+eval_test_split: true
+ce_insert_type: embed
+ce_insert_location: mlp
+ce_insert_merge: false
+num_workers: 0
+pin_memory: false
+early_stopping: true
+early_stopping_metric: val_cos_sim_0.01_epoch/mean
+early_stopping_mode: max
+early_stopping_patience: 20
+early_stopping_min_delta: 0.0005

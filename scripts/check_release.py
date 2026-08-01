@@ -27,7 +27,7 @@ SOURCE_ROOTS = (
 )
 REQUIRED = (
     "README.md",
-    "LICENSE_PENDING.md",
+    "LICENSE",
     "CITATION.cff",
     "THIRD_PARTY_NOTICES.md",
     "requirements.txt",
@@ -45,8 +45,21 @@ REQUIRED = (
     "docs/PIPELINE.md",
     "docs/REPRODUCIBILITY.md",
     "docs/SOURCE_PROVENANCE.md",
+    "docs/BASELINE_PROVENANCE.md",
     "data/README.md",
-    "licenses/FraGNNet-BSD-2-Clause.txt",
+    "baseline_rebuild/baseline/source/fragnnet/LICENSE",
+    "baseline_rebuild/baseline/source/fragnnet/UPSTREAM.md",
+    "baseline_rebuild/baseline/source/fragnnet/src/fragnnet/model.py",
+    "baseline_rebuild/baseline/source/fragnnet/src/fragnnet/iceberg/model.py",
+    "baseline_rebuild/baseline/source/fiora/LICENSE",
+    "baseline_rebuild/baseline/source/fiora/UPSTREAM.md",
+    "baseline_rebuild/baseline/source/fiora/fiora/cli/predict.py",
+    "baseline_rebuild/baseline/neims/UPSTREAM.md",
+    "baseline_rebuild/baseline/massformer/UPSTREAM.md",
+    "baseline_rebuild/baseline/fragnnet_d3/UPSTREAM.md",
+    "baseline_rebuild/baseline/iceberg/UPSTREAM.md",
+    "baseline_rebuild/baseline/graff_ms/UPSTREAM.md",
+    "baseline_rebuild/baseline/fiora/UPSTREAM.md",
 )
 FORBIDDEN_DIR_NAMES = {
     "__pycache__",
@@ -75,7 +88,6 @@ ABSOLUTE_PATTERNS = (
     re.compile(r"/home/lwh(?:/|\b)"),
     re.compile(r"/mnt(?:/|\b)"),
     re.compile(r"/hy-tmp(?:/|\b)"),
-    re.compile(r"fragnnet-main"),
     re.compile(r"ms2spectra_v1_r119"),
 )
 
@@ -184,13 +196,21 @@ def main() -> int:
     for baseline in ("NEIMS", "MassFormer", "FraGNNet-D3", "GrAFF-MS", "ICEBERG", "FIORA"):
         if baseline not in notice:
             fail(f"third-party notice missing baseline: {baseline}", failures)
-    for integrated_scope in (
-        "code/src/ms2spectra/massformer/",
-        "code/src/ms2spectra/graff/",
-        "code/src/ms2spectra/iceberg/",
+    for retained_scope in (
+        "baseline_rebuild/baseline/source/fragnnet/",
+        "baseline_rebuild/baseline/source/fiora/",
     ):
-        if integrated_scope not in notice:
-            fail(f"third-party notice missing integrated scope: {integrated_scope}", failures)
+        if retained_scope not in notice:
+            fail(f"third-party notice missing retained scope: {retained_scope}", failures)
+
+    fera_root = ROOT / "code/src/ms2spectra"
+    for baseline_dir in ("massformer", "graff", "iceberg"):
+        if (fera_root / baseline_dir).exists():
+            fail(f"baseline implementation leaked into FERA-MS package: {baseline_dir}", failures)
+    baseline_import = re.compile(r"ms2spectra\.(?:massformer|graff|iceberg)")
+    for path in fera_root.rglob("*.py"):
+        if baseline_import.search(path.read_text(encoding="utf-8")):
+            fail(f"baseline import leaked into FERA-MS package: {path.relative_to(ROOT)}", failures)
 
     provenance = (ROOT / "docs/SOURCE_PROVENANCE.md").read_text(encoding="utf-8")
     source_suffixes = {".py", ".pyx", ".sh", ".yml", ".yaml", ".toml"}
@@ -211,8 +231,13 @@ def main() -> int:
             continue
         if relative.parts[0] not in covered_roots and str(relative) not in covered_root_files:
             fail(f"source file outside provenance scopes: {relative}", failures)
-    if "214 tracked" not in provenance:
-        fail("source provenance report lacks audited inventory count", failures)
+    for scope in (
+        "code/src/ms2spectra/**",
+        "baseline_rebuild/baseline/source/fragnnet/**",
+        "baseline_rebuild/baseline/source/fiora/**",
+    ):
+        if scope not in provenance:
+            fail(f"source provenance report lacks scope: {scope}", failures)
 
     citation = yaml.safe_load((ROOT / "CITATION.cff").read_text(encoding="utf-8"))
     expected_title = (
@@ -225,11 +250,8 @@ def main() -> int:
         fail("CITATION.cff version mismatch", failures)
     if str(citation.get("date-released")) != "2026-08-01":
         fail("CITATION.cff release date mismatch", failures)
-    if citation.get("license") == "BSD-3-Clause" and "**BLOCKED**" in notice:
-        fail("BSD-3-Clause claimed while provenance blockers remain", failures)
-    if (ROOT / "LICENSE").exists() and "**BLOCKED**" in notice:
-        fail("root LICENSE present while provenance blockers remain", failures)
-
+    if citation.get("license") != "BSD-3-Clause":
+        fail("CITATION.cff license mismatch", failures)
     readme_lower = readme.lower()
     split_disclosure = "record-level" in readme_lower and "not included" in readme_lower
     if not split_disclosure:

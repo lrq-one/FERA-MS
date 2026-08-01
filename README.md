@@ -6,13 +6,13 @@ The implementation combines a structural GINE backbone and cut-chemistry feature
 
 ## Repository layout
 
-- `code/src/ms2spectra/`: model, losses, data utilities, fragment generation, and baseline model components.
+- `code/src/ms2spectra/`: FERA-MS model, losses, data utilities, and fragment generation.
 - `config/train.yml`: locked mainline configuration bundle. Runtime YAML files are generated under `runs/_config/`.
 - `preproc_scripts/`: NIST export parsing, processed data construction, random/scaffold splits, and depth-3 DAG construction.
 - `train/`: single-seed and three-seed mainline entrypoints.
 - `test/`: locked evaluation, CHUN, ACE perturbation, robustness, candidate-space, and molecular-identification analyses.
 - `ablation_studies/`: validated global-only CE, m/z-offset, rendered-gate, and no-reranker controls.
-- `baseline_rebuild/`: baseline configurations, launchers, and aggregation utilities. The integrated NEIMS, MassFormer, FraGNNet-D3, GrAFF-MS, and ICEBERG implementations remain under `code/src/ms2spectra/`; FIORA is invoked through its separately installed CLI.
+- `baseline_rebuild/`: independent baseline source packages, locked random/scaffold configs, launchers, evaluation/retrieval adapters, and aggregation utilities. These sources are kept separate from `code/src/ms2spectra/`.
 - `docs/`: pipeline and reproducibility details.
 
 ## Environment and installation
@@ -26,7 +26,7 @@ pip install -e .
 python scripts/check_release.py
 ```
 
-The editable install compiles `ms2spectra.frag.compute_frags` and `ms2spectra.massformer.algos` from their tracked Cython sources; platform-specific `.so` files are intentionally excluded.
+The editable install compiles `ms2spectra.frag.compute_frags` from its tracked Cython source; platform-specific `.so` files are intentionally excluded. Baseline extensions are built only from the independent packages under `baseline_rebuild/baseline/source/`.
 
 ## Data availability and layout
 
@@ -129,8 +129,8 @@ These scripts preserve the locked split, seed, upstream checkpoints, losses, and
 
 ## Baselines
 
-Baseline configs are under `baseline_rebuild/baseline/`. The repository retains the baseline model implementations that are integrated into the original FERA-MS codebase; licensed data, checkpoints, predictions, and nested Git checkouts are not included. The historical baseline wrappers use `FERA_MS_BASELINE_SOURCE` and `FERA_MS_ICEBERG_SOURCE` to identify the package-compatible local source snapshot used for the reported runs. FIORA remains a separately installed command-line package selected with `FERA_MS_FIORA_WORKSPACE`. See the baseline README and `THIRD_PARTY_NOTICES.md` for the exact current provenance limitations.
+Complete baseline runtime sources are retained under `baseline_rebuild/baseline/source/`, separately from the FERA-MS `ms2spectra` package. NEIMS-ACE, MassFormer-ACE, FraGNNet-D3-ACE, ICEBERG-ACE and GrAFF-MS use the independent `fragnnet` runtime with model-specific locked configs; FIORA retains its own MIT-licensed source and requires its external official weight. Licensed data, checkpoints, predictions and results are not included. See `baseline_rebuild/baseline/README.md`, `docs/BASELINE_PROVENANCE.md` and `THIRD_PARTY_NOTICES.md`.
 
 ## Citation and license
 
-Citation metadata are in `CITATION.cff`; no DOI, journal metadata, ORCID, or preferred publication citation is asserted. The FERA-MS license remains pending until the integrated baseline-source provenance audit is closed; see `LICENSE_PENDING.md`, `THIRD_PARTY_NOTICES.md`, and `docs/SOURCE_PROVENANCE.md`. NIST20 and third-party components remain governed by their separate terms.
+Citation metadata are in `CITATION.cff`; no DOI, journal metadata, ORCID, or preferred publication citation is asserted. FERA-MS-authored code is licensed under BSD-3-Clause. The separately retained baseline source remains governed by its own preserved licenses and notices; see `LICENSE`, `THIRD_PARTY_NOTICES.md`, `docs/SOURCE_PROVENANCE.md` and `docs/BASELINE_PROVENANCE.md`. NIST20 remains governed by its separate license and is not distributed.

@@ -1,65 +1,76 @@
 # Source provenance report
 
 Audit date: 2026-08-01
-
 Release branch: `paper-release`
 
-First repository snapshot containing the integrated implementations:
-`a6f75e7bb83fc4e2adfd287a9cb2afeaafe86e91`
+This report classifies every tracked source path by ownership scope. Generated
+artifacts, licensed data and record-level split files are excluded from Git.
+The complete `code/src/ms2spectra/**` scope is classified below by file role.
 
-## Scope and classification
+## Scope classification
 
-The audit covers all 214 tracked Python, Cython, Shell, YAML, and TOML source
-or configuration files present before this compliance correction. Files are
-classified by exhaustive path scope below. Documentation and metadata are
-FERA-MS-authored unless a notice within the file states otherwise.
+| Tracked scope | Classification | License/provenance treatment |
+|---|---|---|
+| `code/src/ms2spectra/model.py`, `training.py`, `data.py`, `workflow.py`, `components/**`, `losses/**` | FERA-MS model and training implementation, including the FERA-specific formula/H, CE-control, rendering, gate and loss changes | FERA-MS-authored changes: BSD-3-Clause; retained BSD-2 scaffolding remains covered by the notice described below |
+| `code/src/ms2spectra/frag/compute_frags.pyx`, `utils/misc_utils.py`, `utils/profile_utils.py` | Byte-identical low-level infrastructure shared with the independently retained BSD-2 snapshot | BSD-2-Clause notice preserved at `baseline_rebuild/baseline/source/fragnnet/LICENSE` |
+| Other `code/src/ms2spectra/utils/**` | Common infrastructure with both retained BSD-2 portions and FERA-MS modifications | Inherited portions: BSD-2-Clause; FERA-MS-authored modifications: BSD-3-Clause |
+| `train/**` | FERA-MS-authored training, refinement and checkpoint orchestration | BSD-3-Clause |
+| `test/**` | FERA-MS-authored spectrum/retrieval evaluation | BSD-3-Clause |
+| `preproc_scripts/**` | FERA-MS preprocessing, cohort, split and DAG-cache construction | BSD-3-Clause |
+| `ablation_studies/**` | FERA-MS-authored formal ablation wiring/configs, with internal copies of FERA-MS refinement stages where required | BSD-3-Clause |
+| `baseline_rebuild/baseline/source/fragnnet/**` | Independent third-party baseline execution snapshot used for NEIMS-ACE, MassFormer-ACE, FraGNNet-D3-ACE, ICEBERG-ACE and GrAFF-MS | BSD-2-Clause notice preserved in that directory; Microsoft MIT file header preserved; exact upstream commits unresolved |
+| `baseline_rebuild/baseline/source/fiora/**` | Independent FIORA 1.0.1 source snapshot | MIT notice preserved in that directory; exact upstream commit unresolved |
+| Other `baseline_rebuild/**` | FERA-MS-authored locked configs, launchers, cohort adapters, checkpoint selection, exporters, evaluators and aggregators | BSD-3-Clause |
+| `config/**`, `scripts/**`, root packaging/environment files | FERA-MS release/configuration infrastructure | BSD-3-Clause |
 
-| Tracked scope | Count at audit | Classification | Provenance/license treatment |
-|---|---:|---|---|
-| `code/src/ms2spectra/**` | 58 | Mixed: integrated FraGNNet-derived code plus subsequent FERA-MS modifications | Preserve FraGNNet BSD-2-Clause notice; do not relicense inherited portions |
-| `train/**` | 20 | FERA-MS-authored training and refinement orchestration | Intended BSD-3-Clause after audit closure |
-| `test/**` | 25 | FERA-MS-authored evaluation and retrieval orchestration | Intended BSD-3-Clause after audit closure |
-| `preproc_scripts/**` | 6 | Mixed: inherited preprocessing interfaces plus FERA-MS cohort/split changes | Preserve upstream notice; FERA-MS changes intended BSD-3-Clause |
-| `ablation_studies/**` | 68 | FERA-MS-authored formal ablation configs and code, with internal copies of FERA-MS refinement stages | Intended BSD-3-Clause after audit closure |
-| `baseline_rebuild/**` | 31 | FERA-MS-authored adapters, configs, launchers, and aggregators calling the integrated baseline implementations | Intended BSD-3-Clause after audit closure |
-| Root/config/release source (`config/**`, `scripts/**`, `setup.py`, `pyproject.toml`, `sitecustomize.py`, environment YAML) | 6 | Mixed release/configuration infrastructure | Intended BSD-3-Clause where FERA-MS-authored |
+The independent baseline source is intentionally not placed in or imported
+from `code/src/ms2spectra`. Default baseline launchers resolve
+`baseline_rebuild/baseline/source/fragnnet`, while the FERA-MS training path
+resolves `code/src/ms2spectra`.
 
-Within `code/src/ms2spectra/**`, the following baseline-specific scopes require
-explicit third-party treatment:
+This provenance boundary does not identify FERA-MS as the FraGNNet-D3 model.
+FERA-MS is the separate manuscript model and has its own architecture,
+controllers, objectives and refinement pipeline. The BSD-2 classification
+above records only retained implementation ancestry where the file comparison
+shows identical or modified common scaffolding.
 
-- `massformer/**`: adapted MassFormer implementation;
-- `graff/**`: adapted GrAFF-MS implementation;
-- `iceberg/**`: adapted ICEBERG implementation;
-- `model.py` and `training.py`: include the integrated NEIMS reimplementation;
-- `frag/**`, `data.py`, `model.py`, `training.py`, `utils/**`, and
-  `workflow.py`: inherit from the FraGNNet codebase and contain later FERA-MS
-  modifications.
+## Evidence and modifications
 
-The precise line-level boundary between the initial integrated snapshot and
-later FERA-MS modifications can be inspected with:
+- The local baseline execution snapshots had no `.git` directory, and archived
+  run manifests recorded `code_commit: null`.
+- The only locally recorded FraGNNet remote is
+  `https://github.com/lrq-one/fragnnet-main`; no commit matching the complete
+  execution snapshot has been established.
+- The retained independent FraGNNet baseline snapshot carries its own
+  BSD-2-Clause notice attributed to Adamo Young and Fei Wang at
+  `baseline_rebuild/baseline/source/fragnnet/LICENSE`.
+- All retained `fragnnet` runtime files match the local formal-run snapshot,
+  except that the two ICEBERG files match the formal ICEBERG run variant and
+  the package metadata license string was aligned with the preserved
+  BSD-2-Clause `LICENSE`. See `source/fragnnet/UPSTREAM.md` and its patch file.
+- The retained FIORA source reports version 1.0.1 and MIT. The official model
+  weight remains external; its historical checksum is recorded in
+  `source/fiora/UPSTREAM.md`.
+- Detailed model-to-file/import/config tracing is in
+  `docs/BASELINE_PROVENANCE.md`.
 
-```bash
-git diff a6f75e7bb83fc4e2adfd287a9cb2afeaafe86e91..paper-release -- code/src/ms2spectra preproc_scripts
-```
+## FERA-MS versus retained baseline file evidence
 
-## Evidence
+The release audit compared the FERA-MS package against the independent local
+baseline execution snapshot. Representative line differences (added/deleted)
+are: `model.py` 3103/422, `training.py` 2082/344, `data_utils.py` 50/15,
+`feat_utils.py` 213/4 and `frag_utils.py` 831/17. The byte-identical files are
+limited to `frag/compute_frags.pyx`, `utils/misc_utils.py` and
+`utils/profile_utils.py`. Baseline-only packages (`massformer`, `graff`, and
+`iceberg`) and baseline-only NEIMS/precursor/GNN classes were removed from
+`code/src/ms2spectra` and retained only in the independent baseline package.
 
-- Current-repository history places all integrated baseline modules in commit
-  `a6f75e7bb83fc4e2adfd287a9cb2afeaafe86e91`.
-- The retained local FraGNNet source history preserves a BSD-2-Clause notice
-  credited to Adamo Young and Fei Wang; the exact notice is copied unchanged
-  to `licenses/FraGNNet-BSD-2-Clause.txt`.
-- Historical formal-run manifests for NEIMS and ICEBERG record
-  `code_commit: null`; the package-compatible snapshots used for the reported
-  runs have no `.git` directory.
-- The archived FIORA package identifies itself as version 1.0.1 and MIT, but
-  its exact Git commit was not retained.
+## License conclusion
 
-## Audit conclusion
-
-The repository cleanly separates generated/licensed data from source code and
-identifies the integrated baseline scopes, but exact baseline source commits
-remain unresolved. Therefore the provenance audit does **not** authorize the
-root BSD-3-Clause license yet. `LICENSE_PENDING.md` must remain, `LICENSE` must
-not be added, and `CITATION.cff` must not claim BSD-3-Clause until the blocker
-table in `THIRD_PARTY_NOTICES.md` is resolved.
+The FERA-MS model source is structurally separated from all baseline model
+implementations. FERA-MS-authored contributions are released under the root
+BSD-3-Clause license. The root license does not relicense retained BSD-2
+portions or `baseline_rebuild/baseline/source/**`; those files remain governed
+by the licenses and file headers preserved in the repository. Missing exact
+upstream commits remain release-provenance blockers for the bundled baseline
+snapshots and are listed in `THIRD_PARTY_NOTICES.md`.

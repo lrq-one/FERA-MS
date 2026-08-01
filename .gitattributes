@@ -1,0 +1,3 @@
+# Preserve byte-level fidelity of retained third-party execution snapshots.
+# Their historical whitespace is not rewritten by the FERA-MS release cleanup.
+baseline_rebuild/baseline/source/** whitespace=-blank-at-eol,-space-before-tab,-blank-at-eof

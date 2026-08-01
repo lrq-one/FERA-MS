@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import fcntl
 import json
 import os
@@ -36,6 +37,7 @@ for model in [
     "massformer",
     "fragnnet_d3",
     "iceberg",
+    "graff_ms",
 ]:
     for split in [
         "random",
@@ -118,6 +120,33 @@ def read_metrics(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Run the locked 30-job manuscript baseline matrix.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate and print the matrix without creating outputs or training",
+    )
+    args = parser.parse_args()
+
+    if args.dry_run:
+        missing = []
+        for job in JOBS:
+            config = (
+                BASE
+                / job["model"]
+                / "configs"
+                / job["split"]
+                / f"seed_{job['seed']}.yml"
+            )
+            if not config.is_file():
+                missing.append(str(config))
+        if missing:
+            raise FileNotFoundError("\n".join(missing))
+        print("FORMAL_BASELINE_MATRIX_DRY_RUN_OK", len(JOBS))
+        return
+
     ROOT.mkdir(
         parents=True,
         exist_ok=True,

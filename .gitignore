@@ -7,6 +7,9 @@ build/
 dist/
 .pytest_cache/
 .ipynb_checkpoints/
+code/src/ms2spectra/frag/compute_frags.c
+baseline_rebuild/baseline/source/fragnnet/src/fragnnet/frag/compute_frags.c
+baseline_rebuild/baseline/source/fragnnet/src/fragnnet/massformer/algos.c
 
 # Local environments and editors
 .venv/

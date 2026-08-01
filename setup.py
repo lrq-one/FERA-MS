@@ -13,11 +13,6 @@ extensions = [
         [str(ROOT / "code/src/ms2spectra/frag/compute_frags.pyx")],
         include_dirs=[numpy.get_include()],
     ),
-    Extension(
-        "ms2spectra.massformer.algos",
-        [str(ROOT / "code/src/ms2spectra/massformer/algos.pyx")],
-        include_dirs=[numpy.get_include()],
-    ),
 ]
 
 setup(

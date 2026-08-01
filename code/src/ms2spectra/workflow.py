@@ -25,15 +25,10 @@ from multiprocessing import Manager
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SequentialSampler, RandomSampler
 
-from ms2spectra.training import FragGNNPL, NeimsPL, PrecursorPL, GNNPL
-from ms2spectra.iceberg.pl_model import IcebergGenPL, IcebergIntenPL
-from ms2spectra.massformer.pl_model import MassFormerPL
-from ms2spectra.graff.pl_model import GrAFFPL
+from ms2spectra.training import FragGNNPL
 from ms2spectra.utils.nn_utils import nan_forward_hook, nan_backward_hook
 from ms2spectra.utils.pl_utils import ConsoleLogger
-from ms2spectra.data import SpecMolDataset, SpecMolFragDataset, GroupSampler, get_group_sampler, SpecMolFragDynamicBatchSampler
-from ms2spectra.iceberg.dataset import SpecMolMagmaGenDataset, SpecMolMagmaIntenDataset
-from ms2spectra.graff.dataset import SpecMolAnnDataset
+from ms2spectra.data import SpecMolFragDataset, GroupSampler, get_group_sampler, SpecMolFragDynamicBatchSampler
 import ms2spectra.utils.misc_utils as misc_utils
 from ms2spectra.utils.misc_utils import deep_update
 from ms2spectra.utils.profile_utils import MyPyTorchProfiler
@@ -84,17 +79,12 @@ def load_wandb_config(wandb_config_dp) -> dict:
 
 def init_dataset(config_d, splits=("train","val")):
 
-	if config_d["model_type"] == "frag_gnn":
-		dataset_cls = SpecMolFragDataset
-	elif config_d["model_type"] == "iceberg_gen":
-		dataset_cls = SpecMolMagmaGenDataset
-	elif config_d["model_type"] == "iceberg_inten":
-		dataset_cls = SpecMolMagmaIntenDataset
-	elif config_d["model_type"] == "graff":
-		dataset_cls = SpecMolAnnDataset
-	else:
-		assert config_d["model_type"] in ["neims","massformer","precursor", "gnn"], config_d["model_type"]
-		dataset_cls = SpecMolDataset
+	if config_d["model_type"] != "frag_gnn":
+		raise ValueError(
+			"The FERA-MS training package supports model_type='frag_gnn' only; "
+			"baseline implementations are isolated under baseline_rebuild/baseline/."
+		)
+	dataset_cls = SpecMolFragDataset
 	
 	data_dict_types = dataset_cls.get_data_dict_types()
 	
@@ -290,24 +280,12 @@ def init_run(
 
 	# setup model
 	logging.info("setup model")
-	if config_d["model_type"] == "frag_gnn":
-		model_cls = FragGNNPL
-	elif config_d["model_type"] == "neims":
-		model_cls = NeimsPL
-	elif config_d["model_type"] == "iceberg_gen":
-		model_cls = IcebergGenPL
-	elif config_d["model_type"] == "iceberg_inten":
-		model_cls = IcebergIntenPL
-	elif config_d["model_type"] == "massformer":
-		model_cls = MassFormerPL
-	elif config_d["model_type"] == "graff":
-		model_cls = GrAFFPL
-	elif config_d["model_type"] == "precursor":
-		model_cls = PrecursorPL
-	elif config_d["model_type"] == "gnn":
-		model_cls = GNNPL
-	else:
-		raise ValueError(config_d["model_type"])
+	if config_d["model_type"] != "frag_gnn":
+		raise ValueError(
+			"The FERA-MS training package supports model_type='frag_gnn' only; "
+			"baseline implementations are isolated under baseline_rebuild/baseline/."
+		)
+	model_cls = FragGNNPL
 	model = model_cls(**config_d)
 	model.train()
 	if pretrained_ckpt_path is not None:
@@ -588,86 +566,3 @@ def init_run(
 			os.remove(job_id_fp)
 
 	return model
-
-"""
-这段代码是整个项目的 **启动器 (Runner) / 编排脚本**。
-
-如果说 `model.py` 定义了大脑（结构），`pl_model.py` 定义了健身房（训练逻辑），那么这个 `runner.py` 就是 **教练**。它负责安排训练计划、准备器材（数据）、记录成绩（WandB）、以及处理各种突发状况（断点续训、硬件配置）。
-
-它主要基于 **PyTorch Lightning** 的 `Trainer` 接口构建。
-
-以下是详细的功能模块解析：
-
-### 1. 基础配置与兼容性
-
-*   **导入库**:
-    *   同时兼容新版 `lightning.pytorch` 和旧版 `pytorch_lightning`。
-    *   引入了所有之前定义的 PL 模型（`FragGNNPL`, `NeimsPL` 等）和数据集类。
-*   **`load_config`**:
-    *   **功能**: 加载 YAML 配置文件。
-    *   **逻辑**: 支持“模板继承”。它先加载一个基础模板 (`template_fp`)，然后加载自定义配置 (`custom_fp`) 并覆盖基础配置。这允许你为不同实验只写差异化的配置，保持配置文件的整洁。
-
-### 2. 数据集初始化 (`init_dataset`)
-
-*   **功能**: 根据配置文件中的 `model_type` 选择正确的数据集类。
-*   **逻辑**:
-    *   如果是 `frag_gnn` -> 使用 `SpecMolFragDataset`（包含碎片图的数据集）。
-    *   如果是 `neims` -> 使用 `SpecMolDataset`（普通分子指纹数据集）。
-    *   **多进程共享内存**: 如果 `num_workers > 0` 且开启 `share_memory`，它会使用 `multiprocessing.Manager` 创建共享字典。这对于处理大规模数据（避免每个 Worker 进程都复制一份数据副本导致内存爆炸）非常关键。
-
-### 3. 数据加载器初始化 (`init_dataloader`)
-
-这是代码中非常关键且“工程化”程度很高的部分，主要为了解决 **图神经网络训练的效率问题**。
-
-*   **Sampler (采样器)**:
-    *   **`GroupSampler`**: 将相似的数据（例如原子数相近的分子）分在一组。这样可以减少 Padding，提高计算效率。
-    *   **`SpecMolFragDynamicBatchSampler`**: **这是核心亮点**。
-        *   **问题**: 图的大小差异巨大。一个 Batch 如果包含几个巨型图，可能会显存溢出 (OOM)；如果全是小图，显卡又跑不满。
-        *   **解决**: 不按“个数”组 Batch（比如固定 32 个图），而是按“总节点数”或“总边数”组 Batch。这个采样器会动态计算当前 Batch 塞了多少节点，塞满了就发车。
-        *   这解释了为什么 `FragGNNPL` 中会有手动优化 (`manual_optimization`) 的逻辑，因为 Batch Size 是动态变化的。
-
-### 4. 主执行函数 (`init_run`)
-
-这是脚本的入口函数，流程非常长且细致：
-
-#### A. 环境与日志设置
-*   **Seed**: `seed_everything` 确保实验可复现。
-*   **WandB (Weights & Biases)**: 极其完善的实验跟踪集成。
-    *   **断点续训 (Resume)**: 代码检查 `job_id` 文件。如果存在，它会读取旧的 WandB Run ID，自动恢复之前的训练状态（曲线连接、配置同步）。
-    *   **配置检查**: 自动对比本地 Config 和 WandB 云端的 Config，打印差异，确保你跑的代码和你以为的配置是一致的。
-*   **硬件加速**:
-    *   开启 `allow_tf32`: 在 NVIDIA Ampere (如 RTX 3090/A100) 架构上开启 TensorFloat-32，能显著加速矩阵乘法（牺牲微小的精度）。
-
-#### B. 模型与回调 (Callbacks) 初始化
-*   **模型实例化**: 根据 `model_type` 初始化对应的 PL 模型（如 `FragGNNPL`）。
-*   **Checkpoints (模型保存)**:
-    *   使用 `ModelCheckpoint` 保存最佳模型。
-    *   **Hacky Resume Logic**: 如果是断点续训，代码有一段逻辑专门去**修改旧 Checkpoint 文件中的路径**。因为在不同的机器或目录下恢复训练时，旧 Checkpoint 里记录的绝对路径可能失效，这里手动修复了 `dirpath` 等属性。
-
-#### C. 性能分析 (Profiler)
-*   支持 `Simple`, `Advanced` 或自定义的 `MyPyTorchProfiler`。
-*   这用于分析训练瓶颈（是卡在 CPU 数据加载，还是 GPU 计算，或者是内存拷贝）。
-
-#### D. Trainer 设置
-*   **参数配置**: 传入 `accelerator` (GPU/CPU), `precision` (16-mixed/32), `accumulate_grad_batches` 等。
-*   **内存泄漏防护**: `reload_dataloaders_every_n_epochs=1`。这是一种常见的 PyTorch Hack，用于解决 DataLoader 多进程在每个 Epoch 结束后不释放内存的问题。
-
-#### E. 调试与训练 (Fit)
-*   **NaN Hook**: 注册 `nan_forward_hook`。如果模型中间某层输出了 NaN，程序会立即报错并打印位置。这对于调试数值不稳定的 GNN 非常有用。
-*   **Debug Overfit**: 如果开启 `debug_overfit`，只在一个小 Batch 上反复训练。用于验证模型是否有能力拟合数据（如果连小数据都拟合不了，说明模型代码有 Bug）。
-*   **正式训练**: 调用 `trainer.fit()`。
-
-#### F. 测试与收尾
-*   **Test**: 训练结束后，自动加载 Best Checkpoint 并在测试集上运行 `trainer.test()`。
-*   **清理**:
-    *   `th.compile` 报告：如果用了 PyTorch 2.0 编译，打印编译报告。
-    *   **Checkpoint 管理**: 根据配置 (`upload_checkpoints`, `delete_checkpoints`)，决定是把模型传到云端、移动到临时目录还是删除，以节省磁盘空间。
-
-### 总结
-
-`runner.py` 是一个**生产级**的训练脚本。它不仅仅是跑通模型，还解决了很多实际痛点：
-1.  **大规模图数据训练**：通过动态 Batch Sampler 和多进程共享内存解决 OOM 和速度问题。
-2.  **长期训练的稳定性**：完善的断点续训 (Resume) 机制，甚至处理了 Checkpoint 路径不一致的边缘情况。
-3.  **调试友好**：集成了 NaN 检测、Overfit 测试和性能分析器。
-4.  **实验管理**：深度集成 WandB，确保每次实验的配置和结果都被精确记录。
-"""
