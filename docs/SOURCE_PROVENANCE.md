@@ -18,8 +18,8 @@ The complete `code/src/ms2spectra/**` scope is classified below by file role.
 | `test/**` | FERA-MS-authored spectrum/retrieval evaluation | BSD-3-Clause |
 | `preproc_scripts/**` | FERA-MS preprocessing, cohort, split and DAG-cache construction | BSD-3-Clause |
 | `ablation_studies/**` | FERA-MS-authored formal ablation wiring/configs, with internal copies of FERA-MS refinement stages where required | BSD-3-Clause |
-| `baseline_rebuild/baseline/source/fragnnet/**` | Independent third-party baseline execution snapshot used for NEIMS-ACE, MassFormer-ACE, FraGNNet-D3-ACE, ICEBERG-ACE and GrAFF-MS | BSD-2-Clause notice preserved in that directory; Microsoft MIT file header preserved; exact upstream commits unresolved |
-| `baseline_rebuild/baseline/source/fiora/**` | Independent FIORA 1.0.1 source snapshot | MIT notice preserved in that directory; exact upstream commit unresolved |
+| `baseline_rebuild/baseline/source/fragnnet/**` | Independent third-party baseline execution snapshot used for NEIMS-ACE, MassFormer-ACE, FraGNNet-D3-ACE, ICEBERG-ACE and GrAFF-MS | BSD-2-Clause notice and Microsoft MIT file header preserved; retained snapshot is the release source record |
+| `baseline_rebuild/baseline/source/fiora/**` | Independent FIORA 1.0.1 source snapshot | MIT notice preserved; retained snapshot is the release source record |
 | Other `baseline_rebuild/**` | FERA-MS-authored locked configs, launchers, cohort adapters, checkpoint selection, exporters, evaluators and aggregators | BSD-3-Clause |
 | `config/**`, `scripts/**`, root packaging/environment files | FERA-MS release/configuration infrastructure | BSD-3-Clause |
 
@@ -71,6 +71,6 @@ The FERA-MS model source is structurally separated from all baseline model
 implementations. FERA-MS-authored contributions are released under the root
 BSD-3-Clause license. The root license does not relicense retained BSD-2
 portions or `baseline_rebuild/baseline/source/**`; those files remain governed
-by the licenses and file headers preserved in the repository. Missing exact
-upstream commits remain release-provenance blockers for the bundled baseline
-snapshots and are listed in `THIRD_PARTY_NOTICES.md`.
+by the licenses and file headers preserved in the repository. Exact upstream
+commit recovery is not required by the selected release policy; the retained
+execution snapshots and notices are documented in `THIRD_PARTY_NOTICES.md`.

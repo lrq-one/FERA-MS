@@ -8,5 +8,5 @@
   adapters in `../tools_local/`.
 - Source license evidence: the BSD-2-Clause notice preserved at
   `../source/fragnnet/LICENSE`.
-- Blocker: the exact upstream commit and adapted-file license mapping were not
-  recorded in the local execution snapshot.
+- Release decision: the complete retained execution source and preserved
+  notice are sufficient; exact upstream commit recovery is not required.

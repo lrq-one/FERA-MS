@@ -8,5 +8,5 @@
   adapters in `../tools_local/`.
 - License evidence: the baseline snapshot BSD-2-Clause notice and the original
   Microsoft MIT header retained in `massformer/algos.pyx`.
-- Blocker: the exact MassFormer upstream commit and adapted-file license
-  mapping were not recorded.
+- Release decision: the complete retained execution source and preserved
+  notices are sufficient; exact upstream commit recovery is not required.

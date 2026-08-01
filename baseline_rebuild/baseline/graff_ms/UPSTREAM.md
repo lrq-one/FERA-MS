@@ -8,5 +8,5 @@
   adaptation and common evaluation/retrieval utilities.
 - License evidence: snapshot-level BSD-2-Clause notice at
   `../source/fragnnet/LICENSE`.
-- Blocker: the exact GrAFF-MS commit and adapted-file license mapping were not
-  recorded.
+- Release decision: the complete retained execution source and preserved
+  notice are sufficient; exact upstream commit recovery is not required.

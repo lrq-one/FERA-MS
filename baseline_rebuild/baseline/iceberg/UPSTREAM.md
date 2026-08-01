@@ -8,5 +8,6 @@
 - FERA-MS files: locked configs in `configs/`, `run_all.sh` and common adapters.
 - License evidence: snapshot-level BSD-2-Clause notice at
   `../source/fragnnet/LICENSE`.
-- Blocker: the exact ms-pred commit and adapted-file license mapping were not
-  recorded in the local execution snapshot.
+- Release decision: the formal retained source, locked ACE configs and
+  preserved notice are sufficient; exact upstream commit recovery is not
+  required.

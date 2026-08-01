@@ -193,6 +193,8 @@ def main() -> int:
             fail(f"nested third-party Git checkout: {nested_git.relative_to(ROOT)}", failures)
 
     notice = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    if "**BLOCKED**" in notice:
+        fail("third-party notice still marks a retained baseline source route BLOCKED", failures)
     for baseline in ("NEIMS", "MassFormer", "FraGNNet-D3", "GrAFF-MS", "ICEBERG", "FIORA"):
         if baseline not in notice:
             fail(f"third-party notice missing baseline: {baseline}", failures)

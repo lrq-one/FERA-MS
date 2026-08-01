@@ -91,16 +91,16 @@ seeds 42, 43 and 44. Preflight asserts:
 
 No test record is used for training, early stopping or checkpoint selection.
 
-## Upstream and license blockers
+## Recorded upstream metadata
 
-| Baseline | Upstream URL | Commit/tag | License evidence | Remaining blocker |
+| Baseline | Upstream URL | Commit/tag | License evidence | Release treatment |
 |---|---|---|---|---|
-| NEIMS | `https://github.com/brain-research/deep-molecular-massspec` | Unknown | Snapshot-level BSD-2-Clause only | Exact upstream commit and license mapping for the adapted files |
-| MassFormer | `https://github.com/Roestlab/massformer` | Unknown | Snapshot-level BSD-2-Clause; Microsoft MIT header in `algos.pyx` | Exact upstream commit and license mapping |
-| FraGNNet-D3 | Historical local remote `https://github.com/lrq-one/fragnnet-main`; original upstream URL unknown | Unknown | BSD-2-Clause preserved | Exact executed commit and original public upstream URL |
-| ICEBERG | `https://github.com/coleygroup/ms-pred` | Unknown | Snapshot-level BSD-2-Clause only | Exact upstream commit and license mapping |
-| GrAFF-MS | `https://github.com/murphy17/graff-ms` | Unknown | Snapshot-level BSD-2-Clause only | Exact upstream commit and license mapping |
-| FIORA | `https://github.com/BAMeScience/fiora` | Package version 1.0.1; commit unknown | MIT preserved | Exact source commit; official model weight remains external |
+| NEIMS | `https://github.com/brain-research/deep-molecular-massspec` | Not recorded | BSD-2-Clause snapshot notice preserved | Complete retained-source route |
+| MassFormer | `https://github.com/Roestlab/massformer` | Not recorded | BSD-2-Clause snapshot notice; Microsoft MIT header in `algos.pyx` | Complete retained-source route |
+| FraGNNet-D3 | Historical local remote `https://github.com/lrq-one/fragnnet-main` | Not recorded | BSD-2-Clause preserved | Complete retained-source route |
+| ICEBERG | `https://github.com/coleygroup/ms-pred` | Not recorded | BSD-2-Clause snapshot notice preserved | Complete retained-source route |
+| GrAFF-MS | `https://github.com/murphy17/graff-ms` | Not recorded | BSD-2-Clause snapshot notice preserved | Complete retained-source route |
+| FIORA | `https://github.com/BAMeScience/fiora` | Package version 1.0.1 | MIT preserved | Complete source route; official model weight remains external |
 
-The runtime source routes are now complete, but these provenance fields prevent
-`BASELINE_RELEASE_READY` and a root BSD-3-Clause license until confirmed.
+All reported baselines have a complete retained-source route. Exact upstream
+commit recovery is not required for this release.

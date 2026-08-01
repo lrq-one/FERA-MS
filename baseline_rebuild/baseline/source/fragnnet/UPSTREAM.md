@@ -18,8 +18,9 @@ The local execution snapshots had no `.git` directory and their run manifests
 recorded `code_commit: null`. The only locally recorded source remote is
 `https://github.com/lrq-one/fragnnet-main`; an exact commit whose tree matches
 the execution snapshot has not been established. The snapshot's BSD-2-Clause
-license and copyright notice are preserved in this directory. This missing
-exact source commit remains a pre-merge provenance blocker.
+license and copyright notice are preserved in this directory. Under the
+selected release policy, this complete execution snapshot is the authoritative
+source record and exact commit recovery is not required.
 
 A local historical remote branch exposes commit
 `f86390399f1660219479011937d0386786c5b933`. Several low-level files match

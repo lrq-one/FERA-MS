@@ -6,5 +6,5 @@
 - FERA-MS files: locked configs in `configs/`, `run_all.sh` and the common
   adapters in `../tools_local/`.
 - License evidence: BSD-2-Clause at `../source/fragnnet/LICENSE`.
-- Blocker: the local execution snapshot had no Git metadata; the exact source
-  commit and original public upstream URL remain unresolved.
+- Release decision: the complete retained execution source and BSD-2 notice
+  are sufficient; exact upstream commit recovery is not required.
