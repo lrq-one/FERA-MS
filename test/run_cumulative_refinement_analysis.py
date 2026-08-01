@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import os
 import pickle
 import random
 import warnings
@@ -26,7 +27,7 @@ from train._impl.refinement_steps import (
 )
 
 
-ROOT = Path.cwd()
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
 TEMPLATE_PATH = (
     ROOT
@@ -235,8 +236,8 @@ def formula_ce_args(
         max_bins=0,
 
         ce_binned_aux_weight=0.0015,
-        r117_weight=0.0,
-        r117_false_weight=0.20,
+        support_oracle_weight=0.0,
+        support_oracle_false_weight=0.20,
 
         low_w=0.25,
         mid_w=1.75,
@@ -369,7 +370,7 @@ def find_best_alpha(
 
     alpha_table_path = require_file(
         reranker_dir
-        / "r170_alpha_val.csv"
+        / "candidate_reranker_alpha_val.csv"
     )
 
     alpha_table = pd.read_csv(
@@ -596,13 +597,13 @@ def evaluate_one_seed(
 
     base_dir = (
         seed_dir
-        / "v2c_ce_trajectory_ablation/"
+        / "global_ace_control_ce_trajectory_ablation/"
           "control"
     )
 
     refinement_dir = (
         seed_dir
-        / "v2e_full_063"
+        / "full_model_full_063"
     )
 
     config_path = require_file(
@@ -617,30 +618,30 @@ def evaluate_one_seed(
 
     formula_checkpoint = require_file(
         refinement_dir
-        / "05_R150B/"
-          "r148_best_state.pt"
+        / "05_peak_distillation_continuation/"
+          "neural_refinement_best_state.pt"
     )
 
     fragment_checkpoint = require_file(
         refinement_dir
         / "06_R153/"
-          "r148_best_state.pt"
+          "neural_refinement_best_state.pt"
     )
 
     distilled_checkpoint = require_file(
         refinement_dir
         / "08_R160/"
-          "r160_best_state.pt"
+          "final_peak_distillation_best_state.pt"
     )
 
     reranker_dir = (
         refinement_dir
-        / "09_R172D"
+        / "09_candidate_reranker"
     )
 
     reranker_path = require_file(
         reranker_dir
-        / "r170_regressor.pkl"
+        / "candidate_reranker_regressor.pkl"
     )
 
     final_result_candidates = [
@@ -757,7 +758,7 @@ def evaluate_one_seed(
 
     rich_config = (
         candidate_reranker
-        .force_r160_arch(
+        .force_final_peak_distillation_arch(
             rich_config
         )
     )

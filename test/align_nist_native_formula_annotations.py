@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 SAFE_DIR = (
     ROOT
@@ -49,7 +49,7 @@ RANDOM_SPLIT_ROOT = (
     ROOT
     / "data"
     / "split"
-    / "nist20_qtof_cid_safe19659_qcv1_trainonly"
+    / "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
 )
 
 SCAFFOLD_SPLIT_ROOT = (

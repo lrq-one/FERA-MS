@@ -10,7 +10,7 @@ import pandas as pd
 from rdkit import Chem
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 CURRENT_DIR = (
     ROOT

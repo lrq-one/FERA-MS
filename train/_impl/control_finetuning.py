@@ -23,7 +23,8 @@ except ModuleNotFoundError:
     import pytorch_lightning as pl
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[2])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 GLOBAL_SEED = int(
     os.environ.get(
@@ -45,32 +46,29 @@ from train._impl.trainer_helpers import (
 )
 
 
-TEMPLATE = ROOT / "runs/_config/template.yml"
+TEMPLATE = RUNS_ROOT / "_config/template.yml"
 
 BASE_CONFIG = (
-    ROOT
-    / "runs"
-    / "v2a_gine_cutchem_only"
+    RUNS_ROOT
+    / "structural_backbone_gine_cutchem_only"
     / "final"
     / "config.yml"
 )
 
 BASE_CHECKPOINT = (
-    ROOT
-    / "runs"
-    / "v2a_gine_cutchem_only"
+    RUNS_ROOT
+    / "structural_backbone_gine_cutchem_only"
     / "final"
     / "model.ckpt"
 )
 
 OUTPUT_ROOT = (
-    ROOT
-    / "runs"
-    / "v2c_ce_trajectory_ablation"
+    RUNS_ROOT
+    / "global_ace_control_ce_trajectory_ablation"
 )
 
 MONITOR = "val_cos_sim_0.01_epoch/mean"
-V2A_BASELINE = 0.5963571667671204
+STRUCTURAL_BACKBONE_BASELINE = 0.5963571667671204
 
 
 VARIANTS = {'control': {}}
@@ -193,7 +191,7 @@ def build_config(
                 False,
 
             "wandb_name":
-                f"V2C_{variant}",
+                f"GLOBAL_ACE_CONTROL_{variant}",
 
             "wandb_group":
                 "CONTROL_FINETUNING",
@@ -245,7 +243,7 @@ def build_config(
             split_override,
         )
 
-    # 必须保持V2A结构，不能混入连续CE。
+    # 必须保持structural backbone结构，不能混入连续CE。
     assert (
         config["frag_gnn_type"]
         == "GINE"
@@ -419,14 +417,14 @@ def train_variant(
             variant,
 
         "base_val_cosine":
-            V2A_BASELINE,
+            STRUCTURAL_BACKBONE_BASELINE,
 
         "best_val_cosine":
             best_score,
 
-        "delta_vs_v2a":
+        "delta_vs_backbone":
             best_score
-            - V2A_BASELINE,
+            - STRUCTURAL_BACKBONE_BASELINE,
 
         "checkpoint":
             str(best_checkpoint),

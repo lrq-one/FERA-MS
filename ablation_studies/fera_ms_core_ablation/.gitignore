@@ -1,8 +1,0 @@
-runs/*
-logs/*
-results/*
-!runs/.gitkeep
-!logs/.gitkeep
-!results/.gitkeep
-__pycache__/
-*.pyc

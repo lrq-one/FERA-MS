@@ -5,6 +5,7 @@ import argparse
 import importlib.util
 import json
 import math
+import os
 import pickle
 import random
 import sys
@@ -20,7 +21,7 @@ from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
 for import_path in (
     ROOT / "code/src",
@@ -33,7 +34,7 @@ for import_path in (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Evaluate the locked R184B model with "
+            "Evaluate the locked spectrum allocator model with "
             "10 ppm Hungarian cosine similarity."
         )
     )
@@ -999,83 +1000,83 @@ def main() -> None:
         label="seed42模型配置",
         exact_candidates=[
             seed_dir
-            / "v2c_ce_trajectory_ablation"
+            / "global_ace_control_ce_trajectory_ablation"
             / "control"
             / "config.yml",
         ],
         patterns=[
-            "**/v2c_ce_trajectory_ablation/**/config.yml",
-            "**/v2c_ce_trajectory_ablation/**/config.yaml",
+            "**/global_ace_control_ce_trajectory_ablation/**/config.yml",
+            "**/global_ace_control_ce_trajectory_ablation/**/config.yaml",
             "**/control/config.yml",
             "**/control/config.yaml",
         ],
         preferred_tokens=(
-            "v2c_ce_trajectory_ablation",
+            "global_ace_control_ce_trajectory_ablation",
             "control",
         ),
         fallback_candidates=[
             ROOT
             / "runs"
-            / "v2c_ce_trajectory_ablation"
+            / "global_ace_control_ce_trajectory_ablation"
             / "control"
             / "config.yml",
         ],
     )
 
     backbone_path = locate_seed_artifact(
-        label="seed42 R160模型",
+        label="seed42 final peak distillation模型",
         exact_candidates=[
             seed_dir
-            / "v2e_full_063"
+            / "full_model_full_063"
             / "08_R160"
-            / "r160_best_state.pt",
+            / "final_peak_distillation_best_state.pt",
         ],
         patterns=[
-            "**/r160_best_state.pt",
-            "**/*r160*best*.pt",
+            "**/final_peak_distillation_best_state.pt",
+            "**/*final_peak_distillation*best*.pt",
         ],
         preferred_tokens=(
-            "v2e_full_063",
+            "full_model_full_063",
             "08_r160",
-            "r160_best_state",
+            "final_peak_distillation_best_state",
         ),
     )
 
     reranker_path = locate_seed_artifact(
-        label="seed42 R172D模型",
+        label="seed42 candidate reranker模型",
         exact_candidates=[
             seed_dir
-            / "v2e_full_063"
-            / "09_R172D"
-            / "r170_regressor.pkl",
+            / "full_model_full_063"
+            / "09_candidate_reranker"
+            / "candidate_reranker_regressor.pkl",
         ],
         patterns=[
-            "**/r170_regressor.pkl",
+            "**/candidate_reranker_regressor.pkl",
             "**/*regressor*.pkl",
         ],
         preferred_tokens=(
-            "v2e_full_063",
-            "09_r172d",
-            "r170_regressor",
+            "full_model_full_063",
+            "09_candidate_reranker",
+            "candidate_reranker_regressor",
         ),
     )
 
     allocator_path = locate_seed_artifact(
-        label="seed42 R184B模型",
+        label="seed42 spectrum allocator模型",
         exact_candidates=[
             seed_dir
-            / "v2e_full_063"
-            / "11_R184B"
-            / "r184_allocator_best.pt",
+            / "full_model_full_063"
+            / "11_spectrum_allocator"
+            / "spectrum_allocator_allocator_best.pt",
         ],
         patterns=[
-            "**/r184_allocator_best.pt",
-            "**/*r184*allocator*best*.pt",
+            "**/spectrum_allocator_allocator_best.pt",
+            "**/*spectrum_allocator*allocator*best*.pt",
         ],
         preferred_tokens=(
-            "v2e_full_063",
-            "11_r184b",
-            "r184_allocator_best",
+            "full_model_full_063",
+            "11_spectrum_allocator",
+            "spectrum_allocator_allocator_best",
         ),
     )
 
@@ -1240,7 +1241,7 @@ def main() -> None:
 
     config = (
         candidate_reranker
-        .force_r160_arch(config)
+        .force_final_peak_distillation_arch(config)
     )
 
     validation_dataset, test_dataset = (

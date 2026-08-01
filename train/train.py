@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 if str(ROOT) not in sys.path:
     sys.path.insert(
@@ -40,7 +42,7 @@ CONFIG_BUNDLE = (
 )
 
 RUNTIME_CONFIG_DIR = (
-    ROOT / "runs/_config"
+    RUNS_ROOT / "_config"
 )
 
 BASE_TRAINING = (

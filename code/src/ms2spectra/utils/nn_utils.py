@@ -375,7 +375,7 @@ class MPNN(nn.Module):
 
 class GAT(nn.Module):
 	""" Graph attention networks. https://arxiv.org/abs/1710.10903 
-		Graph attention networks v2. (How Attentive are Graph Attention Networks?  https://arxiv.org/abs/2105.14491)
+		Graph attention networks refined_variant. (How Attentive are Graph Attention Networks?  https://arxiv.org/abs/2105.14491)
 	"""
 
 	def __init__(
@@ -402,7 +402,7 @@ class GAT(nn.Module):
 			output_dim (int): _description_
 			gat_heads (int, optional): _description_. Defaults to 1.
 			gat_dropout (float, optional): _description_. Defaults to 0.0.
-			is_v2 (bool, optional). use v2 GATConv, Defaults to True
+			is_v2 (bool, optional). use refined_variant GATConv, Defaults to True
 			is_concat (bool, optional). concatenated multihead attetion, Defaults to True
 		"""
 		super().__init__()
@@ -541,195 +541,6 @@ class MLPBlocks(nn.Module):
 		return output
 
 
-class NeimsBlock(nn.Module):
-	""" from the NEIMS paper (uses LeakyReLU instead of ReLU) """
-
-	def __init__(self, in_dim, out_dim, dropout):
-
-		super().__init__()
-		bottleneck_factor = 0.5
-		bottleneck_size = int(round(bottleneck_factor * out_dim))
-		self.in_batch_norm = nn.BatchNorm1d(in_dim)
-		self.in_activation = nn.LeakyReLU()
-		self.in_linear = nn.Linear(in_dim, bottleneck_size)
-		self.out_batch_norm = nn.BatchNorm1d(bottleneck_size)
-		self.out_linear = nn.Linear(bottleneck_size, out_dim)
-		self.out_activation = nn.LeakyReLU()
-		self.dropout = nn.Dropout(p=dropout)
-
-	def forward(self, x):
-
-		h = x
-		h = self.in_batch_norm(h)
-		h = self.in_activation(h)
-		h = self.dropout(h)
-		h = self.in_linear(h)
-		h = self.out_batch_norm(h)
-		h = self.out_activation(h)
-		h = self.out_linear(h)
-		return h
-
-
-class SpecFFN(nn.Module):
-
-	def __init__(self, 
-		input_size, 
-		hidden_size,
-		mz_max,
-		mz_bin_res,
-		num_layers,
-		dropout, 
-		prec_mz_offset,
-		bidirectional,
-		use_residuals,
-		output_map_size,
-		output_activation,
-		log_min):
-
-		super().__init__()
-
-		self.input_size = input_size
-		self.mz_max = mz_max
-		self.mz_bin_res = mz_bin_res
-		self.prec_mz_offset = prec_mz_offset
-		self.bidirectional = bidirectional
-		self.use_residuals = use_residuals
-		self._compute_output_size()
-
-		self.in_layer = nn.Linear(input_size, hidden_size)
-		self.ff_layers = nn.ModuleList([])
-		# self.ff_layers.append(nn.Linear(mlp_hidden_size, mlp_hidden_size))
-		for i in range(num_layers):
-			self.ff_layers.append(
-				NeimsBlock(
-					hidden_size,
-					hidden_size,
-					dropout))
-		if output_map_size == -1:
-			if self.bidirectional:
-				# assumes gating, mass masking
-				self.forw_out_layer = nn.Linear(hidden_size, self.output_size)
-				self.rev_out_layer = nn.Linear(hidden_size, self.output_size)
-				self.out_gate = nn.Sequential(
-					*[nn.Linear(hidden_size, self.output_size), nn.Sigmoid()])
-			else:
-				self.out_layer = nn.Linear(hidden_size, self.output_size)
-				self.out_gate = nn.Sequential(
-					*[nn.Linear(hidden_size, self.output_size), nn.Sigmoid()])
-		else:
-			if self.bidirectional:
-				# assumes gating, mass masking
-				self.forw_out_layer = LowRankDense(hidden_size, self.output_size, output_map_size)
-				self.rev_out_layer = LowRankDense(hidden_size, self.output_size, output_map_size)
-				self.out_gate = nn.Sequential(
-					*[LowRankDense(hidden_size, self.output_size, output_map_size), nn.Sigmoid()])
-			else:
-				self.out_layer = LowRankDense(hidden_size, self.output_size, output_map_size)
-				self.out_gate = nn.Sequential(
-					*[LowRankDense(hidden_size, self.output_size, output_map_size), nn.Sigmoid()])
-		assert output_activation in ["relu", "sigmoid"], output_activation
-		if output_activation == "relu":
-			self.out_activation = nn.ReLU()
-		else:
-			self.out_activation = nn.Sigmoid()
-		self.out_normalization = lambda x: F.normalize(x, p=1, dim=1)
-		self.log_min = log_min
-
-	def _compute_output_size(self):
-
-		self.mz_bins = nn.Parameter(th.arange(self.mz_bin_res,self.mz_max+self.mz_bin_res,self.mz_bin_res))
-		self.mzs = nn.Parameter(self.mz_bins-0.5*self.mz_bin_res)
-		self.output_size = self.mzs.shape[0]
-
-	def _prec_mz_to_idx(self,prec_mz):
-
-		prec_mz_idx = th.bucketize(prec_mz,self.mz_bins.to(prec_mz.device),right=True)
-		assert th.max(prec_mz_idx) < self.output_size, (prec_mz_idx,self.output_size)
-		return prec_mz_idx
-
-	def forward(self, input_h, prec_mz):
-
-		# get prec_mz_idxs
-		prec_mz_idxs = self._prec_mz_to_idx(prec_mz)
-		# process inputs
-		fh = self.in_layer(input_h)
-		# big MLP
-		for layer in self.ff_layers:
-			if self.use_residuals:
-				fh = fh + layer(fh)
-			else:
-				fh = layer(fh)
-		# bidirectional prediction
-		if self.bidirectional:
-			ff = self.forw_out_layer(fh)
-			fr = reverse_prediction(
-				self.rev_out_layer(fh),
-				prec_mz_idxs,
-				self.prec_mz_offset)
-			fg = self.out_gate(fh)
-			fo = ff * fg + fr * (1. - fg)
-		else:
-			# apply output layer
-			fo = self.out_layer(fh)
-			# apply gating
-			fg = self.out_gate(fh)
-			fo = fg * fo
-		fo = self.out_activation(fo)
-		fo = mask_prediction_by_mass(
-			fo, prec_mz_idxs, self.prec_mz_offset)
-		spec = self.out_normalization(fo)
-		# handle all zeroes (set to first bin by default)
-		all_zero_mask = th.max(spec,dim=1)[0]<=0.
-		all_zero_bonus = th.zeros_like(spec)
-		all_zero_bonus[all_zero_mask,0] = 1.
-		spec = spec + all_zero_bonus
-		# convert dense spectrum to sparse
-		mask = spec>0.
-		pred_mzs = (self.mzs.unsqueeze(0).expand(spec.shape[0],-1))[mask]
-		pred_logprobs = safelog(spec, eps=self.log_min)[mask]
-		pred_batch_idxs = th.arange(spec.shape[0],device=spec.device).unsqueeze(1).expand(-1,spec.shape[1])[mask]
-		pred_specs = spec
-		return pred_mzs, pred_logprobs, pred_batch_idxs, pred_specs
-
-
-def mask_prediction_by_mass(raw_prediction, prec_mass_idx, prec_mass_offset):
-	# adapted from NEIMS
-	# raw_prediction is [B,D], prec_mass_idx is [B]
-
-	max_idx = raw_prediction.shape[1]
-	assert th.all(prec_mass_idx < max_idx)
-	idx = th.arange(max_idx, device=prec_mass_idx.device)
-	mask = (
-		idx.unsqueeze(0) <= (
-			prec_mass_idx.unsqueeze(1) +
-			prec_mass_offset)).float()
-	return mask * raw_prediction
-
-
-def reverse_prediction(raw_prediction, prec_mass_idx, prec_mass_offset):
-	# adapted from NEIMS
-	# raw_prediction is [B,D], prec_mass_idx is [B]
-
-	batch_size = raw_prediction.shape[0]
-	max_idx = raw_prediction.shape[1]
-	assert th.all(prec_mass_idx < max_idx)
-	rev_prediction = th.flip(raw_prediction, dims=(1,))
-	# convention is to shift right, so we express as negative to go left
-	offset_idx = th.minimum(
-		max_idx * th.ones_like(prec_mass_idx),
-		prec_mass_idx + prec_mass_offset + 1)
-	shifts = - (max_idx - offset_idx)
-	gather_idx = th.arange(
-		max_idx,
-		device=raw_prediction.device).unsqueeze(0).expand(
-		batch_size,
-		max_idx)
-	gather_idx = (gather_idx - shifts.unsqueeze(1)) % max_idx
-	offset_rev_prediction = th.gather(rev_prediction, 1, gather_idx)
-	# you could mask_prediction_by_mass here but it's unnecessary
-	return offset_rev_prediction
-
-
 def nan_forward_hook(self, input, output):
 	if isinstance(output, tuple):
 		outputs = list(output)
@@ -760,18 +571,6 @@ def nan_backward_hook(self, grad_input, grad_output):
 			print(">> In", self.__class__.__name__)
 			raise RuntimeError(f"Found NAN in grad_output {i} at indices: ", nan_mask.nonzero(), "where:", val[nan_mask.nonzero()[:, 0].unique(sorted=True)])
 
-
-class LowRankDense(nn.Module):
-
-    def __init__(self, input_dim, output_dim, rank):
-        super(LowRankDense, self).__init__()
-        self.layer1 = nn.Linear(input_dim, rank, bias=False)
-        self.layer2 = nn.Linear(rank, output_dim)
-
-    def forward(self, x):
-        x = self.layer1(x)
-        x = self.layer2(x)
-        return x
 
 def decompile_jit_ckpt(ckpt):
 	"""

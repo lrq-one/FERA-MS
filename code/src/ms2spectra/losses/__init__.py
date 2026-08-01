@@ -1,4 +1,4 @@
-"""Loss functions used by the V1+R119 training stack."""
+"""Loss functions used by the base model+retained control training stack."""
 
 from .base import *
 from .candidate import *

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import bz2
+import os
 import pickle
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from ms2spectra.utils.frag_utils import get_node_feats
 from ms2spectra.utils.formula_utils import PREC_TYPE_TO_MASS_DIFF
 
 
-ROOT = Path.cwd()
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
 SPEC_FP = (
     ROOT
@@ -30,7 +31,7 @@ SPLITS = {
     "random": (
         ROOT
         / "data/split/"
-          "nist20_qtof_cid_safe19659_qcv1_trainonly/test_ids.csv"
+          "nist20_qtof_cid_safe19659_qcbase_model_trainonly/test_ids.csv"
     ),
     "scaffold": (
         ROOT

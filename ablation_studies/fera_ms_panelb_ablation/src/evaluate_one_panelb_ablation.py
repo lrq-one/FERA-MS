@@ -15,7 +15,8 @@ import pandas as pd
 import torch
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[3])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 ABLATION_ROOT = (
     ROOT
     / "ablation_studies"
@@ -186,14 +187,14 @@ def main() -> None:
 
     config_path = (
         run_root
-        / "v2c"
+        / "global_ace_control"
         / "control"
         / "config.yml"
     )
 
     checkpoint_path = (
         run_root
-        / "v2c"
+        / "global_ace_control"
         / "control"
         / "model_best.ckpt"
     )
@@ -218,7 +219,7 @@ def main() -> None:
     seed_everything(seed)
 
     config = load_config(
-        ROOT / "runs/_config/template.yml",
+        RUNS_ROOT / "_config/template.yml",
         config_path,
     )
 

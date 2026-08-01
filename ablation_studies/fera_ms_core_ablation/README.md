@@ -1,36 +1,10 @@
-# FERA-MS core-module ablation
+# Candidate-reranker ablation
 
-This directory contains the five remaining ablation experiments for the
-FERA-MS manuscript.
+This directory retains the valid **without chemical candidate reranking** control. It reuses each completed mainline final peak distillation checkpoint, removes the candidate reranker contribution by using the locked zero-weight route, retrains the spectrum allocator with the mainline hyperparameters, selects on validation, and evaluates test once.
 
-## Experiments
+```bash
+bash ablation_studies/fera_ms_core_ablation/scripts/preflight.sh
+bash ablation_studies/fera_ms_core_ablation/scripts/run_no_candidate_reranker.sh
+```
 
-| ID | Internal name | Formal name | Training scope |
-|---|---|---|---|
-| A1 | fragment_node_mlp | Fragment-wise node encoder | Full neural pipeline |
-| A2 | topology_only_dag | Topology-only fragment DAG | Full neural pipeline |
-| A3 | global_molecular_context | Global molecular context | Full neural pipeline |
-| A4 | global_ace_only | Global ACE conditioning only | ACE/neural refinement pipeline |
-| A5 | no_candidate_reranker | Without chemical candidate reranking | Allocator only |
-
-## Shared protocol
-
-- Random molecule-disjoint and scaffold-disjoint evaluation
-- Seeds 42, 43 and 44
-- Identical D3/H-transfer/NL candidate cache
-- Identical train/validation/test split for the corresponding experiment
-- Test set is never used for model selection
-- 0.01-Da CBIN and JSS evaluation
-- Main results: spectrum-micro mean ± sample standard deviation
-- Molecule-macro results retained for supplementary reporting
-
-## Directory policy
-
-- `src/`: ablation-specific Python code
-- `scripts/`: entrypoints and audit scripts
-- `config/`: fixed experiment definitions
-- `runs/`: checkpoints and per-run outputs
-- `logs/`: terminal logs
-- `results/`: final tables and summaries
-
-The original model checkpoints and original training outputs are read-only.
+The script expects completed random-split seed directories under `$FERA_MS_RUNS_DIR/experiments/`. Historical neural-ablation scripts that did not activate their intended architecture changes were removed from the release.

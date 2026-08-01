@@ -77,7 +77,7 @@ class CEHChannelTransitionPrior(nn.Module):
     Output shape:
         [num_edges, num_h_channels]
 
-    This is designed for FraGNNet formula mode:
+    This is designed for the FERA-MS formula-channel representation:
         frag_joint_logits: [num_nodes, num_h_channels]
     """
 

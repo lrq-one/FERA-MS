@@ -36,7 +36,7 @@ def load_state_dict_any(path):
     return ckpt
 
 
-def force_r160_arch(cfg):
+def force_final_peak_distillation_arch(cfg):
     cfg.setdefault("frag_params", {})
     cfg["frag_params"]["formula_comp_feats"] = True
     cfg["frag_params"]["formula_comp_feat_size"] = 18
@@ -82,8 +82,8 @@ def force_r160_arch(cfg):
     cfg["ce_binned_aux_mid_weight"] = 1.75
     cfg["ce_binned_aux_high_weight"] = 2.25
 
-    cfg["use_r117_false_mass_aux_loss"] = False
-    cfg["r117_weight"] = 0.0
+    cfg["use_support_oracle_false_mass_aux_loss"] = False
+    cfg["support_oracle_weight"] = 0.0
     return cfg
 
 
@@ -221,14 +221,14 @@ def local_density_features(pred_mz, prob, bidx, batch_size, mz_max, bin_res):
 
 def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.01):
     """
-    R173A: richer internal candidate features.
+    fragment-rich candidate features: richer internal candidate features.
 
-    Raw forward output is R54-expanded. _common_step results are final binned peaks.
+    Raw forward output is m-z offset expansion-expanded. _common_step results are final binned peaks.
     We build raw-entry features first, then aggregate raw entries to final result entries
     by (batch_idx, mz_bin).
 
     Feature sources:
-      A) old/raw peak-entry features from R172D
+      A) old/raw peak-entry features from candidate reranker
       B) formula-level logprob gathered by pred_spec_formula_global_idxs
       C) joint-level features aggregated to formula, then gathered to peak
       D) node-level features aggregated through joint->formula, then gathered to peak
@@ -269,7 +269,7 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
         names = []
         total = 0
 
-        # raw R54 entry -> old peak-entry index
+        # raw m-z offset expansion entry -> old peak-entry index
         offset_idx = None
         oi = raw.get("pred_spec_offset_group_idxs", None)
         if isinstance(oi, th.Tensor) and int(oi.numel()) == n_raw:
@@ -283,7 +283,7 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
                 return x.clamp(-30.0, 10.0) / 10.0
             if "comp_feats" in lk:
                 return x.clamp(-10.0, 10.0)
-            if "r12" in lk:
+            if "joint_refinement" in lk:
                 return x.clamp(-10.0, 10.0)
             if "channel" in lk or "h_count" in lk or "depth" in lk:
                 return x.clamp(-20.0, 20.0) / 20.0
@@ -304,10 +304,10 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
 
             x = v.to(device).float()
 
-            # Direct raw R54-expanded entry feature.
+            # Direct raw m-z offset expansion-expanded entry feature.
             if int(x.shape[0]) == n_raw:
                 pass
-            # Old peak-entry feature. Expand old -> raw by R54 offset index.
+            # Old peak-entry feature. Expand old -> raw by m-z offset expansion offset index.
             elif use_offset and offset_idx is not None and int(x.shape[0]) > int(offset_idx.max().item()):
                 x = x[offset_idx]
             else:
@@ -327,9 +327,9 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
             names.append(f"{key}:{take}")
             total += take
 
-        # -------- A) R172D stable peak-entry features --------
+        # -------- A) candidate reranker stable peak-entry features --------
         stable_peak_keys = [
-            "r172_peak_rich_feats",
+            "peak_rich_features",
             "pred_spec_formula_logprobs",
             "pred_spec_formula_comp_feats",
             "pred_spec_base_peak_logprobs",
@@ -481,9 +481,9 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
                         if isinstance(h, th.Tensor):
                             _joint_weighted_formula_avg("agg_joint_abs_h_counts", h.float().abs(), max_take=1)
 
-                    # R12 refiner internal features at joint level
-                    if "pred_joint_r12_feats" in raw:
-                        _joint_weighted_formula_avg("agg_joint_r12_feats", raw["pred_joint_r12_feats"], max_take=8)
+                    # joint refinement refiner internal features at joint level
+                    if "pred_joint_joint_refinement_feats" in raw:
+                        _joint_weighted_formula_avg("agg_joint_joint_refinement_feats", raw["pred_joint_joint_refinement_feats"], max_take=8)
 
                     # node features through joint_node_idxs
                     jn = raw.get("pred_joint_node_idxs", None)
@@ -517,23 +517,23 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
                             _joint_weighted_formula_avg("agg_node_formula_logprobs_by_joint", vals, max_take=1, valid_override=valid_node)
 
         if len(raw_cols) == 0:
-            if not hasattr(base, "_r173a_empty_printed"):
+            if not hasattr(base, "_fragment_features_empty_printed"):
                 print(
-                    "[R173A] no raw-entry rich features built;",
+                    "[fragment-rich candidate features] no raw-entry rich features built;",
                     "n_res=", n_res,
                     "n_raw=", n_raw,
                     "has_offset=", offset_idx is not None,
                     "has_raw_formula_idx=", raw_formula_idx is not None,
                     "raw_keys_head=", list(raw.keys())[:80],
                 )
-                base._r173a_empty_printed = True
+                base._fragment_features_empty_printed = True
             return results
 
         raw_feat = th.cat(raw_cols, dim=1)
         raw_feat = th.nan_to_num(raw_feat, nan=0.0, posinf=20.0, neginf=-20.0).clamp(-20.0, 20.0)
         d = int(raw_feat.shape[1])
 
-        # Aggregate raw R54 entries to final _common_step entries by (batch_idx, mz_bin).
+        # Aggregate raw m-z offset expansion entries to final _common_step entries by (batch_idx, mz_bin).
         br = float(bin_res)
         if br <= 0:
             br = 0.01
@@ -554,16 +554,16 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
         ok = ok & (matched_sorted_key == raw_key)
 
         if not ok.any():
-            if not hasattr(base, "_r173a_nomatch_printed"):
+            if not hasattr(base, "_fragment_features_nomatch_printed"):
                 print(
-                    "[R173A] no raw->result bin matches;",
+                    "[fragment-rich candidate features] no raw->result bin matches;",
                     "n_res=", n_res,
                     "n_raw=", n_raw,
                     "bin_res=", br,
                     "raw_bin_range=", (int(raw_bin.min().item()), int(raw_bin.max().item())),
                     "res_bin_range=", (int(res_bin.min().item()), int(res_bin.max().item())),
                 )
-                base._r173a_nomatch_printed = True
+                base._fragment_features_nomatch_printed = True
             return results
 
         raw_to_res = order[pos_safe[ok]]
@@ -577,13 +577,13 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
         agg = agg / denom.clamp_min(1e-12).unsqueeze(1)
         agg = th.nan_to_num(agg, nan=0.0, posinf=20.0, neginf=-20.0).clamp(-20.0, 20.0)
 
-        results["r173_frag_rich_feats"] = agg.to(dtype=dtype)
+        results["fragment_rich_features"] = agg.to(dtype=dtype)
 
-        if not hasattr(base, "_r173a_printed"):
+        if not hasattr(base, "_fragment_features_printed"):
             matched_frac = float(ok.float().mean().item())
             covered_frac = float((denom > 0).float().mean().item())
             print(
-                "[R173A] attached r173_frag_rich_feats",
+                "[fragment-rich candidate features] attached fragment_rich_features",
                 tuple(agg.shape),
                 "from",
                 names[:120],
@@ -592,12 +592,12 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
                 "matched_raw_frac=", matched_frac,
                 "covered_res_frac=", covered_frac,
             )
-            base._r173a_printed = True
+            base._fragment_features_printed = True
 
     except Exception as e:
-        if not hasattr(base, "_r173a_failed_printed"):
-            print("[R173A] failed:", repr(e))
-            base._r173a_failed_printed = True
+        if not hasattr(base, "_fragment_features_failed_printed"):
+            print("[fragment-rich candidate features] failed:", repr(e))
+            base._fragment_features_failed_printed = True
 
     return results
 
@@ -696,7 +696,7 @@ def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
     ce = ce.to(device).reshape(-1).float()
     ce_entry = ce[bidx]
 
-    # ===== R171 mass-aware candidate features =====
+    # ===== mass-aware candidate features mass-aware candidate features =====
     # Add precursor-relative and neutral-loss features.
     # These are critical for fragment plausibility and are not available to the old 23D basic reranker.
     prec = batch.get("spec_prec_mz", None)
@@ -714,7 +714,7 @@ def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
 
     mz_defect = pred_mz - th.floor(pred_mz)
     loss_defect = pos_loss_mz - th.floor(pos_loss_mz)
-    # ===== end R171 mass-aware candidate features =====
+    # ===== end mass-aware candidate features mass-aware candidate features =====
 
     sum_prob = th.zeros(batch_size, device=device, dtype=prob.dtype)
     sum_prob.index_add_(0, bidx, prob)
@@ -746,7 +746,7 @@ def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
         (ce_entry > 40).float(),
         (ce_entry / 50.0) * (pred_mz / float(mz_max)),
 
-        # R171 mass-aware features.
+        # mass-aware candidate features mass-aware features.
         prec_entry / float(mz_max),
         pred_over_prec,
         loss_over_prec,
@@ -924,12 +924,12 @@ def train_regressor(X, y, w, args):
                 verbose=-1,
             )
             model.fit(X, y, sample_weight=w)
-            print("[R170] trained backend: lightgbm")
+            print("[candidate reranker] trained backend: lightgbm")
             return model, "lightgbm"
         except Exception as e:
             if backend in ["lightgbm", "lgbm"]:
                 raise
-            print("[R170] lightgbm unavailable, fallback to sklearn HistGradientBoosting:", repr(e))
+            print("[candidate reranker] lightgbm unavailable, fallback to sklearn HistGradientBoosting:", repr(e))
 
     from sklearn.ensemble import HistGradientBoostingRegressor
     model = HistGradientBoostingRegressor(
@@ -941,7 +941,7 @@ def train_regressor(X, y, w, args):
         random_state=int(args.seed),
     )
     model.fit(X, y, sample_weight=w)
-    print("[R170] trained backend: sklearn_hist_gradient_boosting")
+    print("[candidate reranker] trained backend: sklearn_hist_gradient_boosting")
     return model, "sklearn_hgb"
 
 
@@ -1055,7 +1055,7 @@ def collect_training_samples(base, train_dl, device, extra_schema, args):
 
     base.eval()
 
-    for batch in tqdm(train_dl, desc="collect R170 train samples"):
+    for batch in tqdm(train_dl, desc="collect candidate reranker train samples"):
         batch = move_to_device(batch, device)
 
         with th.no_grad():
@@ -1109,10 +1109,10 @@ def collect_training_samples(base, train_dl, device, extra_schema, args):
         idx = rng.choice(X.shape[0], size=int(args.max_train_rows), replace=False)
         X, y, w, p = X[idx], y[idx], w[idx], p[idx]
 
-    print("[R170] train sample shape:", X.shape)
-    print("[R170] positive rate:", float(p.mean()))
-    print("[R170] y mean/std/min/max:", float(y.mean()), float(y.std()), float(y.min()), float(y.max()))
-    print("[R170] weight mean/std/min/max:", float(w.mean()), float(w.std()), float(w.min()), float(w.max()))
+    print("[candidate reranker] train sample shape:", X.shape)
+    print("[candidate reranker] positive rate:", float(p.mean()))
+    print("[candidate reranker] y mean/std/min/max:", float(y.mean()), float(y.std()), float(y.min()), float(y.max()))
+    print("[candidate reranker] weight mean/std/min/max:", float(w.mean()), float(w.std()), float(w.min()), float(w.max()))
 
     return X, y, w, p
 
@@ -1182,7 +1182,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = load_config(args.template, args.config)
-    cfg = force_r160_arch(cfg)
+    cfg = force_final_peak_distillation_arch(cfg)
 
     train_ds, val_ds, test_ds = init_dataset(cfg, splits=("train", "val", "test"))
     train_dl = init_dataloader(train_ds, cfg)
@@ -1195,10 +1195,10 @@ def main():
     sd = load_state_dict_any(args.ckpt_path)
     missing, unexpected = base.load_state_dict(sd, strict=False)
 
-    print("[R170] base missing:", len(missing))
+    print("[candidate reranker] base missing:", len(missing))
     for x in missing[:20]:
         print("  missing:", x)
-    print("[R170] base unexpected:", len(unexpected))
+    print("[candidate reranker] base unexpected:", len(unexpected))
     for x in unexpected[:20]:
         print("  unexpected:", x)
 
@@ -1213,9 +1213,9 @@ def main():
         regressor = pack["model"]
         backend = pack.get("backend", "loaded")
         extra_schema = pack.get("extra_schema", [])
-        print("[R170] loaded regressor:", args.load_regressor)
-        print("[R170] loaded backend:", backend)
-        print("[R170] loaded extra schema:", extra_schema)
+        print("[candidate reranker] loaded regressor:", args.load_regressor)
+        print("[candidate reranker] loaded backend:", backend)
+        print("[candidate reranker] loaded extra schema:", extra_schema)
     else:
         # Infer optional candidate-level extra features from one batch.
         first_batch = next(iter(train_dl))
@@ -1225,14 +1225,14 @@ def main():
             first_res = attach_raw_rich_features(base, first_batch, first_res, max_extra_dims=int(args.max_extra_dims))
         extra_schema = infer_extra_schema(first_res, max_extra_dims=int(args.max_extra_dims))
 
-        print("[R170] inferred extra schema:", extra_schema)
-        with open(out_dir / "r170_extra_schema.pkl", "wb") as f:
+        print("[candidate reranker] inferred extra schema:", extra_schema)
+        with open(out_dir / "candidate_reranker_extra_schema.pkl", "wb") as f:
             pickle.dump(extra_schema, f)
 
         X, y, w, p = collect_training_samples(base, train_dl, device, extra_schema, args)
 
         np.savez_compressed(
-            out_dir / "r170_train_sample_stats.npz",
+            out_dir / "candidate_reranker_train_sample_stats.npz",
             y=y,
             w=w,
             p=p,
@@ -1240,7 +1240,7 @@ def main():
 
         regressor, backend = train_regressor(X, y, w, args)
 
-        with open(out_dir / "r170_regressor.pkl", "wb") as f:
+        with open(out_dir / "candidate_reranker_regressor.pkl", "wb") as f:
             pickle.dump({
                 "model": regressor,
                 "backend": backend,
@@ -1259,27 +1259,27 @@ def main():
             "val_cos": float(g["cos"]),
             "val_jss": float(g["jss"]),
         })
-        tab.to_csv(out_dir / f"r170_val_alpha{alpha}.csv", index=False)
+        tab.to_csv(out_dir / f"candidate_reranker_val_alpha{alpha}.csv", index=False)
 
     adf = pd.DataFrame(alpha_rows)
-    adf.to_csv(out_dir / "r170_alpha_val.csv", index=False)
-    print("[R170 alpha val]")
+    adf.to_csv(out_dir / "candidate_reranker_alpha_val.csv", index=False)
+    print("[candidate reranker alpha val]")
     print(adf.to_string(index=False))
 
     best = adf.sort_values("val_cos", ascending=False).iloc[0]
     best_alpha = float(best["alpha"])
 
-    print("[R170] best alpha:", best_alpha, "best val cos:", float(best["val_cos"]))
+    print("[candidate reranker] best alpha:", best_alpha, "best val cos:", float(best["val_cos"]))
 
     best_val = eval_split(base, regressor, extra_schema, val_dl, device, args, split="val", alpha=best_alpha)
-    best_val.to_csv(out_dir / "r170_best_val.csv", index=False)
-    print("\n===== R170 BEST VAL =====")
+    best_val.to_csv(out_dir / "candidate_reranker_best_val.csv", index=False)
+    print("\n===== candidate reranker BEST VAL =====")
     print(best_val.to_string(index=False))
 
     if args.eval_test:
         best_test = eval_split(base, regressor, extra_schema, test_dl, device, args, split="test", alpha=best_alpha)
-        best_test.to_csv(out_dir / "r170_best_test.csv", index=False)
-        print("\n===== R170 BEST TEST =====")
+        best_test.to_csv(out_dir / "candidate_reranker_best_test.csv", index=False)
+        print("\n===== candidate reranker BEST TEST =====")
         print(best_test.to_string(index=False))
 
     print("wrote", out_dir)

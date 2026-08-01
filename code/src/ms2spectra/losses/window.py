@@ -20,7 +20,7 @@ def true_window_distribution_loss(
     chunk_size=2048,
 ):
     """
-    R64: true-window distribution loss.
+    true-peak window objective: true-window distribution loss.
 
     Purpose:
       Move probability mass from false candidates to predicted candidates

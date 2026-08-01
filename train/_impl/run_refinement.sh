@@ -3,17 +3,18 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-OUT="$ROOT/runs/v2e_full_063"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
+OUT="$RUNS_ROOT/full_model_full_063"
 DIAG="$ROOT/train/_impl/refinement_steps"
-TEMPLATE="$ROOT/runs/_config/template.yml"
+TEMPLATE="$RUNS_ROOT/_config/template.yml"
 
-BASE_CONFIG="$ROOT/runs/v2c_ce_trajectory_ablation/control/config.yml"
+BASE_CONFIG="$RUNS_ROOT/global_ace_control_ce_trajectory_ablation/control/config.yml"
 
-BASE_CHECKPOINT="$ROOT/runs/v2c_ce_trajectory_ablation/control/model_best.ckpt"
+BASE_CHECKPOINT="$RUNS_ROOT/global_ace_control_ce_trajectory_ablation/control/model_best.ckpt"
 
-V2C_REFERENCE="0.5970845222"
-V2E_REFERENCE="0.6055593451708329"
+GLOBAL_ACE_CONTROL_REFERENCE="0.5970845222"
+FULL_MODEL_REFERENCE="0.6055593451708329"
 
 FRESH=0
 
@@ -27,6 +28,8 @@ cd "$ROOT" || {
 }
 
 export PYTHONPATH="$ROOT/code/src:$ROOT/code:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export FERA_MS_ROOT="$ROOT"
+export FERA_MS_RUNS_DIR="$RUNS_ROOT"
 
 if [ "$FRESH" -eq 1 ] && [ -d "$OUT" ]; then
     BACKUP="${OUT}.bak_$(date +%Y%m%d_%H%M%S)"
@@ -39,14 +42,14 @@ mkdir -p \
     "$OUT/00_preflight" \
     "$OUT/01_R146" \
     "$OUT/02_R147" \
-    "$OUT/03_R149B" \
-    "$OUT/04_R150A" \
-    "$OUT/05_R150B" \
+    "$OUT/03_neural_refinement" \
+    "$OUT/04_peak_distillation_warmup" \
+    "$OUT/05_peak_distillation_continuation" \
     "$OUT/06_R153" \
     "$OUT/07_R154" \
     "$OUT/08_R160" \
-    "$OUT/09_R172D" \
-    "$OUT/11_R184B" \
+    "$OUT/09_candidate_reranker" \
+    "$OUT/11_spectrum_allocator" \
 
 if [ ! -f "$TEMPLATE" ]; then
     echo "缺少模板：$TEMPLATE"
@@ -54,12 +57,12 @@ if [ ! -f "$TEMPLATE" ]; then
 fi
 
 if [ ! -f "$BASE_CONFIG" ]; then
-    echo "缺少V2C配置：$BASE_CONFIG"
+    echo "缺少global ACE control配置：$BASE_CONFIG"
     exit 1
 fi
 
 if [ ! -f "$BASE_CHECKPOINT" ]; then
-    echo "缺少V2C checkpoint：$BASE_CHECKPOINT"
+    echo "缺少global ACE control checkpoint：$BASE_CHECKPOINT"
     exit 1
 fi
 
@@ -95,6 +98,7 @@ fi
 python - "$ROOT/config/train.yml" \
     > "$OUT/mainline_hparams.env" \
     2> "$OUT/mainline_hparams.log" <<'PY_HPARAMS'
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -131,16 +135,16 @@ source "$OUT/mainline_hparams.env"
 
 
 if [ -n "${MS2_GLOBAL_SEED:-}" ]; then
-    R172_SEED="$MS2_GLOBAL_SEED"
+    CANDIDATE_RERANKER_SEED="$MS2_GLOBAL_SEED"
 fi
 
 cat > "$OUT/effective_seed.env" <<EOF
 MS2_GLOBAL_SEED=${MS2_GLOBAL_SEED:-}
-R172_SEED=$R172_SEED
+CANDIDATE_RERANKER_SEED=$CANDIDATE_RERANKER_SEED
 EOF
 
 echo "Effective pipeline seed: ${MS2_GLOBAL_SEED:-unset}"
-echo "Effective R172/R184 seed: $R172_SEED"
+echo "Effective candidate reranker/spectrum allocator seed: $CANDIDATE_RERANKER_SEED"
 
 run_stage() {
     LABEL="$1"
@@ -181,10 +185,10 @@ metric() {
 
 echo
 echo "================================================================================================"
-echo "V2E-FULL-063 PIPELINE"
+echo "full model-FULL-063 PIPELINE"
 echo "================================================================================================"
-echo "V2C reference : $V2C_REFERENCE"
-echo "V2E reference : $V2E_REFERENCE"
+echo "global ACE control reference : $GLOBAL_ACE_CONTROL_REFERENCE"
+echo "full model reference : $FULL_MODEL_REFERENCE"
 echo "test used      : False"
 echo "output         : $OUT"
 echo "================================================================================================"
@@ -206,10 +210,7 @@ from ms2spectra.training import FragGNNPL
 import importlib.util
 
 
-root = Path(
-    "/home/lwh/projects/lrq2/"
-    "fragnnet-main/ms2spectra_v1_r119"
-)
+root = Path(os.environ["FERA_MS_ROOT"])
 
 script = (
     root
@@ -218,7 +219,7 @@ script = (
 )
 
 spec = importlib.util.spec_from_file_location(
-    "r146_preflight",
+    "formula_composition_preflight",
     str(script),
 )
 
@@ -237,14 +238,14 @@ class Args:
     low_w = 0.30
     mid_w = 1.50
     high_w = 2.00
-    r117_weight = 0.0
-    r117_false_weight = 0.25
+    support_oracle_weight = 0.0
+    support_oracle_false_weight = 0.25
 
 
 config = load_config(
     root / "runs/_config/template.yml",
     root
-    / "runs/v2c_ce_trajectory_ablation/"
+    / "runs/global_ace_control_ce_trajectory_ablation/"
     "control/config.yml",
 )
 
@@ -269,7 +270,7 @@ model = FragGNNPL(
 
 checkpoint = torch.load(
     root
-    / "runs/v2c_ce_trajectory_ablation/"
+    / "runs/global_ace_control_ce_trajectory_ablation/"
     "control/model_best.ckpt",
     map_location="cpu",
     weights_only=False,
@@ -311,7 +312,7 @@ bad_missing = [
 
 if bad_missing:
     raise RuntimeError(
-        "V2C→R146存在非预期missing keys："
+        "global ACE control→formula-composition refinement存在非预期missing keys："
         + repr(
             bad_missing[:40]
         )
@@ -319,7 +320,7 @@ if bad_missing:
 
 if unexpected:
     raise RuntimeError(
-        "V2C→R146存在unexpected keys："
+        "global ACE control→formula-composition refinement存在unexpected keys："
         + repr(
             unexpected[:40]
         )
@@ -361,24 +362,24 @@ print(
     ),
 )
 
-print("V2C_TO_R146_PREFLIGHT_PASSED")
+print("GLOBAL_ACE_CONTROL_TO_FORMULA_COMPOSITION_PREFLIGHT_PASSED")
 PY
 
 PREFLIGHT_RUN=${PIPESTATUS[0]}
 
 if [ "$PREFLIGHT_RUN" -ne 0 ]; then
-    echo "V2C→R146兼容性检查失败。"
+    echo "global ACE control→formula-composition refinement兼容性检查失败。"
     exit 1
 fi
 
 
 # =============================================================================
-# R146
+# formula-composition refinement
 # =============================================================================
 
-R146_CKPT="$OUT/01_R146/r146_best_state.pt"
+FORMULA_COMPOSITION_CKPT="$OUT/01_R146/formula_composition_best_state.pt"
 
-if [ ! -f "$R146_CKPT" ]; then
+if [ ! -f "$FORMULA_COMPOSITION_CKPT" ]; then
     run_stage \
         "01_R146" \
         python -u \
@@ -398,8 +399,8 @@ if [ ! -f "$R146_CKPT" ]; then
         --bin_res 0.01 \
         --max_bins 0 \
         --ce_binned_aux_weight 0.0015 \
-        --r117_weight 0.0 \
-        --r117_false_weight 0.25 \
+        --support_oracle_weight 0.0 \
+        --support_oracle_false_weight 0.25 \
         --low_w 0.30 \
         --mid_w 1.50 \
         --high_w 2.00
@@ -408,24 +409,24 @@ if [ ! -f "$R146_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R146 checkpoint已存在。"
+    echo "[RESUME] formula-composition refinement checkpoint已存在。"
 fi
 
 
 # =============================================================================
-# R147
+# collision-energy response refinement
 # =============================================================================
 
-R147_CKPT="$OUT/02_R147/r147_best_state.pt"
+COLLISION_ENERGY_RESPONSE_CKPT="$OUT/02_R147/collision_energy_response_best_state.pt"
 
-if [ ! -f "$R147_CKPT" ]; then
+if [ ! -f "$COLLISION_ENERGY_RESPONSE_CKPT" ]; then
     run_stage \
         "02_R147" \
         python -u \
         "$DIAG/collision_energy_response.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R146_CKPT" \
+        --ckpt_path "$FORMULA_COMPOSITION_CKPT" \
         --out_dir "$OUT/02_R147" \
         --epochs 4 \
         --max_train_batches -1 \
@@ -444,8 +445,8 @@ if [ ! -f "$R147_CKPT" ]; then
         --bin_res 0.01 \
         --max_bins 0 \
         --ce_binned_aux_weight 0.0015 \
-        --r117_weight 0.0 \
-        --r117_false_weight 0.20 \
+        --support_oracle_weight 0.0 \
+        --support_oracle_false_weight 0.20 \
         --low_w 0.25 \
         --mid_w 1.75 \
         --high_w 2.25
@@ -454,7 +455,7 @@ if [ ! -f "$R147_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R147 checkpoint已存在。"
+    echo "[RESUME] collision-energy response refinement checkpoint已存在。"
 fi
 
 
@@ -472,8 +473,8 @@ FORMULA_COMMON=(
     --bin_res 0.01
     --max_bins 0
     --ce_binned_aux_weight 0.0015
-    --r117_weight 0.0
-    --r117_false_weight 0.20
+    --support_oracle_weight 0.0
+    --support_oracle_false_weight 0.20
     --low_w 0.25
     --mid_w 1.75
     --high_w 2.25
@@ -497,20 +498,20 @@ FORMULA_COMMON=(
 
 
 # =============================================================================
-# R149B
+# neural refinement
 # =============================================================================
 
-R149_CKPT="$OUT/03_R149B/r148_best_state.pt"
+NEURAL_REFINEMENT_CHECKPOINT="$OUT/03_neural_refinement/neural_refinement_best_state.pt"
 
-if [ ! -f "$R149_CKPT" ]; then
+if [ ! -f "$NEURAL_REFINEMENT_CHECKPOINT" ]; then
     run_stage \
-        "03_R149B" \
+        "03_neural_refinement" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R147_CKPT" \
-        --out_dir "$OUT/03_R149B" \
+        --ckpt_path "$COLLISION_ENERGY_RESPONSE_CKPT" \
+        --out_dir "$OUT/03_neural_refinement" \
         --epochs 4 \
         --max_train_batches -1 \
         --lr 5e-6 \
@@ -523,25 +524,25 @@ if [ ! -f "$R149_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R149B checkpoint已存在。"
+    echo "[RESUME] neural refinement checkpoint已存在。"
 fi
 
 
 # =============================================================================
-# R150A
+# peak distillation warmup
 # =============================================================================
 
-R150A_CKPT="$OUT/04_R150A/r148_best_state.pt"
+PEAK_DISTILLATION_WARMUP_CKPT="$OUT/04_peak_distillation_warmup/neural_refinement_best_state.pt"
 
-if [ ! -f "$R150A_CKPT" ]; then
+if [ ! -f "$PEAK_DISTILLATION_WARMUP_CKPT" ]; then
     run_stage \
-        "04_R150A" \
+        "04_peak_distillation_warmup" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R149_CKPT" \
-        --out_dir "$OUT/04_R150A" \
+        --ckpt_path "$NEURAL_REFINEMENT_CHECKPOINT" \
+        --out_dir "$OUT/04_peak_distillation_warmup" \
         --epochs 8 \
         --max_train_batches -1 \
         --lr 3e-6 \
@@ -554,25 +555,25 @@ if [ ! -f "$R150A_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R150A checkpoint已存在。"
+    echo "[RESUME] peak distillation warmup checkpoint已存在。"
 fi
 
 
 # =============================================================================
-# R150B
+# peak distillation continuation
 # =============================================================================
 
-R150B_CKPT="$OUT/05_R150B/r148_best_state.pt"
+PEAK_DISTILLATION_CONTINUATION_CKPT="$OUT/05_peak_distillation_continuation/neural_refinement_best_state.pt"
 
-if [ ! -f "$R150B_CKPT" ]; then
+if [ ! -f "$PEAK_DISTILLATION_CONTINUATION_CKPT" ]; then
     run_stage \
-        "05_R150B" \
+        "05_peak_distillation_continuation" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R150A_CKPT" \
-        --out_dir "$OUT/05_R150B" \
+        --ckpt_path "$PEAK_DISTILLATION_WARMUP_CKPT" \
+        --out_dir "$OUT/05_peak_distillation_continuation" \
         --epochs 6 \
         --max_train_batches -1 \
         --lr 1e-6 \
@@ -585,24 +586,24 @@ if [ ! -f "$R150B_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R150B checkpoint已存在。"
+    echo "[RESUME] peak distillation continuation checkpoint已存在。"
 fi
 
 
 # =============================================================================
-# R153 reconstructed from surviving train_frag_rep implementation
+# fragment representation refinement reconstructed from surviving train_frag_rep implementation
 # =============================================================================
 
-R153_CKPT="$OUT/06_R153/r148_best_state.pt"
+FRAGMENT_REPRESENTATION_CKPT="$OUT/06_R153/neural_refinement_best_state.pt"
 
-if [ ! -f "$R153_CKPT" ]; then
+if [ ! -f "$FRAGMENT_REPRESENTATION_CKPT" ]; then
     run_stage \
         "06_R153" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R150B_CKPT" \
+        --ckpt_path "$PEAK_DISTILLATION_CONTINUATION_CKPT" \
         --out_dir "$OUT/06_R153" \
         --epochs 6 \
         --max_train_batches -1 \
@@ -617,24 +618,24 @@ if [ ! -f "$R153_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R153 checkpoint已存在。"
+    echo "[RESUME] fragment representation refinement checkpoint已存在。"
 fi
 
 
 # =============================================================================
-# R154 bounded residual flow, validation gated
+# bounded residual flow bounded residual flow, validation gated
 # =============================================================================
 
-R154_CKPT="$OUT/07_R154/r148_best_state.pt"
+BOUNDED_RESIDUAL_FLOW_CKPT="$OUT/07_R154/neural_refinement_best_state.pt"
 
-if [ ! -f "$R154_CKPT" ]; then
+if [ ! -f "$BOUNDED_RESIDUAL_FLOW_CKPT" ]; then
     run_stage \
         "07_R154" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R153_CKPT" \
+        --ckpt_path "$FRAGMENT_REPRESENTATION_CKPT" \
         --out_dir "$OUT/07_R154" \
         --epochs 6 \
         --max_train_batches -1 \
@@ -658,37 +659,37 @@ if [ ! -f "$R154_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R154 checkpoint已存在。"
+    echo "[RESUME] bounded residual flow checkpoint已存在。"
 fi
 
-R154_SELECTED="$(
+BOUNDED_RESIDUAL_FLOW_SELECTED="$(
     python "$ROOT/train/_impl/stage_metrics.py" \
         select \
-        --before "$OUT/07_R154/r148_val_epoch0_before.csv" \
-        --best "$OUT/07_R154/r148_best_val.csv" \
-        --parent "$R153_CKPT" \
-        --child "$R154_CKPT" \
+        --before "$OUT/07_R154/neural_refinement_val_epoch0_before.csv" \
+        --best "$OUT/07_R154/neural_refinement_best_val.csv" \
+        --parent "$FRAGMENT_REPRESENTATION_CKPT" \
+        --child "$BOUNDED_RESIDUAL_FLOW_CKPT" \
         --decision "$OUT/07_R154/validation_gate.json" \
         --min-delta 0.0
 )"
 
-echo "R154 selected checkpoint: $R154_SELECTED"
+echo "bounded residual flow selected checkpoint: $BOUNDED_RESIDUAL_FLOW_SELECTED"
 
 
 # =============================================================================
-# R160
+# final peak distillation
 # =============================================================================
 
-R160_CKPT="$OUT/08_R160/r160_best_state.pt"
+FINAL_PEAK_DISTILLATION_CKPT="$OUT/08_R160/final_peak_distillation_best_state.pt"
 
-if [ ! -f "$R160_CKPT" ]; then
+if [ ! -f "$FINAL_PEAK_DISTILLATION_CKPT" ]; then
     run_stage \
         "08_R160" \
         python -u \
         "$DIAG/peak_distillation.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R154_SELECTED" \
+        --ckpt_path "$BOUNDED_RESIDUAL_FLOW_SELECTED" \
         --out_dir "$OUT/08_R160" \
         --epochs 8 \
         --max_train_batches -1 \
@@ -742,74 +743,74 @@ if [ ! -f "$R160_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R160 checkpoint已存在。"
+    echo "[RESUME] final peak distillation checkpoint已存在。"
 fi
 
-R160_COS="$(
+FINAL_PEAK_DISTILLATION_COS="$(
     metric \
-        "$OUT/08_R160/r160_best_val.csv"
+        "$OUT/08_R160/final_peak_distillation_best_val.csv"
 )"
 
-echo "R160 validation cosine: $R160_COS"
+echo "final peak distillation validation cosine: $FINAL_PEAK_DISTILLATION_COS"
 
 
 # =============================================================================
-# R172D exact residual scorer
+# candidate reranker exact residual scorer
 # =============================================================================
 
-R172_PKL="$OUT/09_R172D/r170_regressor.pkl"
+CANDIDATE_RERANKER_PKL="$OUT/09_candidate_reranker/candidate_reranker_regressor.pkl"
 
-if [ ! -f "$R172_PKL" ] || [ ! -s "$OUT/09_R172D/r170_alpha_val.csv" ]; then
+if [ ! -f "$CANDIDATE_RERANKER_PKL" ] || [ ! -s "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" ]; then
     run_stage \
-        "09_R172D" \
+        "09_candidate_reranker" \
         python -u \
         "$DIAG/candidate_reranker.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R160_CKPT" \
-        --out_dir "$OUT/09_R172D" \
-        --seed "$R172_SEED" \
+        --ckpt_path "$FINAL_PEAK_DISTILLATION_CKPT" \
+        --out_dir "$OUT/09_candidate_reranker" \
+        --seed "$CANDIDATE_RERANKER_SEED" \
         --backend lightgbm \
-        --max_train_rows "$R172_MAX_TRAIN_ROWS" \
-        --neg_topk_per_batch "$R172_NEG_TOPK" \
-        --neg_rand_per_batch "$R172_NEG_RANDOM" \
+        --max_train_rows "$CANDIDATE_RERANKER_MAX_TRAIN_ROWS" \
+        --neg_topk_per_batch "$CANDIDATE_RERANKER_NEG_TOPK" \
+        --neg_rand_per_batch "$CANDIDATE_RERANKER_NEG_RANDOM" \
         --mz_tol 0.01 \
         --mz_sigma 0.003 \
         --target_bin_res 0.01 \
         --local_bin_res 0.01 \
         --eval_bin_res 0.01 \
-        --residual_clip "$R172_RESIDUAL_CLIP" \
-        --neg_residual "$R172_NEG_RESIDUAL" \
-        --score_clip "$R172_SCORE_CLIP" \
-        --low_w "$R172_LOW_W" \
-        --mid_w "$R172_MID_W" \
-        --high_w "$R172_HIGH_W" \
-        --pos_weight "$R172_POS_W" \
-        --pos_intensity_weight "$R172_POS_INTENSITY_W" \
-        --neg_weight "$R172_NEG_W" \
-        --neg_prob_weight "$R172_NEG_PROB_W" \
-        --n_estimators "$R172_N_ESTIMATORS" \
-        --gbdt_lr "$R172_GBDT_LR" \
-        --num_leaves "$R172_NUM_LEAVES" \
-        --max_depth "$R172_MAX_DEPTH" \
-        --min_child_samples "$R172_MIN_CHILD" \
-        --subsample "$R172_SUBSAMPLE" \
-        --colsample_bytree "$R172_COLSAMPLE" \
-        --reg_alpha "$R172_REG_ALPHA" \
-        --reg_lambda "$R172_REG_LAMBDA" \
-        --num_workers "$R172_WORKERS" \
-        --max_extra_dims "$R172_EXTRA_DIMS" \
-        --alpha_grid "$R172_ALPHA_GRID"
+        --residual_clip "$CANDIDATE_RERANKER_RESIDUAL_CLIP" \
+        --neg_residual "$CANDIDATE_RERANKER_NEG_RESIDUAL" \
+        --score_clip "$CANDIDATE_RERANKER_SCORE_CLIP" \
+        --low_w "$CANDIDATE_RERANKER_LOW_W" \
+        --mid_w "$CANDIDATE_RERANKER_MID_W" \
+        --high_w "$CANDIDATE_RERANKER_HIGH_W" \
+        --pos_weight "$CANDIDATE_RERANKER_POS_W" \
+        --pos_intensity_weight "$CANDIDATE_RERANKER_POS_INTENSITY_W" \
+        --neg_weight "$CANDIDATE_RERANKER_NEG_W" \
+        --neg_prob_weight "$CANDIDATE_RERANKER_NEG_PROB_W" \
+        --n_estimators "$CANDIDATE_RERANKER_N_ESTIMATORS" \
+        --gbdt_lr "$CANDIDATE_RERANKER_GBDT_LR" \
+        --num_leaves "$CANDIDATE_RERANKER_NUM_LEAVES" \
+        --max_depth "$CANDIDATE_RERANKER_MAX_DEPTH" \
+        --min_child_samples "$CANDIDATE_RERANKER_MIN_CHILD" \
+        --subsample "$CANDIDATE_RERANKER_SUBSAMPLE" \
+        --colsample_bytree "$CANDIDATE_RERANKER_COLSAMPLE" \
+        --reg_alpha "$CANDIDATE_RERANKER_REG_ALPHA" \
+        --reg_lambda "$CANDIDATE_RERANKER_REG_LAMBDA" \
+        --num_workers "$CANDIDATE_RERANKER_WORKERS" \
+        --max_extra_dims "$CANDIDATE_RERANKER_EXTRA_DIMS" \
+        --alpha_grid "$CANDIDATE_RERANKER_ALPHA_GRID"
 
     if [ $? -ne 0 ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R172D regressor已存在。"
+    echo "[RESUME] candidate reranker regressor已存在。"
 fi
 
 BEST_ALPHA="$(
-    python - "$OUT/09_R172D/r170_alpha_val.csv" <<'PY_ALPHA'
+    python - "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" <<'PY_ALPHA'
 import math
 import sys
 
@@ -891,15 +892,15 @@ PY_ALPHA
 ALPHA_CODE=$?
 
 if [ "$ALPHA_CODE" -ne 0 ] || [ -z "$BEST_ALPHA" ]; then
-    echo "无法提取R172最佳alpha。"
+    echo "无法提取candidate reranker最佳alpha。"
     exit 1
 fi
 
 printf '%s\n' "$BEST_ALPHA" \
-    > "$OUT/09_R172D/best_alpha.txt"
+    > "$OUT/09_candidate_reranker/best_alpha.txt"
 
-if [ ! -s "$OUT/09_R172D/r170_alpha_val.csv" ]; then
-    echo "[STOP] R172D缺少r170_alpha_val.csv"
+if [ ! -s "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" ]; then
+    echo "[STOP] candidate reranker缺少candidate_reranker_alpha_val.csv"
     exit 1
 fi
 
@@ -913,38 +914,38 @@ if not math.isfinite(value):
     raise ValueError(value)
 ' "$BEST_ALPHA"
 then
-    echo "[STOP] R172D最佳alpha无效：'$BEST_ALPHA'"
+    echo "[STOP] candidate reranker最佳alpha无效：'$BEST_ALPHA'"
     exit 1
 fi
 
-echo "R172 validated alpha      : $BEST_ALPHA"
+echo "candidate reranker validated alpha      : $BEST_ALPHA"
 
-R172_COS="$(
+CANDIDATE_RERANKER_COS="$(
     metric \
-        "$OUT/09_R172D/r170_best_val.csv"
+        "$OUT/09_candidate_reranker/candidate_reranker_best_val.csv"
 )"
 
-echo "R172 selected alpha      : $BEST_ALPHA"
-echo "R172 validation cosine  : $R172_COS"
+echo "candidate reranker selected alpha      : $BEST_ALPHA"
+echo "candidate reranker validation cosine  : $CANDIDATE_RERANKER_COS"
 
 
 # =============================================================================
-# R184B sibling, stronger residual allocator
+# spectrum allocator sibling, stronger residual allocator
 # =============================================================================
 
-R184B_CKPT="$OUT/11_R184B/r184_allocator_best.pt"
+SPECTRUM_ALLOCATOR_CKPT="$OUT/11_spectrum_allocator/spectrum_allocator_allocator_best.pt"
 
-if [ ! -f "$R184B_CKPT" ]; then
+if [ ! -f "$SPECTRUM_ALLOCATOR_CKPT" ]; then
     run_stage \
-        "11_R184B" \
+        "11_spectrum_allocator" \
         python -u \
         "$DIAG/spectrum_allocator.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
-        --ckpt_path "$R160_CKPT" \
-        --regressor_path "$R172_PKL" \
-        --out_dir "$OUT/11_R184B" \
-        --seed "$R172_SEED" \
+        --ckpt_path "$FINAL_PEAK_DISTILLATION_CKPT" \
+        --regressor_path "$CANDIDATE_RERANKER_PKL" \
+        --out_dir "$OUT/11_spectrum_allocator" \
+        --seed "$CANDIDATE_RERANKER_SEED" \
         --epochs "$B_EPOCHS" \
         --lr "$B_LR" \
         --weight_decay "$B_WEIGHT_DECAY" \
@@ -973,14 +974,14 @@ if [ ! -f "$R184B_CKPT" ]; then
         --eval_bin_res 0.01 \
         --residual_clip 6.0 \
         --neg_residual 4.0 \
-        --max_extra_dims "$R172_EXTRA_DIMS" \
+        --max_extra_dims "$CANDIDATE_RERANKER_EXTRA_DIMS" \
         --max_train_batches 0
 
     if [ $? -ne 0 ]; then
         exit 1
     fi
 else
-    echo "[RESUME] R184B allocator已存在。"
+    echo "[RESUME] spectrum allocator allocator已存在。"
 fi
 
 
@@ -990,13 +991,13 @@ echo "============================================================"
 echo "FINAL MAINLINE REFINEMENT COMPLETE"
 echo "============================================================"
 echo "Refined backbone checkpoint:"
-echo "$R160_CKPT"
+echo "$FINAL_PEAK_DISTILLATION_CKPT"
 echo
 echo "Candidate reranker:"
-echo "$R172_PKL"
+echo "$CANDIDATE_RERANKER_PKL"
 echo
 echo "Final spectrum allocator:"
-echo "$R184B_CKPT"
+echo "$SPECTRUM_ALLOCATOR_CKPT"
 echo
 echo "Test used for selection: False"
 echo "============================================================"

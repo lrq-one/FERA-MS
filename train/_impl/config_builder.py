@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Stage A: Unified V1 -> R119-style low-LR all-parameter transfer.
+Stage A: Unified base model -> retained control-style low-LR all-parameter transfer.
 
 核心原则：
 1. 仅使用当前本地仓库文件；
-2. 不修改 diagnostics/101_unified_all_v1_v5_40ep.py；
-3. 加载 V1 checkpoint 的模型权重，但不恢复历史 optimizer / epoch；
-4. 保留 V1 网络结构和 V1 loss；
-5. 只迁移 R119 的 optimizer、低学习率、scheduler、scope=all 和 no-r117 设置；
+2. 不修改 diagnostics/101_unified_all_base_model_v5_40ep.py；
+3. 加载 base model checkpoint 的模型权重，但不恢复历史 optimizer / epoch；
+4. 保留 base model 网络结构和 base model loss；
+5. 只迁移 retained control 的 optimizer、低学习率、scheduler、scope=all 和 no-support_oracle 设置；
 6. 根据 validation global cosine 保存 best checkpoint；
 7. 训练结束后仅对 best validation checkpoint 测试一次。
 """
@@ -117,12 +117,12 @@ class Tee:
         )
 
 
-def parse_v1_validation(
-    v1_log: Path,
+def parse_base_model_validation(
+    base_model_log: Path,
     output_path: Path,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
-        "log": str(v1_log),
+        "log": str(base_model_log),
         "found": False,
         "best": None,
         "last": None,
@@ -130,15 +130,15 @@ def parse_v1_validation(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if not v1_log.is_file():
+    if not base_model_log.is_file():
         text = (
-            f"V1 validation log not found:\n"
-            f"{v1_log}\n"
+            f"base model validation log not found:\n"
+            f"{base_model_log}\n"
         )
         output_path.write_text(text, encoding="utf-8")
         return result
 
-    log_text = v1_log.read_text(
+    log_text = base_model_log.read_text(
         encoding="utf-8",
         errors="ignore",
     )
@@ -198,15 +198,15 @@ def parse_v1_validation(
         result["last"] = last
 
         text = (
-            f"V1 LOG: {v1_log}\n"
-            f"V1 BEST VAL: {best}\n"
-            f"V1 LAST VAL: {last}\n"
+            f"base model LOG: {base_model_log}\n"
+            f"base model BEST VAL: {best}\n"
+            f"base model LAST VAL: {last}\n"
             f"NUM MATCHES: {len(rows)}\n"
         )
     else:
         text = (
-            f"V1 LOG: {v1_log}\n"
-            "V1 validation cosine not found by supported patterns\n"
+            f"base model LOG: {base_model_log}\n"
+            "base model validation cosine not found by supported patterns\n"
         )
 
     output_path.write_text(text, encoding="utf-8")
@@ -261,18 +261,18 @@ def materialize_training_config(
 
 def prepare_effective_config(
     template_cfg: dict[str, Any],
-    v1_custom: dict[str, Any],
-    r119_custom: dict[str, Any],
+    base_model_custom: dict[str, Any],
+    retained_control_custom: dict[str, Any],
     epochs: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """
-    V1 是结构和 loss 基础。
+    base model 是结构和 loss 基础。
 
-    这里只从 R119 迁移训练策略相关字段，绝不把 R119 的其他历史模块
-    或结构开关覆盖进 V1。
+    这里只从 retained control 迁移训练策略相关字段，绝不把 retained control 的其他历史模块
+    或结构开关覆盖进 base model。
     """
-    effective_v1 = deep_merge(template_cfg, v1_custom)
-    effective_r119 = deep_merge(template_cfg, r119_custom)
+    effective_v1 = deep_merge(template_cfg, base_model_custom)
+    effective_r119 = deep_merge(template_cfg, retained_control_custom)
 
     transfer = copy.deepcopy(effective_v1)
     copied: dict[str, Any] = {}
@@ -318,7 +318,7 @@ def prepare_effective_config(
     transfer["min_epochs"] = 1
     transfer["max_epochs"] = int(epochs)
 
-    # 所有 V1 参数参与低学习率联合收敛。
+    # 所有 base model 参数参与低学习率联合收敛。
     if "spectrum_refiner_train_scope" in transfer:
         transfer["spectrum_refiner_train_scope"] = "all"
         copied["spectrum_refiner_train_scope"] = "all"
@@ -327,14 +327,14 @@ def prepare_effective_config(
         transfer["train_scope"] = "all"
         copied["train_scope"] = "all"
 
-    # 明确关闭 R117。
-    if "use_r117_support_oracle_reweight_loss" in transfer:
-        transfer["use_r117_support_oracle_reweight_loss"] = False
-        copied["use_r117_support_oracle_reweight_loss"] = False
+    # 明确关闭 support oracle。
+    if "use_support_oracle_support_oracle_reweight_loss" in transfer:
+        transfer["use_support_oracle_support_oracle_reweight_loss"] = False
+        copied["use_support_oracle_support_oracle_reweight_loss"] = False
 
-    if "r117_support_oracle_weight" in transfer:
-        transfer["r117_support_oracle_weight"] = 0.0
-        copied["r117_support_oracle_weight"] = 0.0
+    if "support_oracle_support_oracle_weight" in transfer:
+        transfer["support_oracle_support_oracle_weight"] = 0.0
+        copied["support_oracle_support_oracle_weight"] = 0.0
 
     # 保证按照 validation cosine 选 best，训练结束后测试一次。
     transfer["eval_test_split"] = True
@@ -365,15 +365,15 @@ def prepare_effective_config(
         }
     )
 
-    # 禁止意外启用 R117。
+    # 禁止意外启用 support oracle。
     assert not bool(
         transfer.get(
-            "use_r117_support_oracle_reweight_loss",
+            "use_support_oracle_support_oracle_reweight_loss",
             False,
         )
     )
     assert float(
-        transfer.get("r117_support_oracle_weight", 0.0)
+        transfer.get("support_oracle_support_oracle_weight", 0.0)
     ) == 0.0
 
     return transfer, copied
@@ -439,11 +439,11 @@ def main() -> int:
         "--epochs",
         type=int,
         default=3,
-        help="R119-style transfer epochs; first run should use 3",
+        help="retained control-style transfer epochs; first run should use 3",
     )
     parser.add_argument(
         "--run-name",
-        default="v1_r119_reproduce",
+        default="base_model_retained_control_reproduce",
     )
     parser.add_argument(
         "--patience",
@@ -464,17 +464,17 @@ def main() -> int:
     if not root.is_dir():
         raise FileNotFoundError(f"工作目录不存在: {root}")
 
-    v1_cfg_path = root / (
+    base_model_cfg_path = root / (
         "runs/_config/base_stage.yml"
     )
-    r119_cfg_path = root / (
+    retained_control_cfg_path = root / (
         "runs/_config/continuation_stage.yml"
     )
-    v1_ckpt_path = root / (
-        "runs/v1/model_epoch39.ckpt"
+    base_model_ckpt_path = root / (
+        "runs/base_model/model_epoch39.ckpt"
     )
-    v1_log_path = root / (
-        "runs/v1/training.log"
+    base_model_log_path = root / (
+        "runs/base_model/training.log"
     )
 
     template_path = first_existing(
@@ -486,9 +486,9 @@ def main() -> int:
     )
 
     required = {
-        "V1配置": v1_cfg_path,
-        "R119配置": r119_cfg_path,
-        "V1 checkpoint": v1_ckpt_path,
+        "base model配置": base_model_cfg_path,
+        "retained control配置": retained_control_cfg_path,
+        "base model checkpoint": base_model_ckpt_path,
     }
 
     missing = [
@@ -505,11 +505,11 @@ def main() -> int:
     exact_val_path = (
         root
         / "artifacts"
-        / "v1_exact_val.txt"
+        / "base_model_exact_val.txt"
     )
 
-    v1_val_result = parse_v1_validation(
-        v1_log_path,
+    base_model_val_result = parse_base_model_validation(
+        base_model_log_path,
         exact_val_path,
     )
 
@@ -532,12 +532,12 @@ def main() -> int:
 
     try:
         print("=" * 78)
-        print("LOCAL V1 -> R119 TRANSFER")
+        print("LOCAL base model -> retained control TRANSFER")
         print("=" * 78)
         print(f"ROOT          : {root}")
-        print(f"V1 CONFIG     : {v1_cfg_path}")
-        print(f"R119 CONFIG   : {r119_cfg_path}")
-        print(f"V1 CHECKPOINT : {v1_ckpt_path}")
+        print(f"base model CONFIG     : {base_model_cfg_path}")
+        print(f"retained control CONFIG   : {retained_control_cfg_path}")
+        print(f"base model CHECKPOINT : {base_model_ckpt_path}")
         print(f"TEMPLATE      : {template_path}")
         print(f"RUN DIR       : {run_dir}")
         print(f"EPOCHS        : {args.epochs}")
@@ -546,14 +546,14 @@ def main() -> int:
             print(f"OLD RUN BACKUP: {backup_dir}")
 
         template_cfg = load_yaml(template_path)
-        v1_custom = load_yaml(v1_cfg_path)
-        r119_custom = load_yaml(r119_cfg_path)
+        base_model_custom = load_yaml(base_model_cfg_path)
+        retained_control_custom = load_yaml(retained_control_cfg_path)
 
         transfer_cfg, copied_training_settings = (
             prepare_effective_config(
                 template_cfg=template_cfg,
-                v1_custom=v1_custom,
-                r119_custom=r119_custom,
+                base_model_custom=base_model_custom,
+                retained_control_custom=retained_control_custom,
                 epochs=args.epochs,
             )
         )
@@ -591,15 +591,15 @@ def main() -> int:
             "name": args.run_name,
             "root": str(root),
             "random_initialization": False,
-            "weight_initialization": "Unified V1 epoch39",
+            "weight_initialization": "Unified base model epoch39",
             "optimizer_state_restored": False,
             "epoch_state_restored": False,
-            "v1_config": str(v1_cfg_path),
-            "r119_config": str(r119_cfg_path),
+            "base_model_config": str(base_model_cfg_path),
+            "retained_control_config": str(retained_control_cfg_path),
             "template": str(template_path),
-            "v1_checkpoint": str(v1_ckpt_path),
-            "v1_checkpoint_sha256": sha256_file(
-                v1_ckpt_path
+            "base_model_checkpoint": str(base_model_ckpt_path),
+            "base_model_checkpoint_sha256": sha256_file(
+                base_model_ckpt_path
             ),
             "epochs": args.epochs,
             "early_stopping": {
@@ -608,12 +608,12 @@ def main() -> int:
                 "mode": "max",
                 "patience": int(args.patience),
                 "min_delta": float(args.min_delta),
-                "active_stage": "R119 low-LR transfer",
+                "active_stage": "retained control low-LR transfer",
             },
-            "copied_r119_training_settings": (
+            "copied_retained_control_training_settings": (
                 copied_training_settings
             ),
-            "v1_validation_parse": v1_val_result,
+            "base_model_validation_parse": base_model_val_result,
             "selection_metric": transfer_cfg[
                 "checkpoint_metric"
             ],
@@ -632,7 +632,7 @@ def main() -> int:
             encoding="utf-8",
         )
 
-        print("\n[R119 TRANSFER SETTINGS]")
+        print("\n[retained control TRANSFER SETTINGS]")
         print(
             json.dumps(
                 copied_training_settings,
@@ -641,7 +641,7 @@ def main() -> int:
             )
         )
 
-        print("\n[V1 VALIDATION AUDIT]")
+        print("\n[base model VALIDATION AUDIT]")
         print(
             exact_val_path.read_text(
                 encoding="utf-8",
@@ -715,12 +715,12 @@ def main() -> int:
             )
 
             print(
-                "\n[V1 WEIGHT LOAD] "
-                f"loading strictly from {v1_ckpt_path}"
+                "\n[base model WEIGHT LOAD] "
+                f"loading strictly from {base_model_ckpt_path}"
             )
 
             checkpoint = torch.load(
-                v1_ckpt_path,
+                base_model_ckpt_path,
                 map_location="cpu",
             )
 
@@ -734,10 +734,10 @@ def main() -> int:
 
             if not isinstance(state_dict, dict):
                 raise TypeError(
-                    "V1 checkpoint 中没有可用的 state_dict"
+                    "base model checkpoint 中没有可用的 state_dict"
                 )
 
-            # 严格加载，结构只要与 V1 不一致就立即报错，
+            # 严格加载，结构只要与 base model 不一致就立即报错，
             # 禁止 missing/unexpected key 静默继续训练。
             self.load_state_dict(
                 state_dict,
@@ -764,7 +764,7 @@ def main() -> int:
             )
 
             print(
-                "[V1 WEIGHT LOAD] strict=True, "
+                "[base model WEIGHT LOAD] strict=True, "
                 f"state_keys={len(state_dict)}, "
                 f"trainable={trainable}, total={total}"
             )
@@ -778,7 +778,7 @@ def main() -> int:
             print("\n[START LOCAL TRAINING]")
             print(
                 "注意：这是新的 optimizer 状态，"
-                "不是从 V1 optimizer/epoch 恢复。"
+                "不是从 base model optimizer/epoch 恢复。"
             )
 
             runner.init_run(
@@ -874,7 +874,7 @@ def main() -> int:
         print(f"日志     : {log_path}")
         print(f"配置     : {resolved_cfg_path}")
         print(f"manifest : {manifest_path}")
-        print(f"V1审计   : {exact_val_path}")
+        print(f"base model审计   : {exact_val_path}")
         print("=" * 78)
 
         return 0

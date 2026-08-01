@@ -1,0 +1,103 @@
+--- a/src/fragnnet/iceberg/model.py
++++ b/src/fragnnet/iceberg/model.py
+@@ -397,18 +397,6 @@
+ 		# Define map from output layer to attn
+ 		self.isomer_attn_out = copy.deepcopy(self.output_map)
+ 
+-		# CE conditioning for safe19659 CE-aware benchmark.
+-		# Stable gated residual: initialized as exact NoCE behavior.
+-		self.ce_embed = nn.Sequential(
+-			nn.Linear(1, self.hidden_size),
+-			nn.SiLU(),
+-			nn.Dropout(dropout),
+-			nn.Linear(self.hidden_size, self.hidden_size),
+-		)
+-		self.ce_gate = nn.Parameter(th.zeros(1))
+-		nn.init.zeros_(self.ce_embed[-1].weight)
+-		nn.init.zeros_(self.ce_embed[-1].bias)
+-
+ 		# Define buckets
+ 		self.mz_bin_res = mz_bin_res
+ 		self.mz_max = mz_max
+@@ -439,7 +427,6 @@
+ 		masses=None,
+ 		root_forms=None,
+ 		frag_forms=None,
+-		spec_ce=None,
+ 	):
+ 		"""forward _summary_
+ 
+@@ -535,15 +522,6 @@
+ 			padded_hidden = new_hidden
+ 
+ 		padded_hidden = self.intermediate_out(padded_hidden)
+-
+-		# Add CE embedding after fragment/root hidden construction.
+-		# spec_ce shape: [batch_size] or [batch_size, 1].
+-		if spec_ce is not None:
+-			ce = spec_ce.float().view(-1, 1).to(padded_hidden.device)
+-			ce = th.clamp(ce, min=0.0, max=200.0) / 100.0
+-			ce_h = self.ce_embed(ce).unsqueeze(1)
+-			padded_hidden = padded_hidden + self.ce_gate * ce_h
+-
+ 		batch_size, max_frags, hidden_dim = padded_hidden.shape
+ 
+ 		# Build up a mask
+--- a/src/fragnnet/iceberg/pl_model.py
++++ b/src/fragnnet/iceberg/pl_model.py
+@@ -38,7 +38,7 @@
+ 		# per-spec_id targets. Note: ICEBERG forward does not consume spec_ce, so
+ 		# this is an unmerged same-task ICEBERG-NoCE baseline.
+ 		if not self.hparams.spec_params["merge"]:
+-			print(">> WARNING: running IcebergIntenPL with merge=False; CE patch active, spec_ce is used.")
++			print(">> WARNING: running IcebergIntenPL with merge=False; architecture unchanged, spec_ce not used.")
+ 
+ 		# compile
+ 		if self.hparams.compile:
+@@ -500,7 +500,7 @@
+ 		# per-spec_id targets. Note: ICEBERG forward does not consume spec_ce, so
+ 		# this is an unmerged same-task ICEBERG-NoCE baseline.
+ 		if not self.hparams.spec_params["merge"]:
+-			print(">> WARNING: running IcebergIntenPL with merge=False; CE patch active, spec_ce is used.")
++			print(">> WARNING: running IcebergIntenPL with merge=False; architecture unchanged, spec_ce not used.")
+ 
+ 		# compile
+ 		if self.hparams.compile:
+@@ -567,30 +567,6 @@
+ 
+ 	def forward(self,**kwargs):
+ 
+-		# CE-aware patch for unmerged safe19659.
+-		# Dataset provides one ACE per spectrum through spec_ce/spec_ce_batch_idxs.
+-		# Use manual scatter_add instead of scatter_reduce because spec_ce is 1D
+-		# while spec_ce_batch_idxs is also 1D; this avoids dimension mismatch.
+-		iceberg_spec_ce = None
+-		if ("spec_ce" in kwargs) and (kwargs["spec_ce"] is not None):
+-			spec_ce = kwargs["spec_ce"].float().view(-1)
+-			n_spec = int(kwargs["magma_num_frags"].shape[0])
+-
+-			if ("spec_ce_batch_idxs" in kwargs) and (kwargs["spec_ce_batch_idxs"] is not None):
+-				idx = kwargs["spec_ce_batch_idxs"].long().view(-1).to(spec_ce.device)
+-
+-				ce_sum = th.zeros(n_spec, device=spec_ce.device, dtype=spec_ce.dtype)
+-				ce_cnt = th.zeros(n_spec, device=spec_ce.device, dtype=spec_ce.dtype)
+-
+-				ce_sum.scatter_add_(0, idx, spec_ce)
+-				ce_cnt.scatter_add_(0, idx, th.ones_like(spec_ce))
+-
+-				iceberg_spec_ce = ce_sum / ce_cnt.clamp_min(1.0)
+-			else:
+-				iceberg_spec_ce = spec_ce
+-				if iceberg_spec_ce.numel() != n_spec:
+-					iceberg_spec_ce = iceberg_spec_ce[:n_spec]
+-
+ 		outputs = self.model(
+ 			graphs=kwargs["magma_frag_graphs"],
+ 			root_repr=kwargs["magma_root_reprs"],
+@@ -604,6 +580,5 @@
+ 			root_forms=kwargs["magma_root_form_vecs"],
+ 			frag_forms=kwargs["magma_frag_form_vecs"],
+ 			adduct_form_deltas=kwargs.get("magma_adduct_form_deltas",None),
+-			spec_ce=iceberg_spec_ce,
+ 		)
+ 		return outputs

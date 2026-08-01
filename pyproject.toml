@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "Cython==3.0.11", "numpy==1.24.4", "cysignals==1.12.5"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fera-ms"
+version = "0.1.0"
+description = "Fragmentation- and energy-resolved tandem mass spectrum prediction"
+requires-python = ">=3.10,<3.12"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
