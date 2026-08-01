@@ -67,7 +67,7 @@ FORBIDDEN_DIR_NAMES = {
     "cysignals_crash_logs",
     "figure",
     "figures",
-    "results_v2",
+    "results",
 }
 FORBIDDEN_ARTIFACT_SUFFIXES = {
     ".ckpt",
@@ -88,10 +88,12 @@ ABSOLUTE_PATTERNS = (
     re.compile(r"/home/lwh(?:/|\b)"),
     re.compile(r"/mnt(?:/|\b)"),
     re.compile(r"/hy-tmp(?:/|\b)"),
-    re.compile(r"ms2spectra_base_model_r119"),
+    re.compile(r"ms2spectra_base_model_[rv][0-9]+"),
 )
 NUMBERED_CODENAME_PATTERN = re.compile(
-    r"\b(?:R|V|r|v|stage|experiment)[0-9][A-Za-z0-9_-]*\b"
+    r"(?:\b(?:R|V|K|r|v|k)[-_]?[0-9]+[A-Za-z0-9_-]*\b|"
+    r"\b(?:stage|experiment)[-_ ]?[0-9]+[A-Za-z0-9_-]*\b)",
+    re.IGNORECASE,
 )
 
 

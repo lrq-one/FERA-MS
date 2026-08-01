@@ -7,8 +7,8 @@ ROOT=Path(os.environ.get('FERA_MS_ROOT', Path(__file__).resolve().parents[3])).r
 from config_store import write_effective_config
 STEPS=('backbone_training','retained_control_continuation','global_ace_control','formula_composition_refinement','collision_energy_response_refinement','neural_refinement','peak_distillation_warmup','peak_distillation_continuation','fragment_representation_refinement','bounded_residual_flow_refinement','final_peak_distillation','candidate_reranking','spectrum_allocation','validation_evaluation','test_evaluation')
 def manifest(seed, smoke):
- out=ABL/('runs/formal_full_chain_smoke_seed42' if smoke else f'runs/seed_{seed}')
- cfg=lambda s: f"{ABL/'configs/locked.yml'}#seed={seed},stage={s}"
+ out=ABL/(f'runs/smoke/seed_{seed}' if smoke else f'runs/seed_{seed}')
+ cfg=lambda s: f"{ABL/'configs/pipeline.yml'}#seed={seed},stage={s}"
  p=[]; prev='RANDOM_INITIALIZATION'
  for s in STEPS[:11]:
   ck=out/s/'model_last.pt';p.append((s,'internal_neural_stage',str(cfg(s)),prev,str(ck),'false'));prev=str(ck)

@@ -37,11 +37,11 @@ checks.append(
 )
 
 for seed in (42, 43, 44):
-    seed_root = RUNS_ROOT / f"experiments/molecule_disjoint_3seeds/seed_{seed}"
+    seed_root = RUNS_ROOT / f"experiments/molecule_disjoint_three_seeds/seed_{seed}"
     for relative in (
         "global_ace_control_ce_trajectory_ablation/control/config.yml",
-        "full_model_full_063/08_R160/final_peak_distillation_best_state.pt",
-        "full_model_full_063/09_candidate_reranker/candidate_reranker_regressor.pkl",
+        "full_fera_ms/final_peak_distillation/final_peak_distillation_best_state.pt",
+        "full_fera_ms/candidate_reranking/candidate_reranker_regressor.pkl",
     ):
         path = seed_root / relative
         checks.append({"kind": "upstream_artifact", "path": str(path), "ok": path.is_file()})

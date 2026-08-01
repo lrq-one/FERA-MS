@@ -148,7 +148,7 @@ def build_stage_configs() -> tuple[
     dict[str, Any],
     dict[str, Any],
 ]:
-    original_v1 = copy.deepcopy(
+    original_base_config = copy.deepcopy(
         dict(
             workflow.load_config(
                 str(TEMPLATE),
@@ -158,7 +158,7 @@ def build_stage_configs() -> tuple[
     )
 
     initial_training = copy.deepcopy(
-        original_v1
+        original_base_config
     )
 
     # ==========================================================
@@ -214,7 +214,7 @@ def build_stage_configs() -> tuple[
                 "max",
 
             "wandb_name":
-                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_STAGE1",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_INITIAL_TRAINING",
 
             "wandb_group":
                 "STRUCTURAL_BACKBONE_GINE_CUTCHEM_ONLY",
@@ -289,7 +289,7 @@ def build_stage_configs() -> tuple[
                 "max",
 
             "wandb_name":
-                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_STAGE2",
+                "STRUCTURAL_BACKBONE_GINE_CUTCHEM_CONTINUATION",
 
             "wandb_group":
                 "STRUCTURAL_BACKBONE_GINE_CUTCHEM_ONLY",
@@ -418,12 +418,12 @@ def build_stage_configs() -> tuple[
     )
 
     assert (
-        "use_v2_metric_aligned_loss"
+        "use_metric_aligned_loss"
         not in initial_training
     )
 
     assert (
-        "use_v2_metric_aligned_loss"
+        "use_metric_aligned_loss"
         not in continuation
     )
 
@@ -438,7 +438,7 @@ def build_stage_configs() -> tuple[
 
     assert (
         float(initial_training["lr"])
-        == float(original_v1["lr"])
+        == float(original_base_config["lr"])
     )
 
     assert (
@@ -448,7 +448,7 @@ def build_stage_configs() -> tuple[
             ]
         )
         == float(
-            original_v1[
+            original_base_config[
                 "weight_decay"
             ]
         )
@@ -955,14 +955,14 @@ def main() -> None:
     )
 
     if continuation_score >= initial_training_score:
-        selected_stage = "continuation_r119"
+        selected_stage = "retained_control_continuation"
         selected_score = continuation_score
         selected_checkpoint = (
             continuation_checkpoint
         )
         selected_config = continuation_config
     else:
-        selected_stage = "initial_training_v1"
+        selected_stage = "structural_backbone_initial_training"
         selected_score = initial_training_score
         selected_checkpoint = (
             initial_training_checkpoint
@@ -1058,13 +1058,13 @@ def main() -> None:
         "formal_retained_control_baseline":
             FORMAL_RETAINED_CONTROL_BASELINE,
 
-        "delta_vs_base_model_stage1":
+        "delta_vs_structural_backbone_initial_training":
             (
                 selected_score
                 - BASE_MODEL_INITIAL_TRAINING_BASELINE
             ),
 
-        "delta_vs_formal_r119":
+        "delta_vs_formal_retained_control":
             (
                 selected_score
                 - FORMAL_RETAINED_CONTROL_BASELINE

@@ -1,0 +1,7 @@
+frag_params:
+  formula_comp_feats: true
+lr: 5.0e-05
+max_epochs: 4
+use_formula_comp_residual: true
+formula_comp_dropout: 0.05
+formula_comp_delta_scale: 0.05

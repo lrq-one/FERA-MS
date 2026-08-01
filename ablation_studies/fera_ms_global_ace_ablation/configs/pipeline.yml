@@ -1,0 +1,25 @@
+schema: fera-ms-global-ace-functional-pipeline
+stages:
+- name: backbone_training
+- name: retained_control_continuation
+  overrides: stages/retained_control_continuation.yml
+- name: global_ace_control
+  overrides: stages/global_ace_control.yml
+- name: formula_composition_refinement
+  overrides: stages/formula_composition_refinement.yml
+- name: collision_energy_response_refinement
+- name: neural_refinement
+  overrides: stages/neural_refinement.yml
+- name: peak_distillation_warmup
+  overrides: stages/peak_distillation_warmup.yml
+- name: peak_distillation_continuation
+  overrides: stages/peak_distillation_continuation.yml
+- name: fragment_representation_refinement
+  overrides: stages/fragment_representation_refinement.yml
+- name: bounded_residual_flow_refinement
+  overrides: stages/bounded_residual_flow_refinement.yml
+- name: final_peak_distillation
+  overrides: stages/final_peak_distillation.yml
+- name: candidate_reranking
+- name: spectrum_allocation
+- name: final_evaluation

@@ -56,14 +56,14 @@ TEMPLATE = RUNS_ROOT / "_config/template.yml"
 
 BASE_CONFIG = (
     RUNS_ROOT
-    / "from_scratch_base_model_40_retained_control_10_seed42"
+    / "structural_backbone_retained_control/seed_42"
     / "final"
     / "config.yml"
 )
 
 BASE_CHECKPOINT = (
     RUNS_ROOT
-    / "from_scratch_base_model_40_retained_control_10_seed42"
+    / "structural_backbone_retained_control/seed_42"
     / "final"
     / "model.ckpt"
 )

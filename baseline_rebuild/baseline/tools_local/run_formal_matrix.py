@@ -20,7 +20,7 @@ TOOLS = BASE / "tools_local"
 
 ROOT = (
     Path(os.environ.get("FERA_MS_BASELINE_OUTPUT_DIR", BASE / "results_local"))
-    / "formal_v1"
+    / "formal"
 )
 
 SEEDS = [

@@ -16,8 +16,8 @@ OLD_SCRIPT = (
 
 OUT_DIR = (
     ROOT
-    / "runs/experiments/reviewer_stage2/"
-      "retrieval_bootstrap_v2"
+    / "runs/experiments/reviewer_analysis/"
+      "retrieval_bootstrap"
 )
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

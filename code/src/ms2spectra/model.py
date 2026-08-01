@@ -908,7 +908,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		else:
 			self.ce_formula_node_allocator = None
 
-		# ===== K3: true-hit formula-vocabulary residual prior =====
+		# ===== True-hit formula-vocabulary residual prior =====
 		# Predicts a molecule/CE-conditioned prior over train-only formula vocab.
 		# The prior is mapped back to candidate formula rows and added before scatter_logsoftmax.
 		self.use_formula_vocab_residual = bool(use_formula_vocab_residual)
@@ -919,7 +919,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 		if self.use_formula_vocab_residual:
 			assert self.mlp_output_format == "formula", (
-				"K3 formula-vocab residual currently supports mlp_output_format='formula'"
+				"Formula-vocabulary residual currently supports mlp_output_format='formula'"
 			)
 			assert self.ce_insert_location != "none", (
 				"use_formula_vocab_residual=True requires ce_insert_location != none"
@@ -931,9 +931,9 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				self.formula_vocab_size,
 			)
 
-			k3_input_dim = self.mol_embedder.hidden_size + self.ce_insert_size
+			formula_vocab_input_dim = self.mol_embedder.hidden_size + self.ce_insert_size
 			self.formula_vocab_prior_head = nn.Sequential(
-				nn.Linear(k3_input_dim, formula_vocab_hidden_size),
+				nn.Linear(formula_vocab_input_dim, formula_vocab_hidden_size),
 				nn.SiLU(),
 				nn.Dropout(formula_vocab_dropout),
 				nn.Linear(formula_vocab_hidden_size, formula_vocab_hidden_size),
@@ -949,7 +949,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		else:
 			self.formula_vocab_prior_head = None
 
-		# ===== K3b: formula composition residual scorer =====
+		# ===== Formula-composition residual scorer =====
 		self.use_formula_comp_residual = bool(use_formula_comp_residual)
 		self.formula_comp_feat_size = int(formula_comp_feat_size)
 		self.formula_comp_delta_scale = float(formula_comp_delta_scale)
@@ -957,13 +957,13 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 		if self.use_formula_comp_residual:
 			assert self.mlp_output_format == "formula", (
-				"K3b formula composition residual currently supports mlp_output_format='formula'"
+				"Formula-composition residual currently supports mlp_output_format='formula'"
 			)
 
-			k3b_input_dim = self.formula_comp_feat_size + mlp_input_dim
+			formula_comp_input_dim = self.formula_comp_feat_size + mlp_input_dim
 
 			self.formula_comp_residual_head = nn.Sequential(
-				nn.Linear(k3b_input_dim, formula_comp_hidden_size),
+				nn.Linear(formula_comp_input_dim, formula_comp_hidden_size),
 				nn.SiLU(),
 				nn.Dropout(formula_comp_dropout),
 				nn.Linear(formula_comp_hidden_size, formula_comp_hidden_size),
@@ -980,7 +980,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			self.formula_comp_residual_head = None
 
 		print(
-			"[K3b] formula composition residual: "
+			"[formula-composition residual] "
 			f"enabled={self.use_formula_comp_residual}, "
 			f"feat_size={self.formula_comp_feat_size}, "
 			f"hidden={formula_comp_hidden_size}, "
@@ -2342,14 +2342,14 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				frag_formula_node_allocator_delta = (
 					l1_delta_flat - l1_center[frag_joint_batch_idxs]
 				).reshape(batch_frag_num_nodes, 2 * self.num_hs + 1)
-		# ===== K3: true-hit formula-vocabulary residual prior =====
+		# ===== True-hit formula-vocabulary residual prior =====
 		formula_vocab_joint_delta = None
 
 		if self.use_formula_vocab_residual:
 			assert self.formula_vocab_prior_head is not None
-			assert ce_embed is not None, "K3 formula-vocab residual requires ce_embed"
+			assert ce_embed is not None, "Formula-vocabulary residual requires ce_embed"
 			assert frag_formula_vocab_idxs is not None, (
-				"K3 requires batch field frag_formula_vocab_idxs. "
+				"Formula-vocabulary residual requires batch field frag_formula_vocab_idxs. "
 				"Set frag_params.formula_vocab_idxs=True."
 			)
 
@@ -2364,67 +2364,67 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				max=self.formula_vocab_size,
 			)
 
-			k3_input = th.cat([mol_embed_gnn_pool, ce_embed], dim=1)
-			k3_vocab_logits = self.formula_vocab_prior_head(k3_input)
-			assert k3_vocab_logits.shape == (
+			formula_vocab_input = th.cat([mol_embed_gnn_pool, ce_embed], dim=1)
+			formula_vocab_logits = self.formula_vocab_prior_head(formula_vocab_input)
+			assert formula_vocab_logits.shape == (
 				batch_size,
 				self.formula_vocab_size + 1,
-			), k3_vocab_logits.shape
+			), formula_vocab_logits.shape
 
-			k3_delta_by_formula = k3_vocab_logits[
+			formula_vocab_delta_by_formula = formula_vocab_logits[
 				frag_formula_batch_idxs.long(),
 				frag_formula_vocab_idxs,
 			]
-			k3_delta_by_formula = (
+			formula_vocab_delta_by_formula = (
 				self.formula_vocab_delta_scale
-				* th.tanh(k3_delta_by_formula)
+				* th.tanh(formula_vocab_delta_by_formula)
 			)
 
 			# Do not add arbitrary prior to OOV / NULL rows.
-			k3_active = (
+			formula_vocab_active = (
 				frag_formula_vocab_idxs != self.formula_vocab_oov_id
-			).to(dtype=k3_delta_by_formula.dtype)
+			).to(dtype=formula_vocab_delta_by_formula.dtype)
 
-			k3_delta_by_formula = k3_delta_by_formula * k3_active
+			formula_vocab_delta_by_formula = formula_vocab_delta_by_formula * formula_vocab_active
 
 			if self.formula_vocab_center_per_spectrum:
-				k3_sum = scatter_reduce(
-					k3_delta_by_formula,
+				formula_vocab_sum = scatter_reduce(
+					formula_vocab_delta_by_formula,
 					frag_formula_batch_idxs,
 					reduce="sum",
 					dim_size=batch_size,
 				)
-				k3_count = scatter_reduce(
-					k3_active,
+				formula_vocab_count = scatter_reduce(
+					formula_vocab_active,
 					frag_formula_batch_idxs,
 					reduce="sum",
 					dim_size=batch_size,
 				).clamp_min(1.0)
 
-				k3_center = k3_sum / k3_count
-				k3_center = th.nan_to_num(
-					k3_center,
+				formula_vocab_center = formula_vocab_sum / formula_vocab_count
+				formula_vocab_center = th.nan_to_num(
+					formula_vocab_center,
 					nan=0.0,
 					posinf=0.0,
 					neginf=0.0,
 				)
 
-				k3_delta_by_formula = (
-					k3_delta_by_formula
-					- k3_center[frag_formula_batch_idxs]
-				) * k3_active
+				formula_vocab_delta_by_formula = (
+					formula_vocab_delta_by_formula
+					- formula_vocab_center[frag_formula_batch_idxs]
+				) * formula_vocab_active
 
-			formula_vocab_joint_delta = k3_delta_by_formula[
+			formula_vocab_joint_delta = formula_vocab_delta_by_formula[
 				frag_joint_formula_idxs
 			].reshape(batch_frag_num_nodes, 2 * self.num_hs + 1)
 
-		# ===== K3b: formula composition residual scorer =====
+		# ===== Formula-composition residual scorer =====
 		formula_comp_joint_delta = None
 
 		if self.use_formula_comp_residual:
 			assert self.formula_comp_residual_head is not None
 			assert frag_formula_comp_feats is not None, (
-				"K3b requires batch field frag_formula_comp_feats. "
+				"Formula-composition residual requires batch field frag_formula_comp_feats. "
 				"Set frag_params.formula_comp_feats=True."
 			)
 
@@ -2447,45 +2447,45 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				-1,
 			).reshape(batch_frag_num_nodes * num_h_channels, -1)
 
-			k3b_input = th.cat([joint_comp, joint_node], dim=1)
+			formula_comp_input = th.cat([joint_comp, joint_node], dim=1)
 
-			k3b_delta_flat = self.formula_comp_residual_head(k3b_input).squeeze(1)
-			k3b_delta_flat = (
+			formula_comp_delta_flat = self.formula_comp_residual_head(formula_comp_input).squeeze(1)
+			formula_comp_delta_flat = (
 				self.formula_comp_delta_scale
-				* th.tanh(k3b_delta_flat)
+				* th.tanh(formula_comp_delta_flat)
 			)
 
 			# Do not apply residual to NULL formula rows.
-			k3b_delta_flat = k3b_delta_flat * frag_joint_mask
+			formula_comp_delta_flat = formula_comp_delta_flat * frag_joint_mask
 
 			if self.formula_comp_center_per_spectrum:
-				k3b_sum = scatter_reduce(
-					k3b_delta_flat,
+				formula_comp_sum = scatter_reduce(
+					formula_comp_delta_flat,
 					frag_joint_batch_idxs,
 					reduce="sum",
 					dim_size=batch_size,
 				)
-				k3b_count = scatter_reduce(
+				formula_comp_count = scatter_reduce(
 					frag_joint_mask,
 					frag_joint_batch_idxs,
 					reduce="sum",
 					dim_size=batch_size,
 				).clamp_min(1.0)
 
-				k3b_center = k3b_sum / k3b_count
-				k3b_center = th.nan_to_num(
-					k3b_center,
+				formula_comp_center = formula_comp_sum / formula_comp_count
+				formula_comp_center = th.nan_to_num(
+					formula_comp_center,
 					nan=0.0,
 					posinf=0.0,
 					neginf=0.0,
 				)
 
-				k3b_delta_flat = (
-					k3b_delta_flat
-					- k3b_center[frag_joint_batch_idxs]
+				formula_comp_delta_flat = (
+					formula_comp_delta_flat
+					- formula_comp_center[frag_joint_batch_idxs]
 				) * frag_joint_mask
 
-			formula_comp_joint_delta = k3b_delta_flat.reshape(
+			formula_comp_joint_delta = formula_comp_delta_flat.reshape(
 				batch_frag_num_nodes,
 				num_h_channels,
 			)
@@ -3015,11 +3015,11 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					)
 					joint_refinement_feats.append(joint_peak_prior)
 
-				frag_joint_logits_flat_for_r12 = frag_joint_logits.reshape(-1)
+				frag_joint_logits_flat_for_peak_gate = frag_joint_logits.reshape(-1)
 
 				if self.spectrum_refiner_use_logit_feature:
 					joint_refinement_feats.append(
-						frag_joint_logits_flat_for_r12.detach().unsqueeze(1)
+						frag_joint_logits_flat_for_peak_gate.detach().unsqueeze(1)
 					)
 
 				joint_refinement_feats = th.cat(joint_refinement_feats, dim=1)
@@ -3027,7 +3027,7 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 				joint_refinement_delta_flat = self.spectrum_candidate_refiner(
 					cand_feats=joint_refinement_feats,
-					base_logits_flat=frag_joint_logits_flat_for_r12,
+					base_logits_flat=frag_joint_logits_flat_for_peak_gate,
 					cand_batch_idxs=frag_joint_batch_idxs,
 					valid_mask=frag_joint_mask.bool(),
 					batch_size=int(batch_size),

@@ -36,7 +36,7 @@ DATA_ROOT = Path(
 
 RESULT_ROOT = (
     Path(os.environ.get("FERA_MS_BASELINE_OUTPUT_DIR", BASE / "results_local"))
-    / "formal_v1"
+    / "formal"
 )
 
 TOOLS = BASE / "tools_local"
@@ -123,7 +123,7 @@ def clean_temp(repo: Path) -> None:
     )
 
 
-# CHECKPOINT_MIRROR_V3
+# CHECKPOINT_MIRROR
 def mirror_checkpoints(
     repo: Path,
     staging_dir: Path,

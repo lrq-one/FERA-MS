@@ -13,14 +13,14 @@ RANDOM_ROOT = (
     ROOT
     / "runs"
     / "experiments"
-    / "molecule_disjoint_3seeds"
+    / "molecule_disjoint_three_seeds"
 )
 
 SCAFFOLD_ROOT = (
     ROOT
     / "runs"
     / "experiments"
-    / "scaffold_disjoint_3seeds"
+    / "scaffold_disjoint_three_seeds"
 )
 
 REPORT_PATHS = {

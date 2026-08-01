@@ -44,12 +44,12 @@ SPLIT_ROOTS = {
     "random": (
         ROOT
         / "runs/experiments/"
-          "molecule_disjoint_3seeds"
+          "molecule_disjoint_three_seeds"
     ),
     "scaffold": (
         ROOT
         / "runs/experiments/"
-          "scaffold_disjoint_3seeds"
+          "scaffold_disjoint_three_seeds"
     ),
 }
 
@@ -202,9 +202,9 @@ def formula_ce_args(
     use_ce_flowfrag: bool,
 ) -> SimpleNamespace:
     return SimpleNamespace(
-        k3b_hidden=128,
-        k3b_dropout=0.05,
-        k3b_delta_scale=0.05,
+        formula_comp_hidden=128,
+        formula_comp_dropout=0.05,
+        formula_comp_delta_scale=0.05,
         formula_comp_feat_size=18,
 
         ce_hidden=128,
@@ -603,7 +603,7 @@ def evaluate_one_seed(
 
     refinement_dir = (
         seed_dir
-        / "full_model_full_063"
+        / "full_fera_ms"
     )
 
     config_path = require_file(
@@ -618,25 +618,25 @@ def evaluate_one_seed(
 
     formula_checkpoint = require_file(
         refinement_dir
-        / "05_peak_distillation_continuation/"
+        / "peak_distillation_continuation/"
           "neural_refinement_best_state.pt"
     )
 
     fragment_checkpoint = require_file(
         refinement_dir
-        / "06_R153/"
+        / "fragment_representation_refinement/"
           "neural_refinement_best_state.pt"
     )
 
     distilled_checkpoint = require_file(
         refinement_dir
-        / "08_R160/"
+        / "final_peak_distillation/"
           "final_peak_distillation_best_state.pt"
     )
 
     reranker_dir = (
         refinement_dir
-        / "09_candidate_reranker"
+        / "candidate_reranking"
     )
 
     reranker_path = require_file(
@@ -857,7 +857,7 @@ def evaluate_one_seed(
 
     formula_config = (
         collision_energy_response
-        .override_cfg_r147(
+        .override_collision_energy_response_config(
             formula_config,
             formula_ce_args(
                 use_ce_flowfrag=False
@@ -927,7 +927,7 @@ def evaluate_one_seed(
 
     fragment_config = (
         collision_energy_response
-        .override_cfg_r147(
+        .override_collision_energy_response_config(
             fragment_config,
             formula_ce_args(
                 use_ce_flowfrag=False

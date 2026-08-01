@@ -15,15 +15,15 @@ from train._impl.refinement_steps import (
 )
 
 def override_cfg_collision_energy_response(cfg, args):
-    # ===== K3b: keep the static formula/node residual path enabled =====
+    # Keep the static formula/node residual path enabled.
     cfg["use_formula_comp_residual"] = True
-    cfg["formula_comp_hidden_size"] = int(args.k3b_hidden)
-    cfg["formula_comp_dropout"] = float(args.k3b_dropout)
-    cfg["formula_comp_delta_scale"] = float(args.k3b_delta_scale)
+    cfg["formula_comp_hidden_size"] = int(args.formula_comp_hidden)
+    cfg["formula_comp_dropout"] = float(args.formula_comp_dropout)
+    cfg["formula_comp_delta_scale"] = float(args.formula_comp_delta_scale)
     cfg["formula_comp_center_per_spectrum"] = True
     cfg["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
-    # Dataset side: required by both K3b and CE-response when formula_comp is used.
+    # Dataset side: required by both formula composition and CE response.
     cfg.setdefault("frag_params", {})
     cfg["frag_params"]["formula_comp_feats"] = True
     cfg["frag_params"]["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
@@ -82,13 +82,13 @@ def override_cfg_collision_energy_response(cfg, args):
     return cfg
 
 
-def freeze_for_collision_energy_response(model, train_k3b=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
+def freeze_for_collision_energy_response(model, train_formula_composition=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
     for p in model.parameters():
         p.requires_grad_(False)
 
     allow = ["ce_response_scorer"]
 
-    if train_k3b:
+    if train_formula_composition:
         allow.append("formula_comp_residual_head")
     if train_refiner:
         allow.append("spectrum_candidate_refiner")
@@ -133,14 +133,14 @@ def freeze_for_collision_energy_response(model, train_k3b=False, train_refiner=F
         raise RuntimeError("No trainable params. ce_response_scorer not found.")
 
 
-def set_collision_energy_response_train_mode(model, train_k3b=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
+def set_collision_energy_response_train_mode(model, train_formula_composition=False, train_refiner=False, train_formula_module=False, train_render_gate=False, train_frag_rep=False, train_ce_flowfrag=False):
     # Frozen backbone eval mode, only selected residual heads in train mode.
     model.eval()
 
     for name, module in model.model.named_modules():
         if name.startswith("ce_response_scorer"):
             module.train()
-        if train_k3b and name.startswith("formula_comp_residual_head"):
+        if train_formula_composition and name.startswith("formula_comp_residual_head"):
             module.train()
         if train_refiner and name.startswith("spectrum_candidate_refiner"):
             module.train()
@@ -177,10 +177,10 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--weight_decay", type=float, default=1e-5)
 
-    # K3b config must match the checkpoint if loading from formula_composition_refinement best.
-    ap.add_argument("--k3b_hidden", type=int, default=128)
-    ap.add_argument("--k3b_dropout", type=float, default=0.05)
-    ap.add_argument("--k3b_delta_scale", type=float, default=0.05)
+    # Formula-composition config must match its source checkpoint.
+    ap.add_argument("--formula_comp_hidden", type=int, default=128)
+    ap.add_argument("--formula_comp_dropout", type=float, default=0.05)
+    ap.add_argument("--formula_comp_delta_scale", type=float, default=0.05)
     ap.add_argument("--formula_comp_feat_size", type=int, default=18)
 
     # CE-response config.
@@ -217,7 +217,7 @@ def main():
     ap.add_argument("--high_w", type=float, default=2.25)
 
     # Train switches.
-    ap.add_argument("--train_k3b", action="store_true")
+    ap.add_argument("--train_formula_composition", action="store_true")
     ap.add_argument("--train_refiner", action="store_true")
     ap.add_argument("--train_formula_module", action="store_true")
     ap.add_argument("--train_render_gate", action="store_true")
@@ -258,7 +258,7 @@ def main():
 
     freeze_for_collision_energy_response(
         model,
-        train_k3b=args.train_k3b,
+        train_formula_composition=args.train_formula_composition,
         train_refiner=args.train_refiner,
         train_formula_module=args.train_formula_module,
         train_render_gate=args.train_render_gate,
@@ -284,7 +284,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         set_collision_energy_response_train_mode(
             model,
-            train_k3b=args.train_k3b,
+            train_formula_composition=args.train_formula_composition,
             train_refiner=args.train_refiner,
             train_formula_module=args.train_formula_module,
         )

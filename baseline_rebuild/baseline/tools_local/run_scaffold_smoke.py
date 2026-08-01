@@ -183,7 +183,7 @@ def run_job(job):
 
     environment = os.environ.copy()
 
-    # LOCAL_REPO_PYTHONPATH_PATCH_V1
+    # LOCAL_REPOSITORY_PYTHONPATH_PATCH
     # Each packaged repository has its own
     # fragnnet implementation. Do not install
     # both under the same environment; expose

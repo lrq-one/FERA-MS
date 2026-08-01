@@ -27,7 +27,7 @@ MOL_PATH = (
 
 OUT_DIR = (
     ROOT
-    / "runs/experiments/reviewer_stage2/"
+    / "runs/experiments/reviewer_analysis/"
       "similarity_acyclic"
 )
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -35,7 +35,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 PROTOCOLS = {
     "random": {
         "directory":
-            "molecule_disjoint_3seeds",
+            "molecule_disjoint_three_seeds",
         "train_ids":
             ROOT
             / "data/split/"
@@ -49,7 +49,7 @@ PROTOCOLS = {
     },
     "scaffold": {
         "directory":
-            "scaffold_disjoint_3seeds",
+            "scaffold_disjoint_three_seeds",
         "train_ids":
             ROOT
             / "data/split/"
@@ -114,7 +114,7 @@ def choose_score_file(
         if "final_locked_evaluation" in text:
             value += 100
 
-        if "full_model_full_063" in text:
+        if "full_fera_ms" in text:
             value += 20
 
         if "final" in text:

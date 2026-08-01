@@ -34,7 +34,7 @@ warnings.filterwarnings(
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
-RUN_ROOT = RUNS_ROOT / "full_model_full_063"
+RUN_ROOT = RUNS_ROOT / "full_fera_ms"
 
 OUTPUT_DIR = (
     RUN_ROOT
@@ -58,17 +58,17 @@ CONFIG_PATH = (
 
 BACKBONE_PATH = (
     RUN_ROOT
-    / "08_R160/final_peak_distillation_best_state.pt"
+    / "final_peak_distillation/final_peak_distillation_best_state.pt"
 )
 
 RERANKER_PATH = (
     RUN_ROOT
-    / "09_candidate_reranker/candidate_reranker_regressor.pkl"
+    / "candidate_reranking/candidate_reranker_regressor.pkl"
 )
 
 ALLOCATOR_PATH = (
     RUN_ROOT
-    / "11_spectrum_allocator/spectrum_allocator_allocator_best.pt"
+    / "spectrum_allocation/spectrum_allocator_allocator_best.pt"
 )
 
 RERANKER_SCRIPT = (

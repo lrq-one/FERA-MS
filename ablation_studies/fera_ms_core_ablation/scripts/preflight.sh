@@ -22,13 +22,13 @@ mkdir -p \
 python -u \
   "$ABLATION_ROOT/src/preflight.py" \
   2>&1 | tee \
-  "$ABLATION_ROOT/logs/00_preflight.log"
+  "$ABLATION_ROOT/logs/preflight.log"
 
 CODE=${PIPESTATUS[0]}
 
 echo
 echo "PREFLIGHT_EXIT_CODE=$CODE"
-echo "LOG=$ABLATION_ROOT/logs/00_preflight.log"
+echo "LOG=$ABLATION_ROOT/logs/preflight.log"
 echo "REPORT=$ABLATION_ROOT/results/preflight_report.json"
 
 exit "$CODE"

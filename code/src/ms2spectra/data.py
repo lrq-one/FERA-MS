@@ -563,35 +563,35 @@ class SpecMolFragDataset(SpecMolDataset):
 
 	def _setup_formula_vocab(self):
 		"""
-		K3: setup train-only true-hit formula vocabulary mapping.
+		Set up the train-only true-hit formula vocabulary mapping.
 		"""
-		self._k3_formula_vocab_enabled = bool(
+		self._formula_vocab_enabled = bool(
 			self.frag_params.get("formula_vocab_idxs", False)
 		)
-		self._k3_formula_vocab_oov_id = int(
+		self._formula_vocab_oov_id = int(
 			self.frag_params.get("formula_vocab_oov_id", 0)
 		)
-		self._k3_formula_to_id = {}
-		self._k3_formula_vocab_size = int(
+		self._formula_to_vocab_id = {}
+		self._formula_vocab_size = int(
 			self.frag_params.get("formula_vocab_size", 4096)
 		)
 
-		if not self._k3_formula_vocab_enabled:
+		if not self._formula_vocab_enabled:
 			return
 
 		vocab_fp = self.frag_params.get("formula_vocab_fp", None)
 		assert vocab_fp is not None, (
-			"K3 formula vocab enabled but frag_params.formula_vocab_fp is None"
+			"Formula vocabulary enabled but frag_params.formula_vocab_fp is None"
 		)
 
 		vocab_fp = Path(vocab_fp)
-		assert vocab_fp.is_file(), f"K3 formula vocab file not found: {vocab_fp}"
+		assert vocab_fp.is_file(), f"Formula vocabulary file not found: {vocab_fp}"
 
 		with open(vocab_fp, "r", encoding="utf-8") as f:
 			vocab_d = json.load(f)
 
 		items = vocab_d.get("items", [])
-		max_size = self._k3_formula_vocab_size
+		max_size = self._formula_vocab_size
 
 		for item in items[:max_size]:
 			formula = str(item["formula"])
@@ -600,14 +600,14 @@ class SpecMolFragDataset(SpecMolDataset):
 				continue
 			if vid > max_size:
 				continue
-			self._k3_formula_to_id[formula] = vid
+			self._formula_to_vocab_id[formula] = vid
 
 		print(
-			"[K3] formula vocab loaded: "
-			f"enabled={self._k3_formula_vocab_enabled}, "
+			"[formula vocabulary] loaded: "
+			f"enabled={self._formula_vocab_enabled}, "
 			f"vocab_size={max_size}, "
-			f"loaded={len(self._k3_formula_to_id)}, "
-			f"oov_id={self._k3_formula_vocab_oov_id}, "
+			f"loaded={len(self._formula_to_vocab_id)}, "
+			f"oov_id={self._formula_vocab_oov_id}, "
 			f"fp={vocab_fp}"
 		)
 
@@ -1026,7 +1026,7 @@ class SpecMolFragDataset(SpecMolDataset):
                 frag_entry["frontier_event_mz_sparse"].float()
                 + prec_type_mass_diff
             )
-		if getattr(self, "_k3_formula_vocab_enabled", False):
+		if getattr(self, "_formula_vocab_enabled", False):
 			idx_to_formula = frag_entry["idx_to_formula"]
 			num_formula = len(idx_to_formula)
 			vocab_idxs = []
@@ -1034,11 +1034,11 @@ class SpecMolFragDataset(SpecMolDataset):
 			for formula_idx in range(num_formula):
 				formula = str(idx_to_formula.get(formula_idx, ""))
 				if formula == "":
-					vid = self._k3_formula_vocab_oov_id
+					vid = self._formula_vocab_oov_id
 				else:
-					vid = self._k3_formula_to_id.get(
+					vid = self._formula_to_vocab_id.get(
 						formula,
-						self._k3_formula_vocab_oov_id,
+						self._formula_vocab_oov_id,
 					)
 				vocab_idxs.append(int(vid))
 
@@ -1080,7 +1080,7 @@ class SpecMolFragDataset(SpecMolDataset):
 
 	@staticmethod
 	def _formula_to_comp_feat(formula: str):
-		# 18D composition feature for K3b formula composition residual.
+		# Composition features for the formula-composition residual.
 		elems = ["C", "H", "N", "O", "S", "P", "F", "Cl", "Br", "I"]
 		mass_d = {
 			"C": 12.000000,

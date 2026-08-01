@@ -14,7 +14,7 @@ BASE = Path(os.environ.get("FERA_MS_BASELINE_ROOT", Path(__file__).resolve().par
 
 ROOT = (
     Path(os.environ.get("FERA_MS_BASELINE_OUTPUT_DIR", BASE / "results_local"))
-    / "formal_v1"
+    / "formal"
 )
 
 MODELS = [

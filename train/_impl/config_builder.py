@@ -4,7 +4,7 @@ Stage A: Unified base model -> retained control-style low-LR all-parameter trans
 
 核心原则：
 1. 仅使用当前本地仓库文件；
-2. 不修改 diagnostics/101_unified_all_base_model_v5_40ep.py；
+2. 不修改历史 diagnostics 脚本；
 3. 加载 base model checkpoint 的模型权重，但不恢复历史 optimizer / epoch；
 4. 保留 base model 网络结构和 base model loss；
 5. 只迁移 retained control 的 optimizer、低学习率、scheduler、scope=all 和 no-support_oracle 设置；
@@ -271,10 +271,10 @@ def prepare_effective_config(
     这里只从 retained control 迁移训练策略相关字段，绝不把 retained control 的其他历史模块
     或结构开关覆盖进 base model。
     """
-    effective_v1 = deep_merge(template_cfg, base_model_custom)
-    effective_r119 = deep_merge(template_cfg, retained_control_custom)
+    effective_base_config = deep_merge(template_cfg, base_model_custom)
+    effective_retained_control_config = deep_merge(template_cfg, retained_control_custom)
 
-    transfer = copy.deepcopy(effective_v1)
+    transfer = copy.deepcopy(effective_base_config)
     copied: dict[str, Any] = {}
 
     exact_training_keys = {
@@ -295,13 +295,13 @@ def prepare_effective_config(
     }
 
     for key in sorted(exact_training_keys):
-        if key in effective_r119:
-            transfer[key] = copy.deepcopy(effective_r119[key])
-            copied[key] = copy.deepcopy(effective_r119[key])
+        if key in effective_retained_control_config:
+            transfer[key] = copy.deepcopy(effective_retained_control_config[key])
+            copied[key] = copy.deepcopy(effective_retained_control_config[key])
 
     # 搜索本地配置中额外的 scheduler / optimizer 控制字段。
     # 只复制名称明确属于优化和学习率调度的字段。
-    for key, value in effective_r119.items():
+    for key, value in effective_retained_control_config.items():
         key_lower = key.lower()
 
         is_scheduler_key = (
@@ -560,7 +560,7 @@ def main() -> int:
 
         transfer_cfg["wandb_name"] = args.run_name
         transfer_cfg["wandb_group"] = (
-            "MS2SPECTRA_V1_R119"
+            "FERA_MS_BASE_CONFIG"
         )
         transfer_cfg["seed"] = 42
 

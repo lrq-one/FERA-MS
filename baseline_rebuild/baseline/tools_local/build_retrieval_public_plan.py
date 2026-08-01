@@ -24,7 +24,7 @@ ROOT = (
 OUT = (
     ROOT
     / "baseline_molecular_retrieval"
-    / "_common_plan_v1"
+    / "common_plan"
 )
 
 QUERY_SPEC_PATH = (

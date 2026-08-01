@@ -5,7 +5,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
-OUT="$RUNS_ROOT/full_model_full_063"
+OUT="$RUNS_ROOT/full_fera_ms"
 DIAG="$ROOT/train/_impl/refinement_steps"
 TEMPLATE="$RUNS_ROOT/_config/template.yml"
 
@@ -39,17 +39,17 @@ fi
 
 mkdir -p \
     "$OUT/logs" \
-    "$OUT/00_preflight" \
-    "$OUT/01_R146" \
-    "$OUT/02_R147" \
-    "$OUT/03_neural_refinement" \
-    "$OUT/04_peak_distillation_warmup" \
-    "$OUT/05_peak_distillation_continuation" \
-    "$OUT/06_R153" \
-    "$OUT/07_R154" \
-    "$OUT/08_R160" \
-    "$OUT/09_candidate_reranker" \
-    "$OUT/11_spectrum_allocator" \
+    "$OUT/preflight" \
+    "$OUT/formula_composition_refinement" \
+    "$OUT/collision_energy_response_refinement" \
+    "$OUT/neural_refinement" \
+    "$OUT/peak_distillation_warmup" \
+    "$OUT/peak_distillation_continuation" \
+    "$OUT/fragment_representation_refinement" \
+    "$OUT/bounded_residual_flow_refinement" \
+    "$OUT/final_peak_distillation" \
+    "$OUT/candidate_reranking" \
+    "$OUT/spectrum_allocation" \
 
 if [ ! -f "$TEMPLATE" ]; then
     echo "缺少模板：$TEMPLATE"
@@ -195,7 +195,7 @@ echo "==========================================================================
 
 python - <<'PY' \
     2>&1 \
-    | tee "$OUT/00_preflight/preflight.log"
+    | tee "$OUT/preflight/preflight.log"
 from pathlib import Path
 
 import torch
@@ -377,17 +377,17 @@ fi
 # formula-composition refinement
 # =============================================================================
 
-FORMULA_COMPOSITION_CKPT="$OUT/01_R146/formula_composition_best_state.pt"
+FORMULA_COMPOSITION_CKPT="$OUT/formula_composition_refinement/formula_composition_best_state.pt"
 
 if [ ! -f "$FORMULA_COMPOSITION_CKPT" ]; then
     run_stage \
-        "01_R146" \
+        "formula_composition_refinement" \
         python -u \
         "$DIAG/formula_composition.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$BASE_CHECKPOINT" \
-        --out_dir "$OUT/01_R146" \
+        --out_dir "$OUT/formula_composition_refinement" \
         --epochs 4 \
         --max_train_batches -1 \
         --lr 5e-5 \
@@ -417,24 +417,24 @@ fi
 # collision-energy response refinement
 # =============================================================================
 
-COLLISION_ENERGY_RESPONSE_CKPT="$OUT/02_R147/collision_energy_response_best_state.pt"
+COLLISION_ENERGY_RESPONSE_CKPT="$OUT/collision_energy_response_refinement/collision_energy_response_best_state.pt"
 
 if [ ! -f "$COLLISION_ENERGY_RESPONSE_CKPT" ]; then
     run_stage \
-        "02_R147" \
+        "collision_energy_response_refinement" \
         python -u \
         "$DIAG/collision_energy_response.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$FORMULA_COMPOSITION_CKPT" \
-        --out_dir "$OUT/02_R147" \
+        --out_dir "$OUT/collision_energy_response_refinement" \
         --epochs 4 \
         --max_train_batches -1 \
         --lr 5e-5 \
         --weight_decay 1e-5 \
-        --k3b_hidden 128 \
-        --k3b_dropout 0.05 \
-        --k3b_delta_scale 0.05 \
+        --formula_comp_hidden 128 \
+        --formula_comp_dropout 0.05 \
+        --formula_comp_delta_scale 0.05 \
         --formula_comp_feat_size 18 \
         --ce_hidden 128 \
         --ce_dropout 0.05 \
@@ -460,9 +460,9 @@ fi
 
 
 FORMULA_COMMON=(
-    --k3b_hidden 128
-    --k3b_dropout 0.05
-    --k3b_delta_scale 0.05
+    --formula_comp_hidden 128
+    --formula_comp_dropout 0.05
+    --formula_comp_delta_scale 0.05
     --formula_comp_feat_size 18
     --ce_hidden 128
     --ce_dropout 0.05
@@ -501,23 +501,23 @@ FORMULA_COMMON=(
 # neural refinement
 # =============================================================================
 
-NEURAL_REFINEMENT_CHECKPOINT="$OUT/03_neural_refinement/neural_refinement_best_state.pt"
+NEURAL_REFINEMENT_CHECKPOINT="$OUT/neural_refinement/neural_refinement_best_state.pt"
 
 if [ ! -f "$NEURAL_REFINEMENT_CHECKPOINT" ]; then
     run_stage \
-        "03_neural_refinement" \
+        "neural_refinement" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$COLLISION_ENERGY_RESPONSE_CKPT" \
-        --out_dir "$OUT/03_neural_refinement" \
+        --out_dir "$OUT/neural_refinement" \
         --epochs 4 \
         --max_train_batches -1 \
         --lr 5e-6 \
         --weight_decay 1e-5 \
         "${FORMULA_COMMON[@]}" \
-        --train_k3b \
+        --train_formula_composition \
         --train_formula_module
 
     if [ $? -ne 0 ]; then
@@ -532,23 +532,23 @@ fi
 # peak distillation warmup
 # =============================================================================
 
-PEAK_DISTILLATION_WARMUP_CKPT="$OUT/04_peak_distillation_warmup/neural_refinement_best_state.pt"
+PEAK_DISTILLATION_WARMUP_CKPT="$OUT/peak_distillation_warmup/neural_refinement_best_state.pt"
 
 if [ ! -f "$PEAK_DISTILLATION_WARMUP_CKPT" ]; then
     run_stage \
-        "04_peak_distillation_warmup" \
+        "peak_distillation_warmup" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$NEURAL_REFINEMENT_CHECKPOINT" \
-        --out_dir "$OUT/04_peak_distillation_warmup" \
+        --out_dir "$OUT/peak_distillation_warmup" \
         --epochs 8 \
         --max_train_batches -1 \
         --lr 3e-6 \
         --weight_decay 1e-5 \
         "${FORMULA_COMMON[@]}" \
-        --train_k3b \
+        --train_formula_composition \
         --train_formula_module
 
     if [ $? -ne 0 ]; then
@@ -563,23 +563,23 @@ fi
 # peak distillation continuation
 # =============================================================================
 
-PEAK_DISTILLATION_CONTINUATION_CKPT="$OUT/05_peak_distillation_continuation/neural_refinement_best_state.pt"
+PEAK_DISTILLATION_CONTINUATION_CKPT="$OUT/peak_distillation_continuation/neural_refinement_best_state.pt"
 
 if [ ! -f "$PEAK_DISTILLATION_CONTINUATION_CKPT" ]; then
     run_stage \
-        "05_peak_distillation_continuation" \
+        "peak_distillation_continuation" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$PEAK_DISTILLATION_WARMUP_CKPT" \
-        --out_dir "$OUT/05_peak_distillation_continuation" \
+        --out_dir "$OUT/peak_distillation_continuation" \
         --epochs 6 \
         --max_train_batches -1 \
         --lr 1e-6 \
         --weight_decay 1e-5 \
         "${FORMULA_COMMON[@]}" \
-        --train_k3b \
+        --train_formula_composition \
         --train_formula_module
 
     if [ $? -ne 0 ]; then
@@ -594,23 +594,23 @@ fi
 # fragment representation refinement reconstructed from surviving train_frag_rep implementation
 # =============================================================================
 
-FRAGMENT_REPRESENTATION_CKPT="$OUT/06_R153/neural_refinement_best_state.pt"
+FRAGMENT_REPRESENTATION_CKPT="$OUT/fragment_representation_refinement/neural_refinement_best_state.pt"
 
 if [ ! -f "$FRAGMENT_REPRESENTATION_CKPT" ]; then
     run_stage \
-        "06_R153" \
+        "fragment_representation_refinement" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$PEAK_DISTILLATION_CONTINUATION_CKPT" \
-        --out_dir "$OUT/06_R153" \
+        --out_dir "$OUT/fragment_representation_refinement" \
         --epochs 6 \
         --max_train_batches -1 \
         --lr 8e-7 \
         --weight_decay 1e-5 \
         "${FORMULA_COMMON[@]}" \
-        --train_k3b \
+        --train_formula_composition \
         --train_formula_module \
         --train_frag_rep
 
@@ -626,17 +626,17 @@ fi
 # bounded residual flow bounded residual flow, validation gated
 # =============================================================================
 
-BOUNDED_RESIDUAL_FLOW_CKPT="$OUT/07_R154/neural_refinement_best_state.pt"
+BOUNDED_RESIDUAL_FLOW_CKPT="$OUT/bounded_residual_flow_refinement/neural_refinement_best_state.pt"
 
 if [ ! -f "$BOUNDED_RESIDUAL_FLOW_CKPT" ]; then
     run_stage \
-        "07_R154" \
+        "bounded_residual_flow_refinement" \
         python -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$FRAGMENT_REPRESENTATION_CKPT" \
-        --out_dir "$OUT/07_R154" \
+        --out_dir "$OUT/bounded_residual_flow_refinement" \
         --epochs 6 \
         --max_train_batches -1 \
         --lr 5e-7 \
@@ -665,11 +665,11 @@ fi
 BOUNDED_RESIDUAL_FLOW_SELECTED="$(
     python "$ROOT/train/_impl/stage_metrics.py" \
         select \
-        --before "$OUT/07_R154/neural_refinement_val_epoch0_before.csv" \
-        --best "$OUT/07_R154/neural_refinement_best_val.csv" \
+        --before "$OUT/bounded_residual_flow_refinement/neural_refinement_val_epoch0_before.csv" \
+        --best "$OUT/bounded_residual_flow_refinement/neural_refinement_best_val.csv" \
         --parent "$FRAGMENT_REPRESENTATION_CKPT" \
         --child "$BOUNDED_RESIDUAL_FLOW_CKPT" \
-        --decision "$OUT/07_R154/validation_gate.json" \
+        --decision "$OUT/bounded_residual_flow_refinement/validation_gate.json" \
         --min-delta 0.0
 )"
 
@@ -680,24 +680,24 @@ echo "bounded residual flow selected checkpoint: $BOUNDED_RESIDUAL_FLOW_SELECTED
 # final peak distillation
 # =============================================================================
 
-FINAL_PEAK_DISTILLATION_CKPT="$OUT/08_R160/final_peak_distillation_best_state.pt"
+FINAL_PEAK_DISTILLATION_CKPT="$OUT/final_peak_distillation/final_peak_distillation_best_state.pt"
 
 if [ ! -f "$FINAL_PEAK_DISTILLATION_CKPT" ]; then
     run_stage \
-        "08_R160" \
+        "final_peak_distillation" \
         python -u \
         "$DIAG/peak_distillation.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$BOUNDED_RESIDUAL_FLOW_SELECTED" \
-        --out_dir "$OUT/08_R160" \
+        --out_dir "$OUT/final_peak_distillation" \
         --epochs 8 \
         --max_train_batches -1 \
         --lr 2e-7 \
         --weight_decay 1e-5 \
-        --k3b_hidden 128 \
-        --k3b_dropout 0.05 \
-        --k3b_delta_scale 0.05 \
+        --formula_comp_hidden 128 \
+        --formula_comp_dropout 0.05 \
+        --formula_comp_delta_scale 0.05 \
         --formula_comp_feat_size 18 \
         --ce_hidden 128 \
         --ce_dropout 0.05 \
@@ -732,7 +732,7 @@ if [ ! -f "$FINAL_PEAK_DISTILLATION_CKPT" ]; then
         --oracle_low_w 0.50 \
         --oracle_mid_w 2.00 \
         --oracle_high_w 3.00 \
-        --train_k3b \
+        --train_formula_composition \
         --train_formula_module \
         --train_frag_rep \
         --train_ce_flowfrag \
@@ -748,7 +748,7 @@ fi
 
 FINAL_PEAK_DISTILLATION_COS="$(
     metric \
-        "$OUT/08_R160/final_peak_distillation_best_val.csv"
+        "$OUT/final_peak_distillation/final_peak_distillation_best_val.csv"
 )"
 
 echo "final peak distillation validation cosine: $FINAL_PEAK_DISTILLATION_COS"
@@ -758,17 +758,17 @@ echo "final peak distillation validation cosine: $FINAL_PEAK_DISTILLATION_COS"
 # candidate reranker exact residual scorer
 # =============================================================================
 
-CANDIDATE_RERANKER_PKL="$OUT/09_candidate_reranker/candidate_reranker_regressor.pkl"
+CANDIDATE_RERANKER_PKL="$OUT/candidate_reranking/candidate_reranker_regressor.pkl"
 
-if [ ! -f "$CANDIDATE_RERANKER_PKL" ] || [ ! -s "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" ]; then
+if [ ! -f "$CANDIDATE_RERANKER_PKL" ] || [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
     run_stage \
-        "09_candidate_reranker" \
+        "candidate_reranking" \
         python -u \
         "$DIAG/candidate_reranker.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$FINAL_PEAK_DISTILLATION_CKPT" \
-        --out_dir "$OUT/09_candidate_reranker" \
+        --out_dir "$OUT/candidate_reranking" \
         --seed "$CANDIDATE_RERANKER_SEED" \
         --backend lightgbm \
         --max_train_rows "$CANDIDATE_RERANKER_MAX_TRAIN_ROWS" \
@@ -810,7 +810,7 @@ else
 fi
 
 BEST_ALPHA="$(
-    python - "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" <<'PY_ALPHA'
+    python - "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" <<'PY_ALPHA'
 import math
 import sys
 
@@ -897,9 +897,9 @@ if [ "$ALPHA_CODE" -ne 0 ] || [ -z "$BEST_ALPHA" ]; then
 fi
 
 printf '%s\n' "$BEST_ALPHA" \
-    > "$OUT/09_candidate_reranker/best_alpha.txt"
+    > "$OUT/candidate_reranking/best_alpha.txt"
 
-if [ ! -s "$OUT/09_candidate_reranker/candidate_reranker_alpha_val.csv" ]; then
+if [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
     echo "[STOP] candidate reranker缺少candidate_reranker_alpha_val.csv"
     exit 1
 fi
@@ -922,7 +922,7 @@ echo "candidate reranker validated alpha      : $BEST_ALPHA"
 
 CANDIDATE_RERANKER_COS="$(
     metric \
-        "$OUT/09_candidate_reranker/candidate_reranker_best_val.csv"
+        "$OUT/candidate_reranking/candidate_reranker_best_val.csv"
 )"
 
 echo "candidate reranker selected alpha      : $BEST_ALPHA"
@@ -933,18 +933,18 @@ echo "candidate reranker validation cosine  : $CANDIDATE_RERANKER_COS"
 # spectrum allocator sibling, stronger residual allocator
 # =============================================================================
 
-SPECTRUM_ALLOCATOR_CKPT="$OUT/11_spectrum_allocator/spectrum_allocator_allocator_best.pt"
+SPECTRUM_ALLOCATOR_CKPT="$OUT/spectrum_allocation/spectrum_allocator_allocator_best.pt"
 
 if [ ! -f "$SPECTRUM_ALLOCATOR_CKPT" ]; then
     run_stage \
-        "11_spectrum_allocator" \
+        "spectrum_allocation" \
         python -u \
         "$DIAG/spectrum_allocator.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
         --ckpt_path "$FINAL_PEAK_DISTILLATION_CKPT" \
         --regressor_path "$CANDIDATE_RERANKER_PKL" \
-        --out_dir "$OUT/11_spectrum_allocator" \
+        --out_dir "$OUT/spectrum_allocation" \
         --seed "$CANDIDATE_RERANKER_SEED" \
         --epochs "$B_EPOCHS" \
         --lr "$B_LR" \

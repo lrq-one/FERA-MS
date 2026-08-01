@@ -126,11 +126,11 @@ def jss_dense(a, b, eps=1e-12):
 
 
 def override_cfg(cfg, args):
-    # K3b formula composition residual.
+    # Formula-composition residual.
     cfg["use_formula_comp_residual"] = True
-    cfg["formula_comp_hidden_size"] = int(args.k3b_hidden)
-    cfg["formula_comp_dropout"] = float(args.k3b_dropout)
-    cfg["formula_comp_delta_scale"] = float(args.k3b_delta_scale)
+    cfg["formula_comp_hidden_size"] = int(args.formula_comp_hidden)
+    cfg["formula_comp_dropout"] = float(args.formula_comp_dropout)
+    cfg["formula_comp_delta_scale"] = float(args.formula_comp_delta_scale)
     cfg["formula_comp_center_per_spectrum"] = True
     cfg["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
@@ -190,7 +190,7 @@ def allowed_prefixes(args):
         "formula_module",
     ]
 
-    if args.train_k3b:
+    if args.train_formula_composition:
         allow.append("formula_comp_residual_head")
 
     if args.train_formula_module:
@@ -542,9 +542,9 @@ def main():
     ap.add_argument("--lr", type=float, default=2e-7)
     ap.add_argument("--weight_decay", type=float, default=1e-5)
 
-    ap.add_argument("--k3b_hidden", type=int, default=128)
-    ap.add_argument("--k3b_dropout", type=float, default=0.05)
-    ap.add_argument("--k3b_delta_scale", type=float, default=0.05)
+    ap.add_argument("--formula_comp_hidden", type=int, default=128)
+    ap.add_argument("--formula_comp_dropout", type=float, default=0.05)
+    ap.add_argument("--formula_comp_delta_scale", type=float, default=0.05)
     ap.add_argument("--formula_comp_feat_size", type=int, default=18)
 
     ap.add_argument("--ce_hidden", type=int, default=128)
@@ -596,7 +596,7 @@ def main():
     ap.add_argument("--spectrum_high_w", type=float, default=5.00)
 
     # Train scopes.
-    ap.add_argument("--train_k3b", action="store_true")
+    ap.add_argument("--train_formula_composition", action="store_true")
     ap.add_argument("--train_formula_module", action="store_true")
     ap.add_argument("--train_frag_rep", action="store_true")
     ap.add_argument("--train_mol_rep", action="store_true")

@@ -8,7 +8,7 @@ sys.path.insert(0,str(ABL/'pipeline_src'))
 from config_store import load_locked_config
 from ms2spectra.training import FragGNNPL
 STEPS=('backbone_training','retained_control_continuation','global_ace_control','formula_composition_refinement','collision_energy_response_refinement','neural_refinement','peak_distillation_warmup','peak_distillation_continuation','fragment_representation_refinement','bounded_residual_flow_refinement','final_peak_distillation')
-BAD=('seed_42_smoke','limit_train_batches=1','limit_val_batches=1','max_epochs=1')
+BAD=('single_seed_smoke','limit_train_batches=1','limit_val_batches=1','max_epochs=1')
 for p in (ABL/'run_one_seed.sh',ABL/'run_all_seeds.sh',ABL/'scripts/run_formal_seed.sh'):
  t=p.read_text()
  if any(x in t for x in BAD): raise SystemExit(f'formal entry references smoke token: {p}')

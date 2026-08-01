@@ -37,9 +37,9 @@ def main():
     ap.add_argument("--weight_decay", type=float, default=1e-5)
 
     # Must match loaded collision-energy response refinement/formula-composition refinement architecture.
-    ap.add_argument("--k3b_hidden", type=int, default=128)
-    ap.add_argument("--k3b_dropout", type=float, default=0.05)
-    ap.add_argument("--k3b_delta_scale", type=float, default=0.05)
+    ap.add_argument("--formula_comp_hidden", type=int, default=128)
+    ap.add_argument("--formula_comp_dropout", type=float, default=0.05)
+    ap.add_argument("--formula_comp_delta_scale", type=float, default=0.05)
     ap.add_argument("--formula_comp_feat_size", type=int, default=18)
 
     ap.add_argument("--ce_hidden", type=int, default=128)
@@ -96,7 +96,7 @@ def main():
     ap.add_argument("--formula_high_w", type=float, default=2.50)
 
     # Train switches.
-    ap.add_argument("--train_k3b", action="store_true")
+    ap.add_argument("--train_formula_composition", action="store_true")
     ap.add_argument("--train_refiner", action="store_true")
     ap.add_argument("--train_formula_module", action="store_true")
     ap.add_argument("--train_render_gate", action="store_true")
@@ -111,7 +111,7 @@ def main():
     pd.DataFrame([vars(args)]).to_csv(out_dir / "neural_refinement_args.csv", index=False)
 
     cfg = load_config(args.template, args.config)
-    cfg = energy_response.override_cfg_r147(cfg, args)
+    cfg = energy_response.override_collision_energy_response_config(cfg, args)
 
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -135,9 +135,9 @@ def main():
 
     model = model.to(device)
 
-    energy_response.freeze_for_r147(
+    energy_response.freeze_for_collision_energy_response(
         model,
-        train_k3b=args.train_k3b,
+        train_formula_composition=args.train_formula_composition,
         train_refiner=args.train_refiner,
         train_formula_module=args.train_formula_module,
         train_render_gate=args.train_render_gate,
@@ -163,7 +163,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         energy_response.set_collision_energy_response_train_mode(
             model,
-            train_k3b=args.train_k3b,
+            train_formula_composition=args.train_formula_composition,
             train_refiner=args.train_refiner,
             train_formula_module=args.train_formula_module,
         )

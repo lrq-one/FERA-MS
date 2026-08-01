@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
         "--seed-dir",
         type=Path,
         default=Path(
-            "runs/experiments/molecule_disjoint_3seeds/seed42"
+            "runs/experiments/molecule_disjoint_three_seeds/seed_42"
         ),
     )
     parser.add_argument(
@@ -617,8 +617,8 @@ def main() -> None:
         label="seed42 final peak distillation模型",
         exact_candidates=[
             seed_dir
-            / "full_model_full_063"
-            / "08_R160"
+            / "full_fera_ms"
+            / "final_peak_distillation"
             / "final_peak_distillation_best_state.pt",
         ],
         patterns=[
@@ -626,8 +626,8 @@ def main() -> None:
             "**/*final_peak_distillation*best*.pt",
         ],
         preferred_tokens=(
-            "full_model_full_063",
-            "08_r160",
+            "full_fera_ms",
+            "final_peak_distillation",
             "final_peak_distillation_best_state",
         ),
     )
@@ -636,8 +636,8 @@ def main() -> None:
         label="seed42 candidate reranker模型",
         exact_candidates=[
             seed_dir
-            / "full_model_full_063"
-            / "09_candidate_reranker"
+            / "full_fera_ms"
+            / "candidate_reranking"
             / "candidate_reranker_regressor.pkl",
         ],
         patterns=[
@@ -645,8 +645,8 @@ def main() -> None:
             "**/*regressor*.pkl",
         ],
         preferred_tokens=(
-            "full_model_full_063",
-            "09_candidate_reranker",
+            "full_fera_ms",
+            "candidate_reranking",
             "candidate_reranker_regressor",
         ),
     )
@@ -655,8 +655,8 @@ def main() -> None:
         label="seed42 spectrum allocator模型",
         exact_candidates=[
             seed_dir
-            / "full_model_full_063"
-            / "11_spectrum_allocator"
+            / "full_fera_ms"
+            / "spectrum_allocation"
             / "spectrum_allocator_allocator_best.pt",
         ],
         patterns=[
@@ -664,8 +664,8 @@ def main() -> None:
             "**/*spectrum_allocator*allocator*best*.pt",
         ],
         preferred_tokens=(
-            "full_model_full_063",
-            "11_spectrum_allocator",
+            "full_fera_ms",
+            "spectrum_allocation",
             "spectrum_allocator_allocator_best",
         ),
     )

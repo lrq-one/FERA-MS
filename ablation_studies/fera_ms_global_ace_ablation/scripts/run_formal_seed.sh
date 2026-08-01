@@ -6,9 +6,6 @@ ABL="$ROOT/ablation_studies/fera_ms_global_ace_ablation"
 if [[ "${FERA_DRY_RUN:-0}" != "1" ]]; then
   source "$ABL/scripts/require_gpu.sh"
 fi
-for forbidden in run_seed42_smoke; do
-  if [[ "$ABL/runs/seed_$seed" == *"$forbidden"* ]]; then exit 99; fi
-done
 echo "Formal global-only seed $seed control-flow entrypoint."
 echo "This script dispatches the locked backbone/global_ace_control and formula_composition_refinement-spectrum_allocation global-only CE pipeline."
 args=(--seed "$seed")

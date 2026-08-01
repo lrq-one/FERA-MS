@@ -88,7 +88,7 @@ Valid model values are `neims`, `massformer`, `fragnnet_d3`, `iceberg` and
 `graff_ms`; split is `random` or `scaffold`; seed is 42, 43 or 44. The runner
 uses the tracked config, trains, selects the validation-best checkpoint,
 exports test predictions and writes metrics beneath
-`$FERA_MS_BASELINE_OUTPUT_DIR/formal_v1/<split>/<model>/seed<seed>/`.
+`$FERA_MS_BASELINE_OUTPUT_DIR/formal/<split>/<model>/seed<seed>/`.
 
 All three seeds for one model:
 

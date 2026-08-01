@@ -9,8 +9,8 @@ REPO="${FERA_MS_BASELINE_SOURCE:-$BASELINE/source/fragnnet}"
 
 RUNS_ROOT="${FERA_MS_RUNS_DIR:-$PROJECT/runs}"
 ROOT="$RUNS_ROOT/experiments/molecular_retrieval/pubchem_legacy_full"
-EXP5="$ROOT/baseline_molecular_retrieval"
-FROZEN="$EXP5/_frozen_inputs"
+RETRIEVAL_ROOT="$ROOT/baseline_molecular_retrieval"
+FROZEN="$RETRIEVAL_ROOT/_frozen_inputs"
 
 TOOLS="$BASELINE/tools_local"
 RUNNER="$TOOLS/run_baseline_retrieval_formal.py"
@@ -18,9 +18,9 @@ PLAN="$FROZEN/molecular_retrieval_run_plan.csv"
 
 PY="${PYTHON:-python}"
 
-mkdir -p "$EXP5"
+mkdir -p "$RETRIEVAL_ROOT"
 
-exec 9>"$EXP5/.three_baseline_supervisor.lock"
+exec 9>"$RETRIEVAL_ROOT/.three_baseline_supervisor.lock"
 
 if ! flock -n 9; then
     echo "ANOTHER_THREE_BASELINE_SUPERVISOR_IS_RUNNING"
@@ -40,7 +40,7 @@ export TOKENIZERS_PARALLELISM=false
 export WANDB_MODE=disabled
 
 echo "======================================================================"
-echo "THREE-BASELINE EXPERIMENT 5 SUPERVISOR"
+echo "THREE-BASELINE MOLECULAR-RETRIEVAL SUPERVISOR"
 echo "start=$(date -Is)"
 echo "plan=$PLAN"
 echo "cuda_visible_devices=$CUDA_VISIBLE_DEVICES"
@@ -328,6 +328,6 @@ echo "======================================================================"
 
 echo
 echo "======================================================================"
-echo "THREE-BASELINE EXPERIMENT 5 COMPLETE"
+echo "THREE-BASELINE MOLECULAR-RETRIEVAL COMPLETE"
 echo "completed=$(date -Is)"
 echo "======================================================================"

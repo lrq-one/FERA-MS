@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "例如 runs/experiments/"
-            "molecule_disjoint_3seeds"
+            "molecule_disjoint_three_seeds"
         ),
     )
     return parser.parse_args()

@@ -15,7 +15,7 @@ EXPERIMENT_ROOT = (
     ROOT
     / "runs"
     / "experiments"
-    / "molecule_disjoint_3seeds"
+    / "molecule_disjoint_three_seeds"
 )
 
 PROC_PATH = (
@@ -1037,7 +1037,7 @@ report = {
     "all_protocol_checks_passed": (
         all_protocol_checks_passed
     ),
-    "experiment_4_complete": (
+    "ace_perturbation_complete": (
         all_protocol_checks_passed
     ),
     "artifacts": {
@@ -1072,7 +1072,7 @@ report_path.write_text(
 
 print()
 print("=" * 96)
-print("EXPERIMENT 4: ACE PERTURBATION MICRO + MACRO")
+print("ACE PERTURBATION MICRO + MACRO")
 print("=" * 96)
 print(
     summary.to_string(
@@ -1108,7 +1108,7 @@ print("AUDIT:", audit_path)
 print("REPORT:", report_path)
 print()
 print(
-    "EXPERIMENT_4_COMPLETE:",
+    "ACE_PERTURBATION_COMPLETE:",
     all_protocol_checks_passed,
 )
 

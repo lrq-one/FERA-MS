@@ -593,7 +593,7 @@ template:
   spectrum_objective_mid_ce_weight: 2.5
   spectrum_objective_high_ce_weight: 5.0
 base_stage:
-  wandb_name: UNIFIED_V1_renderer_gate_ce_40ep_seed42
+  wandb_name: structural_backbone_renderer_gate_collision_energy
   wandb_group: UNIFIED_40EP
   seed: 42
   spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl

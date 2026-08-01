@@ -1,0 +1,4 @@
+wandb_name: global_ace_control
+wandb_group: CONTROL_FINETUNING
+max_epochs: 5
+num_sanity_val_steps: 0

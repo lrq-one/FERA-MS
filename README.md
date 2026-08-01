@@ -90,9 +90,9 @@ Both scripts set `MS2_GLOBAL_SEED` to 42, 43, and 44 and archive each completed 
 The mainline command is `python train/train.py evaluation`. With a completed seed directory, additional formal evaluations are:
 
 ```bash
-python test/evaluate_chun.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42
-python test/evaluate_ace_perturbation.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42 --ace-mode shuffled
-python test/evaluate_metric_robustness.py --seed-dir runs/experiments/molecule_disjoint_3seeds/seed_42 --seed 42
+python test/evaluate_chun.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42
+python test/evaluate_ace_perturbation.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42 --ace-mode shuffled
+python test/evaluate_metric_robustness.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42
 python test/run_candidate_space_coverage.py
 python test/run_cumulative_refinement_analysis.py
 ```

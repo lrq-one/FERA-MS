@@ -12,7 +12,7 @@ EXPERIMENT_ROOT = (
     ROOT
     / "runs"
     / "experiments"
-    / "molecule_disjoint_3seeds"
+    / "molecule_disjoint_three_seeds"
 )
 
 PROC_PATH = (

@@ -495,7 +495,7 @@ old_ann_path = find_old_annotation_file()
 
 print()
 print("=" * 96)
-print("EXPERIMENT 5B-1: NIST NATIVE ANNOTATION ALIGNMENT")
+print("NIST NATIVE ANNOTATION ALIGNMENT")
 print("=" * 96)
 print("Current safe spec:", safe_spec_path)
 print("Old native annotations:", old_ann_path)
@@ -1336,4 +1336,4 @@ print(
 )
 
 print()
-print("EXPERIMENT_5B_ALIGNMENT_COMPLETE")
+print("NIST_NATIVE_ANNOTATION_ALIGNMENT_COMPLETE")

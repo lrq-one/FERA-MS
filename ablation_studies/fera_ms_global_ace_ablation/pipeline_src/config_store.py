@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read the consolidated, immutable global-ACE ablation configuration."""
+"""Compose immutable global-ACE configs from shared and functional overrides."""
 
 from __future__ import annotations
 
@@ -19,14 +19,24 @@ def _merge(base: dict, overrides: dict) -> dict:
 
 
 def load_locked_config(ablation_root: Path, seed: int, stage: str) -> dict:
-    store_path = ablation_root / "configs" / "locked.yml"
-    store = yaml.safe_load(store_path.read_text(encoding="utf-8"))
-    if int(seed) not in store["seeds"]:
+    config_root = ablation_root / "configs"
+    shared_store = yaml.safe_load(
+        (config_root / "common.yml").read_text(encoding="utf-8")
+    )
+    pipeline = yaml.safe_load(
+        (config_root / "pipeline.yml").read_text(encoding="utf-8")
+    )
+    if int(seed) not in shared_store["seeds"]:
         raise KeyError(f"Unsupported locked seed: {seed}")
-    config = deepcopy(store["common"])
+    config = deepcopy(shared_store["common"])
     config["seed"] = int(seed)
-    for stage_entry in store["stages"]:
-        _merge(config, stage_entry.get("overrides", {}))
+    for stage_entry in pipeline["stages"]:
+        override_path = stage_entry.get("overrides")
+        if override_path:
+            overrides = yaml.safe_load(
+                (config_root / override_path).read_text(encoding="utf-8")
+            )
+            _merge(config, overrides or {})
         if stage_entry["name"] == stage:
             return config
     raise KeyError(f"Missing locked functional stage: {stage}")

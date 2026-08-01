@@ -1902,17 +1902,17 @@ class SpectrumPL(pl.LightningModule):
 				true_prec_mzs=true_prec_mzs,
 				batch_size=batch_size,
 			)
-			pred_d["pred_r107_ce_bin_delta_abs_mean"] = ce_bin_residual_stats["delta_abs_mean"]
+			pred_d["pred_ce_bin_delta_abs_mean"] = ce_bin_residual_stats["delta_abs_mean"]
 			if log:
 				self.log(
-					f"{split}_r107_ce_bin_delta_abs_mean",
+					f"{split}_ce_bin_delta_abs_mean",
 					ce_bin_residual_stats["delta_abs_mean"],
 					batch_size=batch_size,
 					on_step=False,
 					on_epoch=True,
 				)
 				self.log(
-					f"{split}_r107_ce_bin_delta_mean",
+					f"{split}_ce_bin_delta_mean",
 					ce_bin_residual_stats["delta_mean"],
 					batch_size=batch_size,
 					on_step=False,
@@ -3311,7 +3311,7 @@ class FragGNNPL(SpectrumPL):
 			ce_formula_node_center_per_spectrum=self.hparams.ce_formula_node_center_per_spectrum,
 			ce_formula_node_use_depth=self.hparams.ce_formula_node_use_depth,
 			ce_formula_node_mode=self.hparams.ce_formula_node_mode,
-			# K3 dense vocab, keep for completeness
+			# Dense formula vocabulary, kept for completeness.
 			use_formula_vocab_residual=self.hparams.use_formula_vocab_residual,
 			formula_vocab_size=self.hparams.formula_vocab_size,
 			formula_vocab_hidden_size=self.hparams.formula_vocab_hidden_size,
@@ -3320,7 +3320,7 @@ class FragGNNPL(SpectrumPL):
 			formula_vocab_center_per_spectrum=self.hparams.formula_vocab_center_per_spectrum,
 			formula_vocab_oov_id=self.hparams.formula_vocab_oov_id,
 
-			# K3b composition residual
+			# Formula-composition residual.
 			use_formula_comp_residual=self.hparams.use_formula_comp_residual,
 			formula_comp_feat_size=self.hparams.formula_comp_feat_size,
 			formula_comp_hidden_size=self.hparams.formula_comp_hidden_size,

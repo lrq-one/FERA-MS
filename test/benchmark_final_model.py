@@ -880,7 +880,7 @@ def timed_evaluate_split(
 
     print()
     print("=" * 88)
-    print("EXPERIMENT 7: EFFICIENCY BENCHMARK")
+    print("FINAL-MODEL EFFICIENCY BENCHMARK")
     print("=" * 88)
     print(
         json.dumps(

@@ -110,20 +110,20 @@ FAILED=0
 for SPLIT in random
 do
     if [ "$SPLIT" = "random" ]; then
-        SOURCE_ROOT="$RUNS_ROOT/experiments/molecule_disjoint_3seeds"
+        SOURCE_ROOT="$RUNS_ROOT/experiments/molecule_disjoint_three_seeds"
         EXPECTED_TEST_COUNT=3931
     else
-        SOURCE_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_3seeds"
+        SOURCE_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_three_seeds"
         EXPECTED_TEST_COUNT=3960
     fi
 
     for SEED in 42 43 44
     do
-        SOURCE="$SOURCE_ROOT/seed_${SEED}/full_model_full_063"
+        SOURCE="$SOURCE_ROOT/seed_${SEED}/full_fera_ms"
 
         CONFIG="$SOURCE_ROOT/seed_${SEED}/global_ace_control_ce_trajectory_ablation/control/config.yml"
-        final peak distillation="$SOURCE/08_R160/final_peak_distillation_best_state.pt"
-        REGRESSOR="$SOURCE/09_candidate_reranker/candidate_reranker_regressor.pkl"
+        final peak distillation="$SOURCE/final_peak_distillation/final_peak_distillation_best_state.pt"
+        REGRESSOR="$SOURCE/candidate_reranking/candidate_reranker_regressor.pkl"
 
         OUT="$RUN_ROOT/$SPLIT/seed_${SEED}"
         LOG="$LOG_ROOT/${SPLIT}_seed_${SEED}.log"
@@ -147,7 +147,7 @@ do
         fi
 
         if [ ! -s "$final peak distillation" ]; then
-            echo "MISSING_R160=$final peak distillation"
+            echo "MISSING_FINAL_PEAK_DISTILLATION=$final peak distillation"
             FAILED=1
             continue
         fi

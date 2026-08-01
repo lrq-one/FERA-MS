@@ -33,7 +33,7 @@ def load_state_dict(path):
 
 
 def override_cfg(cfg, args):
-    # ===== 正确位置：启用模型内部 K3b formula composition residual =====
+    # 启用模型内部的 formula-composition residual。
     cfg["use_formula_comp_residual"] = True
     cfg["formula_comp_hidden_size"] = int(args.hidden)
     cfg["formula_comp_dropout"] = float(args.dropout)
@@ -42,7 +42,7 @@ def override_cfg(cfg, args):
     cfg["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
     # ===== 关键修复：dataset 侧也必须生成 frag_formula_comp_feats =====
-    # model.py 里 K3b 会 assert batch 中存在 frag_formula_comp_feats；
+    # model.py 会检查 batch 中存在 frag_formula_comp_feats；
     # 这个字段只由 dataset 在 frag_params.formula_comp_feats=True 时生成。
     cfg.setdefault("frag_params", {})
     cfg["frag_params"]["formula_comp_feats"] = True
@@ -75,7 +75,7 @@ def override_cfg(cfg, args):
     return cfg
 
 
-def freeze_for_k3b(model, train_formula_module=False, train_refiner=False):
+def freeze_for_formula_composition(model, train_formula_module=False, train_refiner=False):
     for p in model.parameters():
         p.requires_grad_(False)
 
@@ -103,10 +103,10 @@ def freeze_for_k3b(model, train_formula_module=False, train_refiner=False):
         print("  ...")
 
     if n_train == 0:
-        raise RuntimeError("No trainable params. K3b formula_comp_residual_head not found.")
+        raise RuntimeError("No trainable params. formula_comp_residual_head not found.")
 
 
-def set_k3b_train_mode(model, train_formula_module=False, train_refiner=False):
+def set_formula_composition_train_mode(model, train_formula_module=False, train_refiner=False):
     # 冻结主干时，主模型保持 eval，避免 frozen dropout 改分布。
     model.eval()
 
@@ -328,7 +328,7 @@ def main():
 
     model = model.to(device)
 
-    freeze_for_k3b(
+    freeze_for_formula_composition(
         model,
         train_formula_module=args.train_formula_module,
         train_refiner=args.train_refiner,
@@ -353,7 +353,7 @@ def main():
     train_logs = []
 
     for epoch in range(1, args.epochs + 1):
-        set_k3b_train_mode(
+        set_formula_composition_train_mode(
             model,
             train_formula_module=args.train_formula_module,
             train_refiner=args.train_refiner,

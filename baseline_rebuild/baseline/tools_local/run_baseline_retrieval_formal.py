@@ -46,9 +46,9 @@ ROOT = (
     / "pubchem_legacy_full"
 )
 
-EXP5 = ROOT / "baseline_molecular_retrieval"
-FROZEN = EXP5 / "_frozen_inputs"
-COMMON = EXP5 / "_common_plan_v1"
+RETRIEVAL_ROOT = ROOT / "baseline_molecular_retrieval"
+FROZEN = RETRIEVAL_ROOT / "_frozen_inputs"
+COMMON = RETRIEVAL_ROOT / "common_plan"
 
 RUN_PLAN = (
     FROZEN
@@ -2100,7 +2100,7 @@ def load_split_plan(
             flush=True,
         )
 
-    # COMPOSITE_FROZEN_FORMULA_JOIN_V2
+    # COMPOSITE_FROZEN_FORMULA_JOIN
     #
     # Restore candidate_formula from the frozen candidate master.
     # The join must be target-aware. A connectivity key alone is not
@@ -3146,7 +3146,7 @@ def finalize_run(
                 "Scores are computed immediately "
                 "and only formal candidate-level "
                 "similarities are retained, matching "
-                "the locked Ours Experiment 5 "
+                "the locked FERA-MS molecular-retrieval run "
                 "storage policy."
             ),
         "identity_join":
@@ -3959,7 +3959,7 @@ def aggregate_results(
     )
 
     all_summary_path = (
-        EXP5
+        RETRIEVAL_ROOT
         / "all_seed_summaries.csv"
     )
 
@@ -4059,7 +4059,7 @@ def aggregate_results(
     )
 
     aggregate_path = (
-        EXP5
+        RETRIEVAL_ROOT
         / (
             "molecular_retrieval_baselines_"
             "aggregate.csv"
@@ -4075,7 +4075,7 @@ def aggregate_results(
         VALID_MODELS
     ):
         model_dir = (
-            EXP5 / model
+            RETRIEVAL_ROOT / model
         )
 
         model_dir.mkdir(
@@ -4090,7 +4090,7 @@ def aggregate_results(
             == model
         ].to_csv(
             model_dir
-            / "aggregate_3seeds.csv",
+            / "aggregate_three_seeds.csv",
             index=False,
         )
 
@@ -4110,7 +4110,7 @@ def aggregate_results(
     ].copy()
 
     main_table.to_csv(
-        EXP5
+        RETRIEVAL_ROOT
         / (
             "main_fixed50_"
             "cbin_sqrt.csv"
@@ -4124,7 +4124,7 @@ def aggregate_results(
     )
 
     all_ranks.to_csv(
-        EXP5
+        RETRIEVAL_ROOT
         / "all_true_candidate_ranks.csv.gz",
         index=False,
     )
@@ -4177,7 +4177,7 @@ def aggregate_results(
             ),
         "main_table":
             str(
-                EXP5
+                RETRIEVAL_ROOT
                 / (
                     "main_fixed50_"
                     "cbin_sqrt.csv"
@@ -4186,7 +4186,7 @@ def aggregate_results(
     }
 
     (
-        EXP5
+        RETRIEVAL_ROOT
         / "completion_status.json"
     ).write_text(
         json.dumps(
@@ -4235,7 +4235,7 @@ def aggregate_results(
 
         readiness_path = (
             FROZEN
-            / "readiness_v2.json"
+            / "readiness.json"
         )
 
         if readiness_path.is_file():
@@ -4301,7 +4301,7 @@ def aggregate_results(
                     [],
                 "completion_status":
                     str(
-                        EXP5
+                        RETRIEVAL_ROOT
                         / (
                             "completion_"
                             "status.json"
@@ -4321,7 +4321,7 @@ def aggregate_results(
         )
 
         (
-            EXP5
+            RETRIEVAL_ROOT
             / "THREE_BASELINE_MOLECULAR_RETRIEVAL_SUCCESS"
         ).write_text(
             (

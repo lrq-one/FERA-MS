@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
 
-EXPERIMENT_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_3seeds"
+EXPERIMENT_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_three_seeds"
 SCAFFOLD_SPLIT="$ROOT/data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42"
 
 SEEDS=(
@@ -44,7 +44,7 @@ archive_active_outputs() {
     for NAME in \
         structural_backbone_gine_cutchem_only \
         global_ace_control_ce_trajectory_ablation \
-        full_model_full_063
+        full_fera_ms
     do
         PATH_TO_MOVE="$RUNS_ROOT/$NAME"
 
@@ -65,7 +65,7 @@ save_successful_outputs() {
     for NAME in \
         structural_backbone_gine_cutchem_only \
         global_ace_control_ce_trajectory_ablation \
-        full_model_full_063
+        full_fera_ms
     do
         SOURCE="$RUNS_ROOT/$NAME"
 
@@ -495,8 +495,8 @@ main() {
             > "$SEED_DIR/effective_seed.env"
 
         run_logged \
-            "SEED_${SEED}_STRUCTURAL_BACKBONE_R119" \
-            "$SEED_DIR/logs/01_structural_backbone_r119.log" \
+            "SEED_${SEED}_STRUCTURAL_BACKBONE" \
+            "$SEED_DIR/logs/structural_backbone.log" \
             python -u \
             train/train.py \
             base
@@ -584,7 +584,7 @@ PY
 
         run_logged \
             "SEED_${SEED}_REFINEMENT" \
-            "$SEED_DIR/logs/03_refinement.log" \
+            "$SEED_DIR/logs/refinement.log" \
             bash \
             train/_impl/run_refinement.sh \
             --fresh
@@ -598,17 +598,17 @@ PY
 
         if ! grep -q \
             "CANDIDATE_RERANKER_SEED=$SEED" \
-            "$RUNS_ROOT/full_model_full_063/effective_seed.env"
+            "$RUNS_ROOT/full_fera_ms/effective_seed.env"
         then
             echo "[STOP] candidate reranker/spectrum allocator seed审计失败"
             cat \
-                "$RUNS_ROOT/full_model_full_063/effective_seed.env"
+                "$RUNS_ROOT/full_fera_ms/effective_seed.env"
             return 1
         fi
 
         run_logged \
             "SEED_${SEED}_LOCKED_EVALUATION" \
-            "$SEED_DIR/logs/04_locked_evaluation.log" \
+            "$SEED_DIR/logs/locked_evaluation.log" \
             python -u \
             test/evaluate.py
 
@@ -619,7 +619,7 @@ PY
             return "$CODE"
         fi
 
-        RESULT_ROOT="$RUNS_ROOT/full_model_full_063/final_locked_evaluation"
+        RESULT_ROOT="$RUNS_ROOT/full_fera_ms/final_locked_evaluation"
 
         ensure_molecule_aggregates \
             "$RESULT_ROOT"

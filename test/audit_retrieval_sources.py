@@ -415,7 +415,7 @@ for name, path in PATHS.items():
 
 print()
 print("=" * 100)
-print("EXPERIMENT 5 SOURCE AUDIT")
+print("MOLECULAR-RETRIEVAL SOURCE AUDIT")
 print("=" * 100)
 
 print("Loading current data...")
@@ -533,7 +533,7 @@ print("Scaffold test molecules:", len(scaffold_test_mols))
 
 
 # =====================================================================
-# Experiment 5A: complete-NIST20 structure library audit
+# Complete-NIST20 structure-library audit.
 # =====================================================================
 
 print()
@@ -1265,7 +1265,7 @@ retrieval_summary.to_csv(
 
 
 # =====================================================================
-# Experiment 5B: independent native-annotation benchmark audit
+# Independent native-annotation benchmark audit.
 # =====================================================================
 
 print()
@@ -1930,7 +1930,7 @@ FORMULA_SCHEMA_PATH.write_text(
 
 final_report = {
     "status": "audit_complete",
-    "experiment_5a": {
+    "complete_structure_library_audit": {
         "library": library_audit,
         "summary": (
             retrieval_summary
@@ -1939,7 +1939,7 @@ final_report = {
             )
         ),
     },
-    "experiment_5b": {
+    "native_annotation_benchmark_audit": {
         "summary": (
             formula_summary
             .to_dict(
@@ -2042,4 +2042,4 @@ print(
 )
 
 print()
-print("EXPERIMENT_5_SOURCE_AUDIT_COMPLETE")
+print("MOLECULAR_RETRIEVAL_SOURCE_AUDIT_COMPLETE")

@@ -1,4 +1,4 @@
-schema: fera-ms-global-ace-functional-config
+schema: fera-ms-global-ace-shared-config
 seeds:
 - 42
 - 43
@@ -591,57 +591,3 @@ common:
   spectrum_objective_low_ce_weight: 0.5
   spectrum_objective_mid_ce_weight: 2.5
   spectrum_objective_high_ce_weight: 5.0
-stages:
-- name: backbone_training
-  overrides: {}
-- name: retained_control_continuation
-  overrides:
-    wandb_name: retained_control_continuation
-    lr: 2.0e-06
-    weight_decay: 1.0e-05
-    max_epochs: 10
-    gradient_clip_val: 0.5
-- name: global_ace_control
-  overrides:
-    wandb_name: global_ace_control
-    wandb_group: CONTROL_FINETUNING
-    max_epochs: 5
-    num_sanity_val_steps: 0
-- name: formula_composition_refinement
-  overrides:
-    frag_params:
-      formula_comp_feats: true
-    lr: 5.0e-05
-    max_epochs: 4
-    use_formula_comp_residual: true
-    formula_comp_dropout: 0.05
-    formula_comp_delta_scale: 0.05
-- name: collision_energy_response_refinement
-  overrides: {}
-- name: neural_refinement
-  overrides:
-    lr: 5.0e-06
-- name: peak_distillation_warmup
-  overrides:
-    lr: 3.0e-06
-    max_epochs: 8
-- name: peak_distillation_continuation
-  overrides:
-    lr: 1.0e-06
-    max_epochs: 6
-- name: fragment_representation_refinement
-  overrides:
-    lr: 8.0e-07
-- name: bounded_residual_flow_refinement
-  overrides:
-    lr: 5.0e-07
-- name: final_peak_distillation
-  overrides:
-    lr: 2.0e-07
-    max_epochs: 8
-- name: candidate_reranking
-  overrides: {}
-- name: spectrum_allocation
-  overrides: {}
-- name: final_evaluation
-  overrides: {}

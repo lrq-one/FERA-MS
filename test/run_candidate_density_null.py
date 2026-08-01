@@ -17,7 +17,7 @@ SOURCE_PATH = (
 
 OUT_DIR = (
     ROOT
-    / "runs/experiments/reviewer_stage2/"
+    / "runs/experiments/reviewer_analysis/"
       "candidate_density_null"
 )
 OUT_DIR.mkdir(parents=True, exist_ok=True)

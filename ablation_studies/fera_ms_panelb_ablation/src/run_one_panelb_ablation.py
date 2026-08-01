@@ -543,20 +543,20 @@ def main() -> None:
         initial_training_reference,
         variant,
         seed,
-        "structural_backbone_stage1",
+        "structural_backbone_initial_training",
     )
 
     continuation_config = apply_variant(
         continuation_reference,
         variant,
         seed,
-        "structural_backbone_stage2",
+        "structural_backbone_continuation",
     )
 
     inspect_real_model(
         initial_training_config,
         variant,
-        "structural_backbone_stage1",
+        "structural_backbone_initial_training",
         audit_root
         / "structural_backbone_initial_training_preflight.json",
     )
@@ -564,7 +564,7 @@ def main() -> None:
     inspect_real_model(
         continuation_config,
         variant,
-        "structural_backbone_stage2",
+        "structural_backbone_continuation",
         audit_root
         / "structural_backbone_continuation_preflight.json",
     )
@@ -573,7 +573,7 @@ def main() -> None:
         base_training.train_stage(
             name=(
                 "PANELB_ABLATION_"
-                "STRUCTURAL_BACKBONE_STAGE1"
+                "STRUCTURAL_BACKBONE_INITIAL_TRAINING"
             ),
             run_dir=initial_training_dir,
             config=initial_training_config,
@@ -587,7 +587,7 @@ def main() -> None:
         base_training.train_stage(
             name=(
                 "PANELB_ABLATION_"
-                "STRUCTURAL_BACKBONE_STAGE2"
+                "STRUCTURAL_BACKBONE_CONTINUATION"
             ),
             run_dir=continuation_dir,
             config=continuation_config,
@@ -600,14 +600,14 @@ def main() -> None:
     )
 
     if continuation_score >= initial_training_score:
-        selected_stage = "continuation_r119"
+        selected_stage = "retained_control_continuation"
         selected_score = continuation_score
         selected_checkpoint = (
             continuation_checkpoint
         )
         selected_config = continuation_config
     else:
-        selected_stage = "initial_training_v1"
+        selected_stage = "structural_backbone_initial_training"
         selected_score = initial_training_score
         selected_checkpoint = (
             initial_training_checkpoint

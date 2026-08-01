@@ -44,7 +44,7 @@ MZ_MAX = 1500.0
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Experiment 5: frozen final peak distillation -> candidate reranker -> spectrum allocator PubChem retrieval."
+        description="Molecular retrieval: frozen final peak distillation -> candidate reranker -> spectrum allocator PubChem retrieval."
     )
     parser.add_argument("--splits", nargs="+", default=["random", "scaffold"],
                         choices=["random", "scaffold"])
@@ -105,9 +105,9 @@ def seed_everything(seed: int) -> None:
 
 def config_path(split: str, seed: int) -> Path:
     family = (
-        "molecule_disjoint_3seeds"
+        "molecule_disjoint_three_seeds"
         if split == "random"
-        else "scaffold_disjoint_3seeds"
+        else "scaffold_disjoint_three_seeds"
     )
     return (
         ROOT / "runs/experiments" / family / f"seed_{seed}"
@@ -117,13 +117,13 @@ def config_path(split: str, seed: int) -> Path:
 
 def seed_dir(split: str, seed: int) -> Path:
     family = (
-        "molecule_disjoint_3seeds"
+        "molecule_disjoint_three_seeds"
         if split == "random"
-        else "scaffold_disjoint_3seeds"
+        else "scaffold_disjoint_three_seeds"
     )
     return (
         ROOT / "runs/experiments" / family / f"seed_{seed}"
-        / "full_model_full_063"
+        / "full_fera_ms"
     )
 
 
@@ -681,9 +681,9 @@ def initialize_model(
     from ms2spectra.training import FragGNNPL
 
     run_dir = seed_dir(split, seed)
-    backbone_path = run_dir / "08_R160/final_peak_distillation_best_state.pt"
-    reranker_path = run_dir / "09_candidate_reranker/candidate_reranker_regressor.pkl"
-    allocator_path = run_dir / "11_spectrum_allocator/spectrum_allocator_allocator_best.pt"
+    backbone_path = run_dir / "final_peak_distillation/final_peak_distillation_best_state.pt"
+    reranker_path = run_dir / "candidate_reranking/candidate_reranker_regressor.pkl"
+    allocator_path = run_dir / "spectrum_allocation/spectrum_allocator_allocator_best.pt"
 
     for path in (backbone_path, reranker_path, allocator_path):
         if not path.is_file():
@@ -1770,7 +1770,7 @@ def run_combination(
 
     print("\n" + "=" * 110)
     print(
-        f"EXPERIMENT 5 COMPLETE: "
+        f"MOLECULAR RETRIEVAL COMPLETE: "
         f"split={split}, seed={seed}"
     )
     print("=" * 110)
@@ -1830,7 +1830,7 @@ def aggregate_completed() -> None:
     aggregate.to_csv(OUTPUT_ROOT / "molecular_retrieval_ours_aggregate.csv", index=False)
 
     print("\n" + "=" * 110)
-    print("EXPERIMENT 5 AGGREGATE")
+    print("MOLECULAR RETRIEVAL AGGREGATE")
     print("=" * 110)
     print(aggregate.to_string(index=False))
     print("=" * 110)
@@ -1841,8 +1841,8 @@ def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     sys.path.insert(0, str(ROOT / "code/src"))
-    candidate_reranker = load_module(CANDIDATE_RERANKER_PATH, "molecular_retrieval_r170")
-    spectrum_allocator = load_module(SPECTRUM_ALLOCATOR_PATH, "molecular_retrieval_r184")
+    candidate_reranker = load_module(CANDIDATE_RERANKER_PATH, "molecular_retrieval_candidate_reranker")
+    spectrum_allocator = load_module(SPECTRUM_ALLOCATOR_PATH, "molecular_retrieval_spectrum_allocator")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(

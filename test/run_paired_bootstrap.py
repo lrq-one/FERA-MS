@@ -17,7 +17,7 @@ BASELINE_FP = (
     / "baseline_per_spectrum_sanitized.csv.gz"
 )
 
-OUT_DIR = ROOT / "results_v2"
+OUT_DIR = ROOT / "results"
 RUN_DIR = (
     ROOT
     / "runs/experiments/paired_bootstrap_bootstrap"
@@ -26,11 +26,11 @@ RUN_DIR = (
 OURS_DIRS = {
     "random": (
         ROOT
-        / "runs/experiments/molecule_disjoint_3seeds"
+        / "runs/experiments/molecule_disjoint_three_seeds"
     ),
     "scaffold": (
         ROOT
-        / "runs/experiments/scaffold_disjoint_3seeds"
+        / "runs/experiments/scaffold_disjoint_three_seeds"
     ),
 }
 
@@ -368,7 +368,7 @@ if not BASELINE_FP.is_file():
 
 
 print("=" * 120)
-print("EXPERIMENT 8: MOLECULE-LEVEL PAIRED BOOTSTRAP")
+print("MOLECULE-LEVEL PAIRED BOOTSTRAP")
 print("=" * 120)
 print("BASELINE INPUT :", BASELINE_FP)
 print(
@@ -506,7 +506,7 @@ for split, split_dir in OURS_DIRS.items():
         source_fp = (
             split_dir
             / f"seed_{seed}"
-            / "full_model_full_063"
+            / "full_fera_ms"
             / "final_locked_evaluation"
             / "test_per_spectrum_with_molecule.csv"
         )
@@ -1813,7 +1813,7 @@ audit_fp.write_text(
 
 print()
 print("=" * 120)
-print("EXPERIMENT 8 MOLECULE-MACRO RESULTS")
+print("MOLECULE-MACRO BOOTSTRAP RESULTS")
 print("=" * 120)
 
 print(
@@ -1839,7 +1839,7 @@ print(
 
 print()
 print("=" * 120)
-print("EXPERIMENT 8 CLUSTERED-MICRO RESULTS")
+print("CLUSTERED-MICRO BOOTSTRAP RESULTS")
 print("=" * 120)
 
 print(
@@ -1864,7 +1864,7 @@ print(
 
 print()
 print("=" * 120)
-print("EXPERIMENT 8 OUTPUTS")
+print("PAIRED BOOTSTRAP OUTPUTS")
 print("=" * 120)
 print("MACRO SUMMARY :", macro_fp)
 print("MICRO SUMMARY :", micro_fp)
