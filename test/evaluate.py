@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import torch
+import yaml
 
 from evaluation_aggregates import evaluate_molecule_aggregates
 
@@ -225,6 +226,43 @@ for required_path in required_paths:
 OUTPUT_DIR.mkdir(
     parents=True,
     exist_ok=True,
+)
+
+artifact_identity_audit = {
+    "applicable": False,
+    "enforced": os.environ.get("FERA_MS_VERIFY_PAPER_ARTIFACTS", "0") == "1",
+}
+evaluation_config_identity = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+is_locked_random_split = (
+    Path(str(evaluation_config_identity.get("split_dp", ""))).name
+    == "nist20_qtof_cid_safe19659_qcv1_trainonly"
+)
+if SEED == 42 and is_locked_random_split:
+    identity_path = ROOT / "config/paper_experiment_identity.json"
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
+    expected = identity["training_lineage"]["random_seed_42"]
+    actual = {
+        "final_peak_distillation_sha256": sha256(BACKBONE_PATH),
+        "candidate_reranker_sha256": sha256(RERANKER_PATH),
+        "spectrum_allocator_sha256": sha256(ALLOCATOR_PATH),
+    }
+    expected_subset = {key: expected[key] for key in actual}
+    artifact_identity_audit.update({
+        "applicable": True,
+        "identity_contract": str(identity_path),
+        "actual": actual,
+        "expected": expected_subset,
+        "all_match": actual == expected_subset,
+    })
+    if artifact_identity_audit["enforced"] and not artifact_identity_audit["all_match"]:
+        raise RuntimeError(
+            "Seed-42 artifact replay was requested, but the supplied artifacts do not "
+            "match the locked random-split paper package"
+        )
+
+(OUTPUT_DIR / "artifact_identity_audit.json").write_text(
+    json.dumps(artifact_identity_audit, indent=2, ensure_ascii=False) + "\n",
+    encoding="utf-8",
 )
 
 seed_everything(SEED)

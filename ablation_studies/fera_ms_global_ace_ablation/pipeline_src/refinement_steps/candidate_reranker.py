@@ -12,6 +12,24 @@ from ms2spectra.workflow import load_config, init_dataset, init_dataloader
 from ms2spectra.training import FragGNNPL
 
 
+def alias_rich_feature_keys(results, extra_schema):
+    supported = (
+        "fragment_rich_features",
+        "r173_frag_rich_feats",
+        "candidate_reranker_frag_rich_feats",
+    )
+    source = next(
+        (key for key in supported if isinstance(results.get(key), th.Tensor)),
+        None,
+    )
+    if source is None:
+        return results
+    for key, _ in extra_schema:
+        if key in supported and key not in results:
+            results[key] = results[source]
+    return results
+
+
 def move_to_device(obj, device):
     if isinstance(obj, th.Tensor):
         return obj.to(device)
@@ -686,6 +704,7 @@ def extra_features_from_schema(results, schema, n, device):
 
 
 def candidate_features(results, batch, mz_max, local_bin_res, extra_schema):
+    results = alias_rich_feature_keys(results, extra_schema)
     pred_mz = results["pred_mzs"].float()
     logp = results["pred_logprobs"].float()
     prob = logp.exp().clamp_min(0.0)

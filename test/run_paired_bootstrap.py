@@ -1736,9 +1736,8 @@ audit = {
             "with finite-sample correction"
         ),
         "holm_family": (
-            "8 split-by-baseline comparisons "
-            "within each metric-by-aggregation "
-            "family"
+            "one joint Holm family containing all 32 "
+            "prespecified comparisons"
         ),
         "index_audit": (
             bootstrap_index_audit

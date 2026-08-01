@@ -756,7 +756,7 @@ echo "final peak distillation validation cosine: $FINAL_PEAK_DISTILLATION_COS"
 
 CANDIDATE_RERANKER_PKL="$OUT/candidate_reranking/candidate_reranker_regressor.pkl"
 
-if [ ! -f "$CANDIDATE_RERANKER_PKL" ] || [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
+run_candidate_reranker() {
     run_stage \
         "candidate_reranking" \
         python -u \
@@ -796,13 +796,29 @@ if [ ! -f "$CANDIDATE_RERANKER_PKL" ] || [ ! -s "$OUT/candidate_reranking/candid
         --reg_lambda "$CANDIDATE_RERANKER_REG_LAMBDA" \
         --num_workers "$CANDIDATE_RERANKER_WORKERS" \
         --max_extra_dims "$CANDIDATE_RERANKER_EXTRA_DIMS" \
-        --alpha_grid "$CANDIDATE_RERANKER_ALPHA_GRID"
+        --alpha_grid "$CANDIDATE_RERANKER_ALPHA_GRID" \
+        "$@"
+}
 
+if [ ! -f "$CANDIDATE_RERANKER_PKL" ]; then
+    run_candidate_reranker
     if [ $? -ne 0 ]; then
         exit 1
     fi
+elif [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
+    echo "[RECOVER] regressor已存在；只重新运行validation alpha grid，不覆盖regressor。"
+    REGRESSOR_SHA_BEFORE="$(sha256sum "$CANDIDATE_RERANKER_PKL" | awk '{print $1}')"
+    run_candidate_reranker --load_regressor "$CANDIDATE_RERANKER_PKL"
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    REGRESSOR_SHA_AFTER="$(sha256sum "$CANDIDATE_RERANKER_PKL" | awk '{print $1}')"
+    if [ "$REGRESSOR_SHA_BEFORE" != "$REGRESSOR_SHA_AFTER" ]; then
+        echo "alpha-only recovery错误覆盖了已有regressor。"
+        exit 1
+    fi
 else
-    echo "[RESUME] candidate reranker regressor已存在。"
+    echo "[RESUME] candidate reranker regressor和alpha summary均已存在。"
 fi
 
 BEST_ALPHA="$(

@@ -68,7 +68,7 @@ OUTPUT_ROOT = (
 )
 
 MONITOR = "val_cos_sim_0.01_epoch/mean"
-STRUCTURAL_BACKBONE_BASELINE = 0.5963571667671204
+BASE_DECISION = BASE_CONFIG.with_name("decision.json")
 
 
 VARIANTS = {'control': {}}
@@ -89,6 +89,32 @@ def sha256_file(path: Path) -> str:
             digest.update(block)
 
     return digest.hexdigest()
+
+
+def load_selected_backbone_lineage() -> dict[str, Any]:
+    if not BASE_DECISION.is_file():
+        raise FileNotFoundError(
+            f"Selected-backbone decision summary is required: {BASE_DECISION}"
+        )
+    payload = json.loads(BASE_DECISION.read_text(encoding="utf-8"))
+    score = payload.get("selected_best_val_cosine")
+    checkpoint_sha = payload.get("selected_checkpoint_sha256")
+    if score is None or checkpoint_sha is None:
+        raise RuntimeError(f"Incomplete selected-backbone decision summary: {BASE_DECISION}")
+    actual_sha = sha256_file(BASE_CHECKPOINT)
+    if actual_sha != checkpoint_sha:
+        raise RuntimeError(
+            "Selected-backbone checkpoint does not match decision.json: "
+            f"{actual_sha} != {checkpoint_sha}"
+        )
+    return {
+        "selected_stage": payload.get("selected_stage"),
+        "selected_best_val_cosine": float(score),
+        "selected_checkpoint_sha256": checkpoint_sha,
+        "decision_path": str(BASE_DECISION),
+        "decision_sha256": sha256_file(BASE_DECISION),
+        "config_sha256": sha256_file(BASE_CONFIG),
+    }
 
 
 def load_full_config(path: Path) -> dict[str, Any]:
@@ -411,19 +437,25 @@ def train_variant(
         .cpu()
     )
 
+    backbone_lineage = load_selected_backbone_lineage()
+    backbone_score = backbone_lineage["selected_best_val_cosine"]
+
     summary = {
         "variant":
             variant,
 
         "base_val_cosine":
-            STRUCTURAL_BACKBONE_BASELINE,
+            backbone_score,
 
         "best_val_cosine":
             best_score,
 
         "delta_vs_backbone":
             best_score
-            - STRUCTURAL_BACKBONE_BASELINE,
+            - backbone_score,
+
+        "selected_backbone_lineage":
+            backbone_lineage,
 
         "checkpoint":
             str(best_checkpoint),
@@ -480,6 +512,7 @@ def main() -> None:
         TEMPLATE,
         BASE_CONFIG,
         BASE_CHECKPOINT,
+        BASE_DECISION,
         ROOT / "code/src/ms2spectra/training.py",
     ]
 

@@ -32,7 +32,7 @@ MOL_FP = (
 OUT_DIR = (
     ROOT
     / "runs/experiments/molecular_retrieval"
-    / "pubchem_fixed50"
+    / "live_pubchem_drift_audit"
 )
 
 TARGET_FP = OUT_DIR / "retrieval_target_coverage.csv"
@@ -1807,6 +1807,8 @@ def build_target_pool(
 
 manifest = {
     "created_at_utc": utc_now(),
+    "experiment_identity": "live_requery_drift_audit_not_paper_input",
+    "may_replace_frozen_paper_pool": False,
     "protocol_name": (
         "PubChem current PUG REST "
         "10ppm Morgan-ranked fixed-50"

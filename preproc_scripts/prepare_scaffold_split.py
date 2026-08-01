@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -39,6 +40,21 @@ RATIOS = {
     "val": 0.20,
     "test": 0.20,
 }
+
+IDENTITY_PATH = ROOT / "config/paper_experiment_identity.json"
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def load_split_contract():
+    payload = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
+    return payload["splits"]["scaffold"]
 
 
 def clean_scaffold(value):
@@ -368,6 +384,8 @@ def main():
 
     summary = {}
 
+    contract = load_split_contract()
+
     for split in (
         "train",
         "val",
@@ -376,6 +394,11 @@ def main():
         frame = pool[
             pool["split"] == split
         ]
+
+        output_path = (
+            OUTPUT_SPLIT
+            / f"{split}_ids.csv"
+        )
 
         frame[
             [
@@ -386,8 +409,7 @@ def main():
         ].sort_values(
             "spec_id"
         ).to_csv(
-            OUTPUT_SPLIT
-            / f"{split}_ids.csv",
+            output_path,
             index=False,
         )
 
@@ -430,6 +452,29 @@ def main():
                     ].nunique()
                 ),
         }
+
+        expected = contract[split]
+        actual_counts = (
+            summary[split]["spectra"],
+            summary[split]["molecules"],
+        )
+        expected_counts = (
+            expected["spectra"],
+            expected["molecules"],
+        )
+        if actual_counts != expected_counts:
+            raise RuntimeError(
+                f"{split} does not match the locked paper split: "
+                f"{actual_counts} != {expected_counts}"
+            )
+
+        actual_sha = sha256_file(output_path)
+        if actual_sha != expected["sha256"]:
+            raise RuntimeError(
+                f"{split} SHA-256 does not match the locked paper split: "
+                f"{actual_sha} != {expected['sha256']}"
+            )
+        summary[split]["sha256"] = actual_sha
 
     pd.DataFrame(
         columns=[
@@ -490,18 +535,6 @@ def main():
         "val",
         "test",
     ):
-        fraction = summary[
-            split
-        ]["spectrum_fraction"]
-
-        if abs(
-            fraction - RATIOS[split]
-        ) > 0.03:
-            raise RuntimeError(
-                f"{split}比例偏差过大："
-                f"{fraction}"
-            )
-
         if summary[
             split
         ][

@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "cohort": {
+    "name": "nist20_qtof_cid_safe19659",
+    "spectra": 19659,
+    "molecules": 2274,
+    "canonical_spec_id_sha256": "52ffc6203a55fb10f17e26f27eeb6bb8cf3be602941492b6e70d906d15631601",
+    "files": {
+      "spec_df.pkl": "d0853c00d851295fbe350d7dff96d86148ef50c5c301a91b26ac5481a28421a5",
+      "mol_df.pkl": "50cbea912d97330b0c1752471d2f3605ca4dc436c42add06fb9f0de54b700221",
+      "ann_df.pkl": "696cf4cf694c79c59d19cfc03fe4febee3c35eb918a7a60d4b85ddc43b9f30b0"
+    },
+    "historical_source": {
+      "name": "nist20_qtof_cid_safe19707",
+      "spectra": 19707,
+      "molecules": 2277,
+      "excluded_molecules": [
+        {
+          "mol_id": 20273,
+          "connectivity_key": "XKNKHVGWJDPIRJ",
+          "spectrum_count": 16,
+          "reason": "required_depth3_dag_unavailable"
+        },
+        {
+          "mol_id": 24874,
+          "connectivity_key": "XMVJITFPVVRMHC",
+          "spectrum_count": 16,
+          "reason": "required_depth3_dag_unavailable"
+        },
+        {
+          "mol_id": 26644,
+          "connectivity_key": "QKVRQZFQCGZLDA",
+          "spectrum_count": 16,
+          "reason": "required_depth3_dag_unavailable"
+        }
+      ]
+    }
+  },
+  "splits": {
+    "random": {
+      "name": "nist20_qtof_cid_safe19659_qcv1_trainonly",
+      "train": {
+        "spectra": 11774,
+        "molecules": 1362,
+        "sha256": "c74dee073282187a2335ad0cf7b7cb835091d10cbfc630cf4d78205c3205588f"
+      },
+      "val": {
+        "spectra": 3954,
+        "molecules": 456,
+        "sha256": "6c0b395da973a30f17d31a248bd8127e69bf96c0156e2041fdaa2548648751d1"
+      },
+      "test": {
+        "spectra": 3931,
+        "molecules": 456,
+        "sha256": "4771eb509f24f3de00da56859a22d2d677b6ad9a095a8ce2fd2bf8cb3dc2f256"
+      }
+    },
+    "scaffold": {
+      "name": "nist20_qtof_cid_safe19659_scaffold60_20_20_seed42",
+      "train": {
+        "spectra": 11741,
+        "molecules": 1374,
+        "sha256": "f562d3daf6b0dc2d2eb829738a659fc61adaeb378cc14c06986063b004f5974f"
+      },
+      "val": {
+        "spectra": 3958,
+        "molecules": 450,
+        "sha256": "e6192e695f6b5ff57e3de013847d16514151fdc5c71cfeded4c1cc48617a81c1"
+      },
+      "test": {
+        "spectra": 3960,
+        "molecules": 450,
+        "sha256": "fc94bc88ecf5b998f6c84b0399d43181aa48603944b7666ed1dfe1b8243c5ff4"
+      }
+    }
+  },
+  "retrieval": {
+    "protocol": "frozen_fixed50",
+    "unique_targets": 824,
+    "formal_queries": {
+      "random": {"spectra": 3917, "molecules": 454},
+      "scaffold": {"spectra": 3949, "molecules": 448}
+    },
+    "files": {
+      "experiment5_fixed50_targets.csv": "0c0e6eb1edae7def312375c0781f2278fbf9f742a9af6cb828ae98a54ad8ad45",
+      "experiment5_fixed50_memberships.csv": "41bf64119b52618c8f1916edd93b6af4c2eeaa84ea3ba1f223378b31dfe309f8",
+      "experiment5_inference_ready_candidates.csv.gz": "1251dd3889d208767091810bc05d90959ea6492fb3210fdf81d7a2d6763ce7ab",
+      "experiment5_queries_fixed50.csv.gz": "28ed9e57fd7613ed5b617e321d1e664db21cd5180f74b9e494acbb546ef4871a",
+      "experiment5_query_candidates_fixed50.csv.gz": "15380963587b2bdc8e7803154d100d17f9b436cf9d6974a8d0c8e4944a934006"
+    }
+  },
+  "training_lineage": {
+    "sequence": [
+      "structural_gine_cutchem_initialization_40_epochs",
+      "retained_control_continuation_10_epochs",
+      "validation_selection_across_initialization_and_continuation",
+      "control_fitting_5_epochs",
+      "formula_h_and_ace_sequential_validation_selection",
+      "conditional_ce_flow_validation_gate",
+      "final_peak_distillation",
+      "lightgbm_candidate_reranker",
+      "spectrum_allocator"
+    ],
+    "ce_flow_policy": "retain_only_if_prespecified_validation_metric_improves_otherwise_use_pre_gate_checkpoint",
+    "random_seed_42": {
+      "initialization_checkpoint_sha256": "bd1e0b6d5054639a90c026dc467f3b1c8d58f772348fc4be547d1ae0eadb8f22",
+      "continuation_checkpoint_sha256": "a4bea35374f93d3a39e809fdfc5849a0bc97bbea76d9687f337a60b8d0af5391",
+      "selected_backbone_checkpoint_sha256": "a4bea35374f93d3a39e809fdfc5849a0bc97bbea76d9687f337a60b8d0af5391",
+      "control_checkpoint_sha256": "164d91a96a6b6d5ecabdde732d324a44fa2c88dbaa02f6570a649ca4afca05d4",
+      "final_peak_distillation_sha256": "5a0f0742e64829b53c2fd4bd631dcefbf2db0188b80be03a0512ebdad9838789",
+      "candidate_reranker_sha256": "266c395f04b9573a161163509758ff9e53b9a31c70071498343d933768fd2b7f",
+      "spectrum_allocator_sha256": "ae859c52e5b001708cab78794abc68025dfe836a76b1f37732d2704479015c70",
+      "ce_flow_gate": "accepted",
+      "test_metrics": {
+        "micro_cbin": 0.6493451047,
+        "micro_jss": 0.6170435527,
+        "macro_cbin": 0.6969375246,
+        "macro_jss": 0.6472883769
+      }
+    }
+  },
+  "candidate_reranker": {
+    "explicit_dimensions": 26,
+    "local_density_dimensions": 8,
+    "internal_dimensions": 42,
+    "total_dimensions": 76,
+    "canonical_internal_key": "fragment_rich_features",
+    "schema_sha256": "f1d61c618f7e1351cab5fb00da5f4c6a58db42faf4f79eca44ebf647012638db"
+  }
+}

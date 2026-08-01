@@ -28,7 +28,7 @@ import torch
 
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
-BASE = Path(os.environ.get("FERA_MS_RETRIEVAL_ROOT", RUNS_ROOT / "experiments/molecular_retrieval/pubchem_fixed50")).resolve()
+BASE = Path(os.environ.get("FERA_MS_RETRIEVAL_ROOT", RUNS_ROOT / "experiments/molecular_retrieval/frozen_fixed50")).resolve()
 POOL_DIR = BASE / "inference_ready_pools"
 FROZEN_DIR = BASE / "frozen_manifest"
 CANDIDATE_DIR = BASE / "candidate_dags"
@@ -40,6 +40,26 @@ CANDIDATE_RERANKER_PATH = ROOT / "train/_impl/refinement_steps/candidate_reranke
 SPECTRUM_ALLOCATOR_PATH = ROOT / "train/_impl/refinement_steps/spectrum_allocator.py"
 BIN_RES = 0.01
 MZ_MAX = 1500.0
+IDENTITY_PATH = ROOT / "config/paper_experiment_identity.json"
+
+
+def first_existing(*paths: Path) -> Path:
+    return next((path for path in paths if path.exists()), paths[0])
+
+
+def configure_asset_root(base: Path) -> None:
+    global BASE, POOL_DIR, FROZEN_DIR, CANDIDATE_DIR, PROC_DIR, DAG_DIR, OUTPUT_ROOT
+    BASE = base.resolve()
+    POOL_DIR = first_existing(BASE / "inference_ready_pools", BASE / "inference_ready_pools_20260723")
+    FROZEN_DIR = first_existing(BASE / "frozen_manifest", BASE / "frozen_manifest_20260723")
+    CANDIDATE_DIR = first_existing(BASE / "candidate_dags", BASE / "candidate_d3_20260723")
+    PROC_DIR = CANDIDATE_DIR / "proc"
+    DAG_DIR = CANDIDATE_DIR / "frag/dags"
+    OUTPUT_ROOT = BASE / "ours_spectrum_allocator_molecular_retrieval"
+
+
+def named_file(directory: Path, current_name: str, historical_name: str) -> Path:
+    return first_existing(directory / current_name, directory / historical_name)
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,6 +75,12 @@ def parse_args() -> argparse.Namespace:
                         default=int(os.environ.get("EX5_NUM_WORKERS", "4")))
     parser.add_argument("--max-query-spectra", type=int, default=0)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--retrieval-root",
+        type=Path,
+        default=BASE,
+        help="Root containing the frozen fixed-50 paper inputs; live PubChem output is rejected.",
+    )
     return parser.parse_args()
 
 
@@ -160,13 +186,27 @@ def target_set_from_manifest(path: Path, split: str) -> set[str]:
 
 def available_and_fixed_targets(split: str) -> tuple[set[str], set[str]]:
     available = target_set_from_manifest(
-        FROZEN_DIR / "molecular_retrieval_available_pool_targets.csv", split
+        named_file(
+            FROZEN_DIR,
+            "molecular_retrieval_available_pool_targets.csv",
+            "experiment5_available_pool_memberships.csv",
+        ),
+        split,
     )
     fixed = target_set_from_manifest(
-        FROZEN_DIR / "molecular_retrieval_fixed50_targets.csv", split
+        named_file(
+            FROZEN_DIR,
+            "molecular_retrieval_fixed50_targets.csv",
+            "experiment5_fixed50_memberships.csv",
+        ),
+        split,
     )
 
-    summary_path = POOL_DIR / "molecular_retrieval_inference_ready_pool_summary.csv"
+    summary_path = named_file(
+        POOL_DIR,
+        "molecular_retrieval_inference_ready_pool_summary.csv",
+        "experiment5_inference_ready_pool_summary.csv",
+    )
     if not available:
         summary = filter_manifest_split(pd.read_csv(summary_path), split)
         available = {norm_id(value) for value in summary["target_mol_id"]}
@@ -217,7 +257,11 @@ def dag_ids() -> set[str]:
 
 
 def load_candidate_assets() -> dict[str, Any]:
-    candidate_path = POOL_DIR / "molecular_retrieval_inference_ready_candidates.csv.gz"
+    candidate_path = named_file(
+        POOL_DIR,
+        "molecular_retrieval_inference_ready_candidates.csv.gz",
+        "experiment5_inference_ready_candidates.csv.gz",
+    )
     mapping_path = PROC_DIR / "candidate_structure_mapping.csv.gz"
     mol_path = PROC_DIR / "mol_df.pkl"
     spec_path = PROC_DIR / "spec_df.pkl"
@@ -300,6 +344,57 @@ def load_candidate_assets() -> dict[str, Any]:
         "mol_df": mol_df,
         "spec_df": spec_df,
         "available_dags": available_dags,
+    }
+
+
+def verify_frozen_identity() -> dict[str, Any]:
+    contract = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))["retrieval"]
+    if "live_pubchem_drift_audit" in BASE.parts:
+        raise RuntimeError(
+            "Live PubChem re-query output is a drift audit and cannot be used for the paper result"
+        )
+    locations = {
+        "experiment5_fixed50_targets.csv": FROZEN_DIR / "experiment5_fixed50_targets.csv",
+        "experiment5_fixed50_memberships.csv": FROZEN_DIR / "experiment5_fixed50_memberships.csv",
+        "experiment5_inference_ready_candidates.csv.gz": POOL_DIR / "experiment5_inference_ready_candidates.csv.gz",
+        "experiment5_queries_fixed50.csv.gz": BASE / "query_candidate_manifest_20260723/experiment5_queries_fixed50.csv.gz",
+        "experiment5_query_candidates_fixed50.csv.gz": BASE / "query_candidate_manifest_20260723/experiment5_query_candidates_fixed50.csv.gz",
+    }
+    audit = {}
+    for name, expected_sha in contract["files"].items():
+        path = locations[name]
+        if not path.is_file():
+            raise FileNotFoundError(f"Required frozen retrieval identity file is missing: {path}")
+        actual_sha = sha256(path)
+        if actual_sha != expected_sha:
+            raise RuntimeError(f"Frozen retrieval SHA-256 mismatch for {name}: {actual_sha} != {expected_sha}")
+        audit[name] = actual_sha
+    targets = pd.read_csv(locations["experiment5_fixed50_targets.csv"])
+    if len(targets) != int(contract["unique_targets"]):
+        raise RuntimeError(f"Frozen target count mismatch: {len(targets)}")
+    memberships = pd.read_csv(locations["experiment5_fixed50_memberships.csv"])
+    membership_counts = memberships["split"].value_counts().to_dict()
+    if membership_counts != {"random_test": 455, "scaffold_test": 448}:
+        raise RuntimeError(f"Frozen target membership mismatch: {membership_counts}")
+    candidates = pd.read_csv(locations["experiment5_inference_ready_candidates.csv.gz"])
+    fixed_ids = set(targets["target_mol_id"].map(norm_id))
+    fixed_candidates = candidates[
+        candidates["target_mol_id"].map(norm_id).isin(fixed_ids)
+    ]
+    pool_sizes = fixed_candidates.groupby("target_mol_id")["candidate_rank"].nunique()
+    if len(pool_sizes) != len(targets) or not pool_sizes.eq(50).all():
+        raise RuntimeError("Frozen fixed-50 candidate membership is incomplete")
+    queries = pd.read_csv(locations["experiment5_queries_fixed50.csv.gz"])
+    query_counts = queries["split"].value_counts().to_dict()
+    if query_counts != {"random_test": 3918, "scaffold_test": 3949}:
+        raise RuntimeError(f"Frozen pre-DAG query membership mismatch: {query_counts}")
+    return {
+        "protocol": contract["protocol"],
+        "verified_sha256": audit,
+        "unique_targets": int(len(targets)),
+        "target_memberships": membership_counts,
+        "pre_dag_queries": query_counts,
+        "candidate_pool_size": 50,
     }
 
 
@@ -1569,6 +1664,19 @@ def run_combination(
         audit_dir=combo_dir,
     )
 
+    if args.max_query_spectra == 0:
+        expected = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))[
+            "retrieval"
+        ]["formal_queries"][split]
+        actual = {
+            "spectra": int(metadata["_query_spec_norm"].nunique()),
+            "molecules": int(metadata["query_target_mol_id"].nunique()),
+        }
+        if actual != expected:
+            raise RuntimeError(
+                f"Formal retrieval query identity mismatch for {split}: {actual} != {expected}"
+            )
+
     effective_available = (
         available_targets - incomplete_targets
     )
@@ -1836,6 +1944,7 @@ def aggregate_completed() -> None:
 
 def main() -> None:
     args = parse_args()
+    configure_asset_root(args.retrieval_root)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     sys.path.insert(0, str(ROOT / "code/src"))
@@ -1855,6 +1964,7 @@ def main() -> None:
     if device.type == "cuda":
         print("[gpu]", torch.cuda.get_device_name(0))
 
+    frozen_identity_audit = verify_frozen_identity()
     assets = load_candidate_assets()
 
     run_manifest = {
@@ -1869,6 +1979,8 @@ def main() -> None:
         "ranking_methods": ["cbin", "cbin_sqrt", "jss"],
         "cohorts": ["fixed50", "available_pool", "exact_formula"],
         "missing_d3_policy": "exclude_entire_affected_target_pool",
+        "retrieval_input_protocol": "frozen_fixed50",
+        "frozen_identity_audit": frozen_identity_audit,
     }
     (OUTPUT_ROOT / "run_manifest.json").write_text(
         json.dumps(run_manifest, indent=2, ensure_ascii=False) + "\n",

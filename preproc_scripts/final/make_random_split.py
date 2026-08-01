@@ -1,268 +1,209 @@
 #!/usr/bin/env python3
-"""Select the fixed benchmark cohort, then create its random split."""
+"""Restore and verify the exact random cohort used by the paper.
+
+The historical random assignment is an input identity, not a split that can be
+recreated from a new random seed.  The formal route starts from the archived
+``safe19707`` processed tables and split, removes only molecules for which the
+required depth-3 DAG is unavailable, and verifies the locked paper files.
+"""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 
-QC_COLUMNS = (
-    "n_peaks",
-    "max_intensity_frac",
-    "entropy_norm",
-    "precursor_survival_yield",
-    "support_PR_abs006",
-    "support_PWR_abs006",
-    "true_oos_intensity",
-)
+ROOT = Path(__file__).resolve().parents[2]
+IDENTITY_PATH = ROOT / "config/paper_experiment_identity.json"
+ID_COLUMNS = ["spec_id", "mol_id", "group_id"]
 
 
-def load_eligible_pool(split_dir: Path) -> pd.DataFrame:
-    frames = [
-        pd.read_csv(split_dir / f"{split}_ids.csv")
-        for split in ("train", "val", "test")
-    ]
-    pool = pd.concat(frames, ignore_index=True)[
-        ["spec_id", "mol_id", "group_id"]
-    ]
-    if pool["spec_id"].duplicated().any():
-        raise RuntimeError("Eligible split union contains duplicate spec_id values")
-    return pool
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
-def score_qc(pool: pd.DataFrame) -> pd.DataFrame:
-    result = pool.copy()
-    missing = sorted(set(QC_COLUMNS) - set(result.columns))
-    if missing:
-        raise RuntimeError(f"QC table is missing columns: {missing}")
+def load_identity(path: Path) -> dict:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1:
+        raise RuntimeError(f"Unsupported identity schema: {path}")
+    return payload
 
-    result["n_peaks"] = result["n_peaks"].fillna(0)
-    result["max_intensity_frac"] = result["max_intensity_frac"].fillna(1.0)
-    result["entropy_norm"] = result["entropy_norm"].fillna(0.0)
-    result["precursor_survival_yield"] = result[
-        "precursor_survival_yield"
-    ].fillna(1.0)
-    result["support_PWR_abs006"] = result["support_PWR_abs006"].fillna(0.0)
-    result["support_PR_abs006"] = result["support_PR_abs006"].fillna(0.0)
 
-    result["bad_too_few_peaks"] = result["n_peaks"] < 3
-    result["bad_low_support"] = result["support_PWR_abs006"] < 0.35
-    result["bad_precursor_dominated"] = (
-        result["precursor_survival_yield"] > 0.95
+def normalized_molecules(path: Path) -> pd.DataFrame:
+    frame = pd.read_pickle(path)
+    if "mol_id" not in frame.columns:
+        if frame.index.name != "mol_id":
+            raise RuntimeError(f"mol_df has no mol_id: {path}")
+        frame = frame.reset_index()
+    return frame
+
+
+def dag_exists(directory: Path, mol_id: int) -> bool:
+    return any(
+        (directory / f"{mol_id}{suffix}").is_file()
+        for suffix in (".pickle.bz2", ".json.bz2", ".pkl.bz2", ".pickle")
     )
-    result["bad_single_peak"] = result["max_intensity_frac"] > 0.98
-    result["bad_low_entropy"] = result["entropy_norm"] < 0.03
-    hard_bad_columns = (
-        "bad_too_few_peaks",
-        "bad_low_support",
-        "bad_precursor_dominated",
-        "bad_single_peak",
-        "bad_low_entropy",
-    )
-    result["hard_bad"] = result[list(hard_bad_columns)].any(axis=1)
-
-    result["qcv1_bad_score"] = (
-        0.45 * (1.0 - result["support_PWR_abs006"]).clip(0.0, 1.0)
-        + 0.20 * result["precursor_survival_yield"].clip(0.0, 1.0)
-        + 0.15 * result["max_intensity_frac"].clip(0.0, 1.0)
-        + 0.10 * (1.0 - result["entropy_norm"]).clip(0.0, 1.0)
-        + 0.10
-        * (1.0 / np.sqrt(result["n_peaks"].clip(lower=1))).clip(0.0, 1.0)
-    )
-    return result
 
 
-def select_fixed_cohort(
-    scored: pd.DataFrame,
-    target_count: int,
-    target_molecules: int,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    candidates = scored.loc[~scored["hard_bad"]].sort_values(
-        ["qcv1_bad_score", "spec_id"],
-        kind="mergesort",
-    )
-    if len(candidates) < target_count:
-        raise RuntimeError(
-            f"Only {len(candidates)} spectra pass hard QC; {target_count} required"
-        )
+def assert_split_identity(
+    split_dir: Path,
+    expected: dict,
+    *,
+    verify_file_hashes: bool,
+) -> dict:
+    frames: dict[str, pd.DataFrame] = {}
+    audit: dict[str, dict] = {}
+    for name in ("train", "val", "test"):
+        path = split_dir / f"{name}_ids.csv"
+        frame = pd.read_csv(path)[ID_COLUMNS]
+        frames[name] = frame
+        actual = {
+            "spectra": int(frame["spec_id"].nunique()),
+            "molecules": int(frame["mol_id"].nunique()),
+            "sha256": sha256_file(path),
+        }
+        wanted = expected[name]
+        if actual["spectra"] != wanted["spectra"]:
+            raise RuntimeError(f"{name} spectrum identity mismatch: {actual} != {wanted}")
+        if actual["molecules"] != wanted["molecules"]:
+            raise RuntimeError(f"{name} molecule identity mismatch: {actual} != {wanted}")
+        if verify_file_hashes and actual["sha256"] != wanted["sha256"]:
+            raise RuntimeError(f"{name} SHA-256 mismatch: {actual['sha256']} != {wanted['sha256']}")
+        audit[name] = actual
 
-    best_per_molecule = candidates.drop_duplicates(
-        "connectivity_key",
-        keep="first",
-    )
-    if best_per_molecule["connectivity_key"].nunique() != target_molecules:
-        raise RuntimeError(
-            "QC-passing cohort does not contain the locked number of molecules: "
-            f"{best_per_molecule['connectivity_key'].nunique()} != {target_molecules}"
-        )
-
-    selected_ids = set(best_per_molecule["spec_id"])
-    remaining = candidates.loc[~candidates["spec_id"].isin(selected_ids)]
-    selected = pd.concat(
-        [
-            best_per_molecule,
-            remaining.head(target_count - len(best_per_molecule)),
-        ],
-        ignore_index=True,
-    ).sort_values("spec_id")
-    dropped = scored.loc[~scored["spec_id"].isin(selected["spec_id"])].copy()
-    return selected, dropped
-
-
-def exact_subset(
-    groups: pd.DataFrame,
-    target: int,
-    seed: int,
-) -> set[str]:
-    shuffled = groups.sample(frac=1.0, random_state=seed).reset_index(drop=True)
-    previous: dict[int, tuple[int, int]] = {0: (-1, -1)}
-    for index, size in enumerate(shuffled["spectrum_count"].astype(int)):
-        for subtotal in sorted(tuple(previous), reverse=True):
-            updated = subtotal + int(size)
-            if updated <= target and updated not in previous:
-                previous[updated] = (subtotal, index)
-        if target in previous:
-            break
-
-    if target not in previous:
-        raise RuntimeError(
-            f"Cannot construct an exact molecule-disjoint partition of {target} spectra"
-        )
-    chosen_total = target
-    chosen_indices = []
-    while chosen_total:
-        chosen_total, index = previous[chosen_total]
-        chosen_indices.append(index)
-    return set(shuffled.loc[chosen_indices, "connectivity_key"].astype(str))
-
-
-def make_random_split(cohort: pd.DataFrame, seed: int) -> dict[str, pd.DataFrame]:
-    groups = cohort.groupby("connectivity_key", as_index=False).agg(
-        spectrum_count=("spec_id", "nunique")
-    )
-    target = int(np.floor(len(cohort) * 0.20))
-    test_keys = None
-    val_keys = None
-    for attempt in range(100):
-        candidate_test = exact_subset(groups, target, seed + 2 * attempt)
-        remaining = groups.loc[
-            ~groups["connectivity_key"].isin(candidate_test)
-        ]
-        try:
-            candidate_val = exact_subset(
-                remaining,
-                target,
-                seed + 2 * attempt + 1,
-            )
-        except RuntimeError:
-            continue
-        test_keys = candidate_test
-        val_keys = candidate_val
-        break
-    if test_keys is None or val_keys is None:
-        raise RuntimeError(
-            "Unable to construct exact random validation/test spectrum counts"
-        )
-    train_keys = set(groups["connectivity_key"].astype(str)) - test_keys - val_keys
-
-    result = {}
-    for split, keys in (
-        ("train", train_keys),
-        ("val", val_keys),
-        ("test", test_keys),
-    ):
-        result[split] = cohort.loc[
-            cohort["connectivity_key"].astype(str).isin(keys),
-            ["spec_id", "mol_id", "group_id"],
-        ].sort_values("spec_id")
-    return result
+    if pd.concat(frames.values(), ignore_index=True)["spec_id"].duplicated().any():
+        raise RuntimeError("A spectrum occurs in more than one random subset")
+    for left, right in (("train", "val"), ("train", "test"), ("val", "test")):
+        overlap = set(frames[left]["mol_id"]) & set(frames[right]["mol_id"])
+        if overlap:
+            raise RuntimeError(f"Molecule overlap between {left} and {right}: {len(overlap)}")
+    return audit
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--base_split_dp", type=Path, required=True)
-    parser.add_argument("--qc_csv", type=Path, required=True)
-    parser.add_argument("--mol_df", type=Path, required=True)
-    parser.add_argument("--out_split_dp", type=Path, required=True)
-    parser.add_argument("--target_count", type=int, default=19659)
-    parser.add_argument("--target_molecules", type=int, default=2274)
-    parser.add_argument("--seed", type=int, default=42)
+    parser = argparse.ArgumentParser(
+        description="Restore the exact safe19707 -> safe19659 paper cohort and random split."
+    )
+    parser.add_argument("--source-proc", type=Path, required=True)
+    parser.add_argument("--source-split", type=Path, required=True)
+    parser.add_argument("--dag-dir", type=Path, required=True)
+    parser.add_argument("--output-proc", type=Path, required=True)
+    parser.add_argument("--output-split", type=Path, required=True)
+    parser.add_argument("--identity", type=Path, default=IDENTITY_PATH)
     args = parser.parse_args()
 
-    eligible = load_eligible_pool(args.base_split_dp)
-    qc = pd.read_csv(args.qc_csv)
-    molecules = pd.read_pickle(args.mol_df)
-    if "mol_id" not in molecules.columns:
-        molecules = molecules.reset_index()
-    molecules = molecules[["mol_id", "inchikey_s"]].drop_duplicates("mol_id")
+    identity = load_identity(args.identity)
+    cohort_contract = identity["cohort"]
+    source_contract = cohort_contract["historical_source"]
+    split_contract = identity["splits"]["random"]
 
-    scored = eligible.merge(
-        qc,
-        on=["spec_id", "mol_id", "group_id"],
-        how="left",
-        validate="one_to_one",
-    ).merge(molecules, on="mol_id", how="left", validate="many_to_one")
-    scored = scored.rename(columns={"inchikey_s": "connectivity_key"})
-    if scored["connectivity_key"].isna().any():
-        raise RuntimeError("Some eligible spectra lack a connectivity key")
-    if scored[list(QC_COLUMNS)].isna().any().any():
-        raise RuntimeError("QC table does not cover every eligible spectrum")
+    source_spec = pd.read_pickle(args.source_proc / "spec_df.pkl")
+    source_mol = normalized_molecules(args.source_proc / "mol_df.pkl")
+    source_ann_path = args.source_proc / "ann_df.pkl"
+    source_splits = {
+        name: pd.read_csv(args.source_split / f"{name}_ids.csv")[ID_COLUMNS]
+        for name in ("train", "val", "test")
+    }
 
-    scored = score_qc(scored)
-    cohort, dropped = select_fixed_cohort(
-        scored,
-        args.target_count,
-        args.target_molecules,
-    )
-    splits = make_random_split(cohort, args.seed)
-    expected_eval_count = int(np.floor(args.target_count * 0.20))
-    for split in ("val", "test"):
-        if len(splits[split]) != expected_eval_count:
+    if len(source_spec) != source_contract["spectra"]:
+        raise RuntimeError(f"Historical source spectra mismatch: {len(source_spec)}")
+    if source_mol["mol_id"].nunique() != source_contract["molecules"]:
+        raise RuntimeError(f"Historical source molecules mismatch: {source_mol['mol_id'].nunique()}")
+
+    exclusions = source_contract["excluded_molecules"]
+    excluded_ids = {int(item["mol_id"]) for item in exclusions}
+    for item in exclusions:
+        mol_id = int(item["mol_id"])
+        row = source_mol.loc[source_mol["mol_id"] == mol_id]
+        if len(row) != 1:
+            raise RuntimeError(f"Expected one historical molecule row for mol_id={mol_id}")
+        if str(row.iloc[0]["inchikey_s"]) != item["connectivity_key"]:
+            raise RuntimeError(f"Connectivity identity mismatch for historical mol_id={mol_id}")
+        count = int((source_spec["mol_id"] == mol_id).sum())
+        if count != int(item["spectrum_count"]):
+            raise RuntimeError(f"Spectrum identity mismatch for historical mol_id={mol_id}")
+        if dag_exists(args.dag_dir, mol_id):
             raise RuntimeError(
-                f"{split} contains {len(splits[split])} spectra; "
-                f"expected {expected_eval_count}"
+                f"Locked exclusion mol_id={mol_id} now has a DAG; review the cohort identity rather than silently excluding it"
             )
+        if not (source_splits["train"]["mol_id"] == mol_id).any():
+            raise RuntimeError(f"Locked exclusion mol_id={mol_id} is not in the historical training split")
 
-    args.out_split_dp.mkdir(parents=True, exist_ok=True)
-    for split, frame in splits.items():
-        frame.to_csv(args.out_split_dp / f"{split}_ids.csv", index=False)
-    pd.DataFrame(columns=["spec_id", "mol_id", "group_id"]).to_csv(
-        args.out_split_dp / "secondary_ids.csv",
-        index=False,
+    output_spec = source_spec.loc[~source_spec["mol_id"].isin(excluded_ids)].copy()
+    output_mol = source_mol.loc[~source_mol["mol_id"].isin(excluded_ids)].copy()
+    output_splits = {
+        "train": source_splits["train"].loc[
+            ~source_splits["train"]["mol_id"].isin(excluded_ids)
+        ].copy(),
+        "val": source_splits["val"].copy(),
+        "test": source_splits["test"].copy(),
+    }
+
+    remaining_missing = sorted(
+        mol_id
+        for mol_id in output_mol["mol_id"].astype(int).unique()
+        if not dag_exists(args.dag_dir, int(mol_id))
     )
-    cohort.to_csv(args.out_split_dp / "cohort_ids.csv", index=False)
-    cohort.to_csv(args.out_split_dp / "qcv1_keep_details.csv", index=False)
-    dropped.to_csv(args.out_split_dp / "qcv1_drop_details.csv", index=False)
+    if remaining_missing:
+        raise RuntimeError(f"Final cohort still has missing required DAGs: {remaining_missing[:20]}")
+    if len(output_spec) != cohort_contract["spectra"]:
+        raise RuntimeError(f"Final cohort spectrum count mismatch: {len(output_spec)}")
+    if output_mol["mol_id"].nunique() != cohort_contract["molecules"]:
+        raise RuntimeError(f"Final cohort molecule count mismatch: {output_mol['mol_id'].nunique()}")
 
-    overlap = {}
-    for left, right in (("train", "val"), ("train", "test"), ("val", "test")):
-        overlap[f"{left}_{right}"] = len(
-            set(splits[left]["mol_id"]) & set(splits[right]["mol_id"])
-        )
-    if any(overlap.values()):
-        raise RuntimeError(f"Molecule overlap across random splits: {overlap}")
+    args.output_proc.mkdir(parents=True, exist_ok=True)
+    args.output_split.mkdir(parents=True, exist_ok=True)
+    output_spec.to_pickle(args.output_proc / "spec_df.pkl")
+    output_mol.to_pickle(args.output_proc / "mol_df.pkl")
+    shutil.copyfile(source_ann_path, args.output_proc / "ann_df.pkl")
+    for name, frame in output_splits.items():
+        frame.to_csv(args.output_split / f"{name}_ids.csv", index=False)
+    pd.DataFrame(columns=ID_COLUMNS).to_csv(
+        args.output_split / "secondary_ids.csv", index=False
+    )
+    cohort_ids = pd.concat(output_splits.values(), ignore_index=True).sort_values("spec_id")
+    cohort_ids.to_csv(args.output_split / "cohort_ids.csv", index=False)
+
+    split_audit = assert_split_identity(
+        args.output_split,
+        split_contract,
+        verify_file_hashes=True,
+    )
+    file_audit = {
+        name: sha256_file(args.output_proc / name)
+        for name in ("spec_df.pkl", "mol_df.pkl", "ann_df.pkl")
+    }
+    for name, expected_sha in cohort_contract["files"].items():
+        if file_audit[name] != expected_sha:
+            raise RuntimeError(f"{name} SHA-256 mismatch: {file_audit[name]} != {expected_sha}")
 
     audit = {
-        "protocol": "cohort-wide QC before molecule-disjoint random splitting",
-        "seed": args.seed,
-        "cohort_spectra": int(len(cohort)),
-        "cohort_molecules": int(cohort["connectivity_key"].nunique()),
-        "split_spectra": {name: int(len(frame)) for name, frame in splits.items()},
-        "split_molecules": {
-            name: int(frame["mol_id"].nunique()) for name, frame in splits.items()
+        "protocol": "historical_safe19707_pruned_only_for_unavailable_required_depth3_dag",
+        "identity_contract": str(args.identity.resolve()),
+        "cohort": {
+            "spectra": int(len(output_spec)),
+            "molecules": int(output_mol["mol_id"].nunique()),
+            "file_sha256": file_audit,
         },
-        "molecule_overlap": overlap,
+        "excluded_molecules": exclusions,
+        "random_split": split_audit,
+        "molecule_overlap": 0,
+        "remaining_missing_required_dags": 0,
+        "byte_identity_enforced": True,
     }
-    (args.out_split_dp / "audit.json").write_text(
-        json.dumps(audit, indent=2) + "\n",
-        encoding="utf-8",
+    (args.output_split / "audit.json").write_text(
+        json.dumps(audit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    print(json.dumps(audit, indent=2))
+    print(json.dumps(audit, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

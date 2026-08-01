@@ -43,7 +43,7 @@ data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42/{train,val,test}_id
 data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags/
 ```
 
-See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked commands. Record-level train/validation/test CSV files are not included because their redistribution status has not been confirmed. They are deterministically regenerated from a licensed local NIST20 export using the tracked seeds, grouping rules, cohort counts, and overlap assertions.
+See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked commands. Record-level train/validation/test CSV files are not included because their redistribution status has not been confirmed. The random assignment is restored from the archived licensed `safe19707` assignment and verified against the paper SHA-256 contract; it is not regenerated from a new pseudorandom draw.
 
 ## Preprocessing, splits, and depth-3 DAGs
 
@@ -52,14 +52,12 @@ The abbreviated build sequence is:
 ```bash
 python preproc_scripts/prepare_dataframes.py --msp_file nist_20/hr_nist_msms.MSP --mol_dir nist_20/hr_nist_msms.MOL --input_format msp+mol --output_format csv --output_dp data/df --output_name nist20_hr
 python preproc_scripts/prepare_processed_data.py --df_dp data/df --dsets nist20_hr --proc_dp data/proc/nist20
-python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --proc_dp data/proc/nist20_qtof_cid_safe19659 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
-python preproc_scripts/prepare_split.py --split_type random --split_key inchikey_s --primary_dsets nist20_hr --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --ces ace --proc_dp data/proc/nist20_qtof_cid_safe19659 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --split_dp data/split/nist20_qtof_cid_safe19659_random_base
-python preproc_scripts/final/generate_cohort_qc.py --spec-fp data/proc/nist20_qtof_cid_safe19659/spec_df.pkl --frag-dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags --eligible-split data/split/nist20_qtof_cid_safe19659_random_base --out data/proc/nist20_qtof_cid_safe19659/cohort_qc.csv
-python preproc_scripts/final/make_random_split.py --base_split_dp data/split/nist20_qtof_cid_safe19659_random_base --qc_csv data/proc/nist20_qtof_cid_safe19659/cohort_qc.csv --mol_df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --out_split_dp data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --target_count 19659 --target_molecules 2274 --seed 42
+python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19707_d3_mhp_qtof_cid_base --proc_dp data/proc/nist20_qtof_cid_safe19707 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
+python preproc_scripts/final/make_random_split.py --source-proc data/proc/nist20_qtof_cid_safe19707 --source-split data/split/nist20_qtof_cid_safe19707_qcv1_trainonly --dag-dir data/frag/nist20_qtof_cid_safe19707_d3_mhp_qtof_cid_base/dags --output-proc data/proc/nist20_qtof_cid_safe19659 --output-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
 python preproc_scripts/prepare_scaffold_split.py --source-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --mol-df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --output-split data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42 --seed 42
 ```
 
-QC metrics are generated locally from the licensed spectra and tracked depth-3 candidate DAGs. The cohort-wide QC rule first fixes exactly 19,659 spectra from 2,274 molecular connectivity groups; only then are the molecule-disjoint random and scaffold-disjoint partitions generated from the same `cohort_ids.csv`. The historical `qcv1_trainonly` directory name is retained solely as the locked artifact identifier. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
+The paper cohort is the historical `safe19707` population after excluding three training molecules whose required depth-3 DAGs were unavailable. This produces exactly 19,659 spectra and 2,274 molecules. `config/paper_experiment_identity.json` locks the excluded molecular connectivity identities, processed-file hashes, exact random/scaffold counts, and split hashes. The scaffold split is deterministically rebuilt from the resulting `cohort_ids.csv`; the random assignment is preserved from the historical source split. The `qcv1_trainonly` directory name is retained solely as the locked artifact identifier. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
 
 ## Training
 
@@ -100,13 +98,15 @@ python test/run_candidate_space_coverage.py
 
 Each evaluator reads model artifacts from the supplied seed directory and writes under that directory or `runs/experiments/`; it does not train or select a checkpoint on the test set. Median-ACE replacement computes the median from the training loader unless a locked training value is explicitly supplied with `--ace-median`; it never falls back to the test distribution.
 
-For molecular identification, first build the licensed/local PubChem candidate pools with `test/build_retrieval_candidates.py`, then run:
+For an exact random-split seed-42 artifact replay, set `FERA_MS_VERIFY_PAPER_ARTIFACTS=1` together with `MS2_GLOBAL_SEED=42`. The evaluator then requires the final-peak, reranker, and allocator hashes in `config/paper_experiment_identity.json`; fresh retraining remains metric-tolerance based and does not require checkpoint byte identity.
+
+For the paper molecular-identification result, point the evaluator at the frozen fixed-50 input package, then run:
 
 ```bash
-python test/run_molecular_retrieval.py --splits random scaffold --seeds 42 43 44
+python test/run_molecular_retrieval.py --retrieval-root /path/to/frozen_pubchem_fixed50 --splits random scaffold --seeds 42 43 44
 ```
 
-The builder derives target membership directly from the two tracked split contracts and uses the repository-local `test/retrieval/candidate_pool.py` implementation for structure validation, connectivity deduplication, true-target injection, and Morgan ranking. It has no dependency on a sibling or historical checkout. Set `FERA_MS_RETRIEVAL_ROOT` if the candidate pools are outside the default run directory. Candidate caches and retrieval outputs are intentionally not versioned.
+The evaluator verifies the frozen target, membership, candidate, and query manifests against the hashes in `config/paper_experiment_identity.json`, then asserts the final 3,917/454 random and 3,949/448 scaffold query identities. `test/build_retrieval_candidates.py` is intentionally isolated under `live_pubchem_drift_audit`; it re-queries current PubChem to test method availability and source drift and cannot replace the frozen paper input. It uses the repository-local structure validation, connectivity deduplication, true-target injection, and Morgan-ranking implementation and has no dependency on a sibling checkout. Candidate caches and retrieval outputs are intentionally not versioned.
 
 Statistical inference follows the manuscript protocol. Spectrum-prediction metrics are averaged across the three seeds before 20,000 molecule-clustered bootstrap replicates, with one Holm correction over the required 32 comparisons. Retrieval uses 20,000 paired molecule bootstrap replicates and one independent Holm correction over the required 48 comparisons (3 baselines x 2 splits x 4 metrics x 2 aggregations). Both analysis scripts reject incomplete comparison families instead of silently correcting a smaller set.
 

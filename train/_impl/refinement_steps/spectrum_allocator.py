@@ -127,20 +127,6 @@ def normalize_target_mass_per_spec(target_mass, bidx, batch_size):
     return target_mass / denom[bidx.long()]
 
 
-def alias_rich_feature_keys(res, extra_schema):
-    keys = {k for k, _ in extra_schema}
-
-    if "candidate_reranker_frag_rich_feats" in keys:
-        if "candidate_reranker_frag_rich_feats" not in res and "fragment_rich_features" in res:
-            res["candidate_reranker_frag_rich_feats"] = res["fragment_rich_features"]
-
-    if "fragment_rich_features" in keys:
-        if "fragment_rich_features" not in res and "candidate_reranker_frag_rich_feats" in res:
-            res["fragment_rich_features"] = res["candidate_reranker_frag_rich_feats"]
-
-    return res
-
-
 def lgbm_predict(regressor, feats, device, dtype, score_clip):
     X = feats.detach().cpu().numpy().astype(np.float32)
     s = regressor.predict(X).astype(np.float32)
@@ -159,7 +145,7 @@ def build_batch_tensors(base, batch, candidate_reranker, regressor, extra_schema
             max_extra_dims=int(args.max_extra_dims),
             bin_res=float(args.target_bin_res),
         )
-        res = alias_rich_feature_keys(res, extra_schema)
+        res = candidate_reranker.alias_rich_feature_keys(res, extra_schema)
 
         feats = candidate_reranker.candidate_features(
             res,
@@ -421,13 +407,14 @@ def train_one_epoch(base, allocator, regressor, extra_schema, train_dl, opt, dev
     return {k: (v / n if k != "n" else v) for k, v in sums.items()}
 
 
-def save_pack(path, allocator, input_dim, extra_schema, args, best_val_cos):
+def save_pack(path, allocator, input_dim, extra_schema, args, best_val_cos, feature_schema_sha256):
     th.save({
         "model": allocator.state_dict(),
         "input_dim": int(input_dim),
         "extra_schema": extra_schema,
         "args": vars(args),
         "best_val_cos": float(best_val_cos),
+        "feature_schema_sha256": feature_schema_sha256,
     }, path)
 
 
@@ -505,12 +492,19 @@ def main():
         reg_pack = pickle.load(f)
 
     regressor = reg_pack["model"]
-    extra_schema = reg_pack.get("extra_schema", [])
+    extra_schema = candidate_reranker.validate_extra_schema(
+        reg_pack.get("extra_schema", [])
+    )
     backend = reg_pack.get("backend", "unknown")
 
     print("[spectrum allocator] loaded regressor:", args.regressor_path)
     print("[spectrum allocator] regressor backend:", backend)
     print("[spectrum allocator] regressor extra_schema:", extra_schema)
+    feature_schema = candidate_reranker.write_feature_schema(out_dir, extra_schema)
+    feature_schema_sha256 = feature_schema["schema_sha256"]
+    regressor_schema_sha = reg_pack.get("feature_schema_sha256")
+    if regressor_schema_sha and regressor_schema_sha != feature_schema_sha256:
+        raise RuntimeError("Regressor feature schema SHA-256 mismatch")
 
     cfg = load_config(args.template, args.config)
     cfg = candidate_reranker.force_final_peak_distillation_arch(cfg)
@@ -550,7 +544,7 @@ def main():
             max_extra_dims=int(args.max_extra_dims),
             bin_res=float(args.target_bin_res),
         )
-        first_res = alias_rich_feature_keys(first_res, extra_schema)
+        first_res = candidate_reranker.alias_rich_feature_keys(first_res, extra_schema)
 
         first_feats = candidate_reranker.candidate_features(
             first_res,
@@ -562,6 +556,12 @@ def main():
 
     input_dim = int(first_feats.shape[1])
     print("[spectrum allocator] input_dim:", input_dim)
+
+    if input_dim != candidate_reranker.TOTAL_FEATURE_DIM:
+        raise RuntimeError(
+            f"Paper allocator requires {candidate_reranker.TOTAL_FEATURE_DIM} features; "
+            f"found {input_dim}"
+        )
 
     if hasattr(regressor, "n_features_in_"):
         print("[spectrum allocator] regressor n_features_in_:", int(regressor.n_features_in_))
@@ -609,6 +609,9 @@ def main():
                 f"resume input_dim不一致："
                 f"{saved_input_dim} != {input_dim}"
             )
+        saved_schema_sha = resume_pack.get("feature_schema_sha256")
+        if saved_schema_sha and saved_schema_sha != feature_schema_sha256:
+            raise RuntimeError("Resume allocator feature schema SHA-256 mismatch")
 
         allocator.load_state_dict(
             resume_pack["model"],
@@ -699,6 +702,7 @@ def main():
             extra_schema,
             args,
             best_val_cos,
+            feature_schema_sha256,
         )
 
         before_val.to_csv(
@@ -749,6 +753,7 @@ def main():
                 extra_schema,
                 args,
                 best_val_cos,
+                feature_schema_sha256,
             )
 
             before_val.to_csv(
@@ -814,6 +819,7 @@ def main():
                 extra_schema,
                 args,
                 best_val_cos,
+                feature_schema_sha256,
             )
             val_table.to_csv(out_dir / "spectrum_allocator_best_val.csv", index=False)
             print("[spectrum allocator] saved best:", out_dir / "spectrum_allocator_allocator_best.pt")

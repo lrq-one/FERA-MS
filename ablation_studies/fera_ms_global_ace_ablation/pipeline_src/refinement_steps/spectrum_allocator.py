@@ -130,13 +130,20 @@ def normalize_target_mass_per_spec(target_mass, bidx, batch_size):
 def alias_rich_feature_keys(res, extra_schema):
     keys = {k for k, _ in extra_schema}
 
+    if "r173_frag_rich_feats" in keys:
+        if "r173_frag_rich_feats" not in res and "fragment_rich_features" in res:
+            res["r173_frag_rich_feats"] = res["fragment_rich_features"]
+
     if "candidate_reranker_frag_rich_feats" in keys:
         if "candidate_reranker_frag_rich_feats" not in res and "fragment_rich_features" in res:
             res["candidate_reranker_frag_rich_feats"] = res["fragment_rich_features"]
 
     if "fragment_rich_features" in keys:
-        if "fragment_rich_features" not in res and "candidate_reranker_frag_rich_feats" in res:
-            res["fragment_rich_features"] = res["candidate_reranker_frag_rich_feats"]
+        if "fragment_rich_features" not in res:
+            for legacy_key in ("r173_frag_rich_feats", "candidate_reranker_frag_rich_feats"):
+                if legacy_key in res:
+                    res["fragment_rich_features"] = res[legacy_key]
+                    break
 
     return res
 
