@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 RANDOM_ROOT = (
     ROOT

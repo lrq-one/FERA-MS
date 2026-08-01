@@ -30,7 +30,8 @@ except ModuleNotFoundError:
     )
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[2])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 sys.path.insert(
     0,
@@ -51,27 +52,24 @@ from ms2spectra import workflow
 from ms2spectra.training import FragGNNPL
 
 
-TEMPLATE = ROOT / "runs/_config/template.yml"
+TEMPLATE = RUNS_ROOT / "_config/template.yml"
 
 BASE_CONFIG = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "from_scratch_v1_40_r119_10_seed42"
     / "final"
     / "config.yml"
 )
 
 BASE_CHECKPOINT = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "from_scratch_v1_40_r119_10_seed42"
     / "final"
     / "model.ckpt"
 )
 
 OUTPUT_ROOT = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "r121_allocation_ablation"
 )
 

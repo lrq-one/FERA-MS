@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 REFERENCE_DIR = (
     ROOT

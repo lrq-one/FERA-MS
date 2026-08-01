@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -618,4 +619,16 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Build the locked 60/20/20 molecule-disjoint Murcko-scaffold split."
+    )
+    parser.add_argument("--source-split", type=Path, default=SOURCE_SPLIT)
+    parser.add_argument("--mol-df", type=Path, default=MOL_PATH)
+    parser.add_argument("--output-split", type=Path, default=OUTPUT_SPLIT)
+    parser.add_argument("--seed", type=int, default=SEED)
+    args = parser.parse_args()
+    SOURCE_SPLIT = args.source_split.resolve()
+    MOL_PATH = args.mol_df.resolve()
+    OUTPUT_SPLIT = args.output_split.resolve()
+    SEED = args.seed
     main()

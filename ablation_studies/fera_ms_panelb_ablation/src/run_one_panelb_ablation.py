@@ -16,7 +16,7 @@ import torch
 import yaml
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[3])).resolve()
 ABLATION_ROOT = (
     ROOT
     / "ablation_studies"

@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use FERA-MS, please cite the accompanying manuscript."
+title: "FERA-MS"
+type: software
+version: "0.1.0"
+authors:
+  - name: "FERA-MS authors"
+repository-code: "https://github.com/lrq-one/FERA-MS"
+license: "LicenseRef-Pending"

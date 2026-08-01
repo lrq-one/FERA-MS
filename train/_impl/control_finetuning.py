@@ -23,7 +23,8 @@ except ModuleNotFoundError:
     import pytorch_lightning as pl
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[2])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 GLOBAL_SEED = int(
     os.environ.get(
@@ -45,27 +46,24 @@ from train._impl.trainer_helpers import (
 )
 
 
-TEMPLATE = ROOT / "runs/_config/template.yml"
+TEMPLATE = RUNS_ROOT / "_config/template.yml"
 
 BASE_CONFIG = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "v2a_gine_cutchem_only"
     / "final"
     / "config.yml"
 )
 
 BASE_CHECKPOINT = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "v2a_gine_cutchem_only"
     / "final"
     / "model.ckpt"
 )
 
 OUTPUT_ROOT = (
-    ROOT
-    / "runs"
+    RUNS_ROOT
     / "v2c_ce_trajectory_ablation"
 )
 

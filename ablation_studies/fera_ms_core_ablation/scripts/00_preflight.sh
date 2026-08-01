@@ -2,7 +2,8 @@
 
 set -u
 
-ROOT="/home/lwh/projects/lrq2/fragnnet-main/ms2spectra_v1_r119"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 ABLATION_ROOT="$ROOT/ablation_studies/fera_ms_core_ablation"
 
 cd "$ROOT" || {

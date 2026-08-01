@@ -5,6 +5,7 @@ import argparse
 import importlib.util
 import json
 import math
+import os
 import pickle
 import random
 import sys
@@ -20,7 +21,7 @@ from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
 for import_path in (
     ROOT / "code/src",

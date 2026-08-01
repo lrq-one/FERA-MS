@@ -26,15 +26,16 @@ import pandas as pd
 import torch
 
 
-ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "runs/experiments/molecular_retrieval/pubchem_legacy_full"
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
+BASE = Path(os.environ.get("FERA_MS_RETRIEVAL_ROOT", RUNS_ROOT / "experiments/molecular_retrieval/pubchem_legacy_full")).resolve()
 POOL_DIR = BASE / "inference_ready_pools_20260723"
 FROZEN_DIR = BASE / "frozen_manifest_20260723"
 CANDIDATE_DIR = BASE / "candidate_d3_20260723"
 PROC_DIR = CANDIDATE_DIR / "proc"
 DAG_DIR = CANDIDATE_DIR / "frag/dags"
 OUTPUT_ROOT = BASE / "ours_r184b_experiment5_20260724"
-TEMPLATE_PATH = ROOT / "runs/_config/template.yml"
+TEMPLATE_PATH = RUNS_ROOT / "_config/template.yml"
 R170_PATH = ROOT / "train/_impl/refinement_steps/candidate_reranker.py"
 R184_PATH = ROOT / "train/_impl/refinement_steps/spectrum_allocator.py"
 BIN_RES = 0.01

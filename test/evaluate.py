@@ -31,9 +31,10 @@ warnings.filterwarnings(
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
-RUN_ROOT = ROOT / "runs/v2e_full_063"
+RUN_ROOT = RUNS_ROOT / "v2e_full_063"
 
 OUTPUT_DIR = (
     RUN_ROOT
@@ -46,12 +47,12 @@ DIAGNOSTICS = (
 )
 
 TEMPLATE_PATH = (
-    ROOT / "runs/_config/template.yml"
+    RUNS_ROOT / "_config/template.yml"
 )
 
 CONFIG_PATH = (
-    ROOT
-    / "runs/v2c_ce_trajectory_ablation/"
+    RUNS_ROOT
+    / "v2c_ce_trajectory_ablation/"
     "control/config.yml"
 )
 

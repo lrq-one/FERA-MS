@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-ROOT="/home/lwh/projects/lrq2/fragnnet-main/ms2spectra_v1_r119"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
 
-EXPERIMENT_ROOT="$ROOT/runs/experiments/scaffold_disjoint_3seeds"
+EXPERIMENT_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_3seeds"
 SCAFFOLD_SPLIT="$ROOT/data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42"
 
 SEEDS=(
@@ -44,7 +46,7 @@ archive_active_outputs() {
         v2c_ce_trajectory_ablation \
         v2e_full_063
     do
-        PATH_TO_MOVE="$ROOT/runs/$NAME"
+        PATH_TO_MOVE="$RUNS_ROOT/$NAME"
 
         if [ -e "$PATH_TO_MOVE" ]; then
             echo "[ARCHIVE ACTIVE] $PATH_TO_MOVE"
@@ -65,7 +67,7 @@ save_successful_outputs() {
         v2c_ce_trajectory_ablation \
         v2e_full_063
     do
-        SOURCE="$ROOT/runs/$NAME"
+        SOURCE="$RUNS_ROOT/$NAME"
 
         if [ ! -e "$SOURCE" ]; then
             echo "[ERROR] 缺少输出：$SOURCE"
@@ -446,6 +448,8 @@ main() {
     export PYTHONDONTWRITEBYTECODE=1
     export PYTHONUNBUFFERED=1
     export PYTHONPATH="$ROOT/code/src:$ROOT/code:$ROOT"
+    export FERA_MS_ROOT="$ROOT"
+    export FERA_MS_RUNS_DIR="$RUNS_ROOT"
     export MS2_SPLIT_DP="$SCAFFOLD_SPLIT"
 
     for SEED in "${SEEDS[@]}"
@@ -518,7 +522,7 @@ main() {
             return "$CODE"
         fi
 
-        python - "$SEED" <<'PY'
+        python - "$SEED" "$RUNS_ROOT" <<'PY'
 import sys
 from pathlib import Path
 
@@ -526,18 +530,19 @@ import yaml
 
 
 expected = int(sys.argv[1])
+runs_root = Path(sys.argv[2])
 
 paths = [
-    Path(
-        "runs/v2a_gine_cutchem_only/"
+    runs_root / (
+        "v2a_gine_cutchem_only/"
         "stage1_v1_40ep/config.yml"
     ),
-    Path(
-        "runs/v2a_gine_cutchem_only/"
+    runs_root / (
+        "v2a_gine_cutchem_only/"
         "stage2_r119_10ep/config.yml"
     ),
-    Path(
-        "runs/v2c_ce_trajectory_ablation/"
+    runs_root / (
+        "v2c_ce_trajectory_ablation/"
         "control/config.yml"
     ),
 ]
@@ -593,11 +598,11 @@ PY
 
         if ! grep -q \
             "R172_SEED=$SEED" \
-            "runs/v2e_full_063/effective_seed.env"
+            "$RUNS_ROOT/v2e_full_063/effective_seed.env"
         then
             echo "[STOP] R172/R184 seed审计失败"
             cat \
-                "runs/v2e_full_063/effective_seed.env"
+                "$RUNS_ROOT/v2e_full_063/effective_seed.env"
             return 1
         fi
 
@@ -614,7 +619,7 @@ PY
             return "$CODE"
         fi
 
-        RESULT_ROOT="$ROOT/runs/v2e_full_063/final_locked_evaluation"
+        RESULT_ROOT="$RUNS_ROOT/v2e_full_063/final_locked_evaluation"
 
         ensure_molecule_aggregates \
             "$RESULT_ROOT"

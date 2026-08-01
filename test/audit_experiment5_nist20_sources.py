@@ -12,7 +12,7 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 CURRENT_DIR = (
     ROOT

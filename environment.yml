@@ -1,0 +1,12 @@
+name: fera-ms
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - gcc_linux-64
+  - gxx_linux-64
+  - pip:
+      - -r requirements.txt

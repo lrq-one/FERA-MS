@@ -8,7 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 SOURCE_PATH = (
     ROOT

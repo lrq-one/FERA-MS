@@ -2,15 +2,17 @@
 
 set -u
 
-ROOT="/home/lwh/projects/lrq2/fragnnet-main/ms2spectra_v1_r119"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
+RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
 ABLATION_ROOT="$ROOT/ablation_studies/fera_ms_core_ablation"
 RUN_ROOT="$ABLATION_ROOT/runs/no_candidate_reranker"
 LOG_ROOT="$ABLATION_ROOT/logs/no_candidate_reranker"
 RESULT_ROOT="$ABLATION_ROOT/results"
 
-TEMPLATE="$ROOT/runs/_config/template.yml"
+TEMPLATE="$RUNS_ROOT/_config/template.yml"
 ALLOCATOR_SCRIPT="$ROOT/train/_impl/refinement_steps/spectrum_allocator.py"
-HPARAM_ENV="$ABLATION_ROOT/config/mainline_allocator_hparams.env"
+HPARAM_ENV="$RUN_ROOT/mainline_allocator_hparams.env"
 
 cd "$ROOT" || exit 1
 
@@ -108,10 +110,10 @@ FAILED=0
 for SPLIT in random
 do
     if [ "$SPLIT" = "random" ]; then
-        SOURCE_ROOT="$ROOT/runs/experiments/molecule_disjoint_3seeds"
+        SOURCE_ROOT="$RUNS_ROOT/experiments/molecule_disjoint_3seeds"
         EXPECTED_TEST_COUNT=3931
     else
-        SOURCE_ROOT="$ROOT/runs/experiments/scaffold_disjoint_3seeds"
+        SOURCE_ROOT="$RUNS_ROOT/experiments/scaffold_disjoint_3seeds"
         EXPECTED_TEST_COUNT=3960
     fi
 

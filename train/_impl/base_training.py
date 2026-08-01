@@ -21,7 +21,8 @@ except ModuleNotFoundError:
     import pytorch_lightning as pl
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[2])).resolve()
+RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 GLOBAL_SEED = int(
     os.environ.get(
@@ -64,14 +65,14 @@ CONFIG_BUNDLE = ROOT / "config/train.yml"
 
 RUNTIME_CONFIG = materialize_training_config(
     CONFIG_BUNDLE,
-    ROOT / "runs/_config",
+    RUNS_ROOT / "_config",
 )
 
 TEMPLATE = RUNTIME_CONFIG["template"]
 V1_CUSTOM = RUNTIME_CONFIG["base_stage"]
 R119_CUSTOM = RUNTIME_CONFIG["continuation_stage"]
 
-OUTPUT_ROOT = ROOT / "runs/v2a_gine_cutchem_only"
+OUTPUT_ROOT = RUNS_ROOT / "v2a_gine_cutchem_only"
 
 STAGE1_DIR = OUTPUT_ROOT / "stage1_v1_40ep"
 STAGE2_DIR = OUTPUT_ROOT / "stage2_r119_10ep"

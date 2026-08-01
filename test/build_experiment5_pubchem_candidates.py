@@ -20,7 +20,7 @@ import pandas as pd
 from rdkit import RDLogger
 
 
-ROOT = Path.cwd().resolve()
+ROOT = Path(__file__).resolve().parents[1]
 
 TARGET_FP = (
     ROOT
@@ -53,11 +53,12 @@ OUT_DIR = (
 
 TARGET_OUT_DIR = OUT_DIR / "target_pools"
 
-CACHE_DIR = (
-    Path.home()
-    / "datasets"
-    / "pubchem_pugrest_10ppm_20260723"
-)
+CACHE_DIR = Path(
+    os.environ.get(
+        "FERA_MS_PUBCHEM_CACHE",
+        ROOT / "data/raw/pubchem_pugrest_10ppm",
+    )
+).resolve()
 
 MASS_CACHE_DIR = (
     CACHE_DIR

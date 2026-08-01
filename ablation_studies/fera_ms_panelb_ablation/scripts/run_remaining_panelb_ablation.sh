@@ -1,46 +1,17 @@
 #!/usr/bin/env bash
 
-ROOT="/home/lwh/projects/lrq2/fragnnet-main/ms2spectra_v1_r119"
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 ABLATION_ROOT="$ROOT/ablation_studies/fera_ms_panelb_ablation"
 
 cd "$ROOT" || exit 1
 
-source /home/lwh/anaconda3/etc/profile.d/conda.sh
-conda activate lrq_q || exit 1
-
 export PYTHONPATH="$ROOT/code/src:$ROOT/code:$ROOT"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONUNBUFFERED=1
-export CUDA_VISIBLE_DEVICES=0
-
-SEED42_SUMMARY="$ABLATION_ROOT/runs/without_mz_offset_expansion/seed_42/evaluation/test_summary.json"
-
-python - "$SEED42_SUMMARY" <<'PY'
-import json
-import math
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-
-if not path.is_file():
-    raise FileNotFoundError(path)
-
-data = json.loads(
-    path.read_text(encoding="utf-8")
-)
-
-assert data["test_spectrum_count"] == 3931
-assert math.isfinite(float(data["micro_cbin"]))
-assert math.isfinite(float(data["micro_jss"]))
-
-print("SEED42_LOCKED_TEST_GATE_PASS")
-PY
-
-if [ "$?" -ne 0 ]; then
-    echo "Seed42 test gate failed."
-    exit 1
-fi
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 
 run_case () {
     VARIANT="$1"
@@ -89,12 +60,11 @@ run_case () {
       "$ABLATION_ROOT/runs/$VARIANT/seed_$SEED/evaluation/test_summary.json"
 }
 
-run_case without_mz_offset_expansion 43
-run_case without_mz_offset_expansion 44
-
-run_case without_rendered_peak_gate 42
-run_case without_rendered_peak_gate 43
-run_case without_rendered_peak_gate 44
+for VARIANT in without_mz_offset_expansion without_rendered_peak_gate; do
+    for SEED in 42 43 44; do
+        run_case "$VARIANT" "$SEED"
+    done
+done
 
 python - <<'PY'
 from pathlib import Path

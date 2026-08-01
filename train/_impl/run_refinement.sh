@@ -3,14 +3,15 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-OUT="$ROOT/runs/v2e_full_063"
+ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
+OUT="$RUNS_ROOT/v2e_full_063"
 DIAG="$ROOT/train/_impl/refinement_steps"
-TEMPLATE="$ROOT/runs/_config/template.yml"
+TEMPLATE="$RUNS_ROOT/_config/template.yml"
 
-BASE_CONFIG="$ROOT/runs/v2c_ce_trajectory_ablation/control/config.yml"
+BASE_CONFIG="$RUNS_ROOT/v2c_ce_trajectory_ablation/control/config.yml"
 
-BASE_CHECKPOINT="$ROOT/runs/v2c_ce_trajectory_ablation/control/model_best.ckpt"
+BASE_CHECKPOINT="$RUNS_ROOT/v2c_ce_trajectory_ablation/control/model_best.ckpt"
 
 V2C_REFERENCE="0.5970845222"
 V2E_REFERENCE="0.6055593451708329"
@@ -27,6 +28,8 @@ cd "$ROOT" || {
 }
 
 export PYTHONPATH="$ROOT/code/src:$ROOT/code:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export FERA_MS_ROOT="$ROOT"
+export FERA_MS_RUNS_DIR="$RUNS_ROOT"
 
 if [ "$FRESH" -eq 1 ] && [ -d "$OUT" ]; then
     BACKUP="${OUT}.bak_$(date +%Y%m%d_%H%M%S)"
@@ -95,6 +98,7 @@ fi
 python - "$ROOT/config/train.yml" \
     > "$OUT/mainline_hparams.env" \
     2> "$OUT/mainline_hparams.log" <<'PY_HPARAMS'
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -206,10 +210,7 @@ from ms2spectra.training import FragGNNPL
 import importlib.util
 
 
-root = Path(
-    "/home/lwh/projects/lrq2/"
-    "fragnnet-main/ms2spectra_v1_r119"
-)
+root = Path(os.environ["FERA_MS_ROOT"])
 
 script = (
     root

@@ -1,24 +1,34 @@
-# Python缓存
+# Python/build artifacts
 __pycache__/
 *.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
 .pytest_cache/
 .ipynb_checkpoints/
-.cache/
 
-# 编辑器和系统文件
-.vscode/
+# Local environments and editors
+.venv/
+venv/
+.env
 .idea/
+.vscode/
 .DS_Store
-Thumbs.db
 
-# 实验平台缓存
+# Training and experiment outputs
 wandb/
+lightning_logs/
+cysignals_crash_logs/
+runs/
+results*/
+figure/
+figures/
+**/logs/
+**/results/
+**/runs/
 
-# 本地处理数据和fragment DAG
-data/proc/
-data/frag/
-runs/transfer
-# 模型权重和大型二进制文件
+# Models, arrays, caches, and logs
 *.ckpt
 *.pt
 *.pth
@@ -33,37 +43,33 @@ runs/transfer
 *.h5
 *.hdf5
 *.log
-*.txt
-*.csv
-*.json
-*.png
-*.gz
-*.bz2
-*.txt
-*.log
-*.svg
 *.pid
-*.pdf
 
-# 重复checkpoint目录
-runs/**/checkpoints/
+# Licensed/raw/processed data
+data/raw/
+data/df/
+data/proc/
+data/frag/
+data/split/
+baseline_rebuild/baseline/shared/
+baseline_rebuild/baseline/results_local/
 
-# 临时工作区和软链接副本
-runs/**/workspace/
-
-# 临时原始日志
-*.raw.log
-
-# 备份文件和目录
+# Temporary and backup files
 *.bak
 *.bak_*
+*.backup
 *.before_*
-*bak_before*
-*bak_after*
+*~
+*.tmp
 
-# 压缩包
-*.zip
-*.7z
-*.tar
-*.tar.gz
-*.tgz
+# Documentation and small reproducibility manifests remain trackable.
+!README.md
+!docs/*.md
+!data/README.md
+!requirements.txt
+!environment.yml
+!config/**/*.yml
+!config/**/*.yaml
+!ablation_studies/**/configs/**/*.yml
+!ablation_studies/**/config/**/*.yml
+!baseline_rebuild/baseline/**/configs/*.yml

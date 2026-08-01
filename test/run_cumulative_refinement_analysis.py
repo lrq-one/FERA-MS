@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import os
 import pickle
 import random
 import warnings
@@ -26,7 +27,7 @@ from train._impl.refinement_steps import (
 )
 
 
-ROOT = Path.cwd()
+ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 
 TEMPLATE_PATH = (
     ROOT

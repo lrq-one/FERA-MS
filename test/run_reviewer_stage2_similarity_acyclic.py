@@ -11,7 +11,7 @@ from rdkit.Chem import rdFingerprintGenerator
 from rdkit.Chem import rdMolDescriptors
 
 
-ROOT = Path.cwd()
+ROOT = Path(__file__).resolve().parents[1]
 
 SPEC_PATH = (
     ROOT
