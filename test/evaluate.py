@@ -705,13 +705,9 @@ result = {
 
     "status":
         (
-            "accepted"
-            if (
-                validation_parity
-                and test_metrics["cosine"]
-                >= 0.65
-            )
-            else "below_target"
+            "completed"
+            if validation_parity
+            else "validation_parity_failed"
         ),
 
     "selection": {

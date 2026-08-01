@@ -18,6 +18,11 @@ from ms2spectra.training import FragGNNPL
 def module(path, name):
     spec=importlib.util.spec_from_file_location(name, path); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
 
+def verify_artifact_schema(pack, expected_sha, label):
+    artifact_sha=pack.get('feature_schema_sha256')
+    if artifact_sha not in (None, expected_sha):
+        raise RuntimeError(f'{label} schema SHA mismatch: {artifact_sha} != {expected_sha}')
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--seed',type=int,required=True); ap.add_argument('--run-root',type=Path,required=True)
@@ -52,14 +57,19 @@ def main():
         detail=pd.DataFrame(rows); table=spectrum_allocator.summarize_rows(rows)[0]
     else:
         with (a.run_root/'candidate_reranking/candidate_reranker_regressor.pkl').open('rb') as f: candidate_rerankerpack=pickle.load(f)
+        reranker_extra=candidate_reranker.validate_extra_schema(candidate_rerankerpack.get('extra_schema',[]))
+        expected_schema_sha=candidate_reranker.feature_schema_payload(reranker_extra)['schema_sha256']
+        verify_artifact_schema(candidate_rerankerpack,expected_schema_sha,'Reranker')
         if a.stage == 'candidate_reranking':
-            args=SimpleNamespace(max_eval_batches=int(a.limit_batches), max_extra_dims=32, local_bin_res=.01, eval_bin_res=.01, score_clip=6.0)
+            args=SimpleNamespace(max_eval_batches=int(a.limit_batches), max_extra_dims=candidate_reranker.INTERNAL_DIM, local_bin_res=.01, eval_bin_res=.01, score_clip=6.0)
             alpha=float(pd.read_csv(a.run_root/'candidate_reranking/candidate_reranker_alpha_val.csv').sort_values('val_cos',ascending=False).iloc[0]['alpha'])
-            table,detail=candidate_reranker.eval_split(base,candidate_rerankerpack['model'],candidate_rerankerpack.get('extra_schema',[]),dl,device,args,a.split,alpha,return_detail=True)
+            table,detail=candidate_reranker.eval_split(base,candidate_rerankerpack['model'],reranker_extra,dl,device,args,a.split,alpha,return_detail=True)
         else:
             allocpack=torch.load(a.run_root/'spectrum_allocation/spectrum_allocator.pt',map_location=device,weights_only=False)
-            args=SimpleNamespace(**dict(allocpack['args'])); args.max_eval_batches=int(a.limit_batches)
-            extra=allocpack.get('extra_schema',candidate_rerankerpack.get('extra_schema',[]))
+            args=SimpleNamespace(**dict(allocpack['args'])); args.max_eval_batches=int(a.limit_batches); args.max_extra_dims=candidate_reranker.INTERNAL_DIM
+            extra=candidate_reranker.validate_extra_schema(allocpack.get('extra_schema',reranker_extra))
+            allocator_schema_sha=candidate_reranker.feature_schema_payload(extra)['schema_sha256']
+            verify_artifact_schema(allocpack,allocator_schema_sha,'Allocator')
             allocator=spectrum_allocator.ResidualAllocator(int(allocpack['input_dim']),int(args.hidden),int(args.layers),float(args.dropout),float(args.score_clip)).to(device)
             allocator.load_state_dict(allocpack['model'],strict=True); allocator.eval()
             table, detail=spectrum_allocator.eval_split(base,allocator,candidate_rerankerpack['model'],extra,dl,device,candidate_reranker,args,a.split)

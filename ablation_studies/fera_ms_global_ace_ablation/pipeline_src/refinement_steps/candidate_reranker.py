@@ -620,7 +620,7 @@ def attach_raw_rich_features(base, batch, results, max_extra_dims=96, bin_res=0.
 
     return results
 
-def infer_extra_schema(results, max_extra_dims=32):
+def infer_extra_schema(results, max_extra_dims=INTERNAL_DIM):
     if int(max_extra_dims) < INTERNAL_DIM:
         raise RuntimeError(
             f"max_extra_dims={max_extra_dims} cannot hold the locked {INTERNAL_DIM}D internal schema"
@@ -1153,7 +1153,6 @@ def main():
     ap.add_argument("--max_extra_dims", type=int, default=64)
     ap.add_argument("--alpha_grid", type=str, default="0,0.1,0.2,0.3,0.4,0.5,0.6,0.75,0.9,1.0,1.25,1.5")
     ap.add_argument("--load_regressor", default=None)
-    ap.add_argument("--eval_test", action="store_true")
 
     args = ap.parse_args()
 
@@ -1170,7 +1169,6 @@ def main():
     train_ds, val_ds = init_dataset(cfg, splits=("train", "val"))
     train_dl = init_dataloader(train_ds, cfg)
     val_dl = init_dataloader(val_ds, cfg)
-    test_dl = None
 
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -1280,12 +1278,6 @@ def main():
     best_val.to_csv(out_dir / "candidate_reranker_best_val.csv", index=False)
     print("\n===== candidate reranker BEST VAL =====")
     print(best_val.to_string(index=False))
-
-    if args.eval_test:
-        best_test = eval_split(base, regressor, extra_schema, test_dl, device, args, split="test", alpha=best_alpha)
-        best_test.to_csv(out_dir / "candidate_reranker_best_test.csv", index=False)
-        print("\n===== candidate reranker BEST TEST =====")
-        print(best_test.to_string(index=False))
 
     print("wrote", out_dir)
 

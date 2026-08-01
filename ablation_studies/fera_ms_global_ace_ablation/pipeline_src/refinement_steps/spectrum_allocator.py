@@ -467,7 +467,6 @@ def main():
     ap.add_argument("--max_extra_dims", type=int, default=64)
     ap.add_argument("--max_train_batches", type=int, default=0)
     ap.add_argument("--max_eval_batches", type=int, default=0)
-    ap.add_argument("--eval_test", action="store_true")
 
     ap.add_argument(
         "--resume_allocator_path",
@@ -514,7 +513,6 @@ def main():
     train_ds, val_ds = init_dataset(cfg, splits=("train", "val"))
     train_dl = init_dataloader(train_ds, cfg)
     val_dl = init_dataloader(val_ds, cfg)
-    test_dl = None
 
     device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -844,24 +842,6 @@ def main():
 
     print("\n===== spectrum allocator BEST VAL =====")
     print(best_val.to_string(index=False))
-
-    if args.eval_test:
-        best_test, best_test_detail = eval_split(
-            base,
-            allocator,
-            regressor,
-            extra_schema,
-            test_dl,
-            device,
-            candidate_reranker,
-            args,
-            split="test",
-        )
-        best_test.to_csv(out_dir / "spectrum_allocator_best_test.csv", index=False)
-        best_test_detail.to_csv(out_dir / "spectrum_allocator_best_test_detail.csv", index=False)
-
-        print("\n===== spectrum allocator BEST TEST =====")
-        print(best_test.to_string(index=False))
 
     print("wrote", out_dir)
 
