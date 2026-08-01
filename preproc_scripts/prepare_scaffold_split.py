@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE_SPLIT = (
     ROOT
     / "data/split/"
-    "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
+    "nist20_qtof_cid_safe19659_qcv1_trainonly"
 )
 
 OUTPUT_SPLIT = (
@@ -59,38 +59,23 @@ def clean_scaffold(value):
 
 
 def load_pool():
-    frames = []
-
-    for split in (
-        "train",
-        "val",
-        "test",
-    ):
-        path = (
-            SOURCE_SPLIT
-            / f"{split}_ids.csv"
+    cohort_path = SOURCE_SPLIT / "cohort_ids.csv"
+    if not cohort_path.is_file():
+        raise FileNotFoundError(
+            f"Fixed cohort manifest is required before scaffold splitting: {cohort_path}"
         )
-
-        frames.append(
-            pd.read_csv(path)[
-                [
-                    "spec_id",
-                    "mol_id",
-                    "group_id",
-                ]
-            ]
-        )
-
-    pool = pd.concat(
-        frames,
-        ignore_index=True,
-    )
+    pool = pd.read_csv(cohort_path)[["spec_id", "mol_id", "group_id"]]
 
     if pool["spec_id"].duplicated().any():
         raise RuntimeError(
             "源split存在重复spec_id"
         )
 
+    if len(pool) != 19659 or pool["mol_id"].nunique() != 2274:
+        raise RuntimeError(
+            "Fixed cohort must contain 19,659 spectra and 2,274 molecules; "
+            f"found {len(pool)} spectra and {pool['mol_id'].nunique()} molecules"
+        )
     return pool
 
 

@@ -31,7 +31,7 @@ SPLITS = {
     "random": (
         ROOT
         / "data/split/"
-          "nist20_qtof_cid_safe19659_qcbase_model_trainonly/test_ids.csv"
+          "nist20_qtof_cid_safe19659_qcv1_trainonly/test_ids.csv"
     ),
     "scaffold": (
         ROOT

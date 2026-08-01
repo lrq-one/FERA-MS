@@ -11,7 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-import pandas as pd
 import torch
 
 
@@ -343,59 +342,6 @@ def main() -> None:
         "architecture":
             architecture,
     }
-
-    reference_path = (
-        ROOT
-        / "runs"
-        / "experiments"
-        / "cumulative_refinement_analysis"
-        / "random"
-        / f"seed_{seed}"
-        / "structured_fragment_dag_backbone"
-        / "test_metrics.csv"
-    )
-
-    if reference_path.is_file():
-        reference_table = pd.read_csv(
-            reference_path
-        )
-
-        reference_global = reference_table[
-            reference_table[
-                "ce_bucket"
-            ].astype(str)
-            == "global"
-        ]
-
-        if len(reference_global) == 1:
-            reference_row = (
-                reference_global.iloc[0]
-            )
-
-            reference_cbin = float(
-                reference_row["cos"]
-            )
-            reference_jss = float(
-                reference_row["jss"]
-            )
-
-            summary.update(
-                {
-                    "full_backbone_micro_cbin":
-                        reference_cbin,
-
-                    "full_backbone_micro_jss":
-                        reference_jss,
-
-                    "delta_cbin_vs_full":
-                        cosine
-                        - reference_cbin,
-
-                    "delta_jss_vs_full":
-                        jss
-                        - reference_jss,
-                }
-            )
 
     summary_path = (
         output_dir

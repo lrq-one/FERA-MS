@@ -8,7 +8,7 @@ PROJECT="${FERA_MS_ROOT:-$(cd "$BASELINE/../.." && pwd)}"
 REPO="${FERA_MS_BASELINE_SOURCE:-$BASELINE/source/fragnnet}"
 
 RUNS_ROOT="${FERA_MS_RUNS_DIR:-$PROJECT/runs}"
-ROOT="$RUNS_ROOT/experiments/molecular_retrieval/pubchem_legacy_full"
+ROOT="$RUNS_ROOT/experiments/molecular_retrieval/pubchem_fixed50"
 RETRIEVAL_ROOT="$ROOT/baseline_molecular_retrieval"
 FROZEN="$RETRIEVAL_ROOT/_frozen_inputs"
 

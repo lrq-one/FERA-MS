@@ -26,7 +26,7 @@ pip install -e .
 python scripts/check_release.py
 ```
 
-The editable install compiles `ms2spectra.frag.compute_frags` from its tracked Cython source; platform-specific `.so` files are intentionally excluded. Baseline extensions are built only from the independent packages under `baseline_rebuild/baseline/source/`.
+The root editable install compiles only `ms2spectra.frag.compute_frags` from its tracked Cython source; platform-specific `.so` files are intentionally excluded. The independent FraGNNet baseline package has its own `setup.py`, which compiles both `fragnnet.frag.compute_frags` and `fragnnet.massformer.algos` from the sources under `baseline_rebuild/baseline/source/fragnnet/`.
 
 ## Data availability and layout
 
@@ -54,11 +54,12 @@ python preproc_scripts/prepare_dataframes.py --msp_file nist_20/hr_nist_msms.MSP
 python preproc_scripts/prepare_processed_data.py --df_dp data/df --dsets nist20_hr --proc_dp data/proc/nist20
 python preproc_scripts/prepare_dag_features.py --max_depth 3 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --proc_dp data/proc/nist20_qtof_cid_safe19659 --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --wandb_mode disabled
 python preproc_scripts/prepare_split.py --split_type random --split_key inchikey_s --primary_dsets nist20_hr --prec_types "[M+H]+" --inst_types QTOF --frag_modes CID --ion_modes P --ces ace --proc_dp data/proc/nist20_qtof_cid_safe19659 --frag_dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1 --split_dp data/split/nist20_qtof_cid_safe19659_random_base
-python preproc_scripts/final/make_random_split.py --base_split_dp data/split/nist20_qtof_cid_safe19659_random_base --qc_csv /path/to/licensed_local_train_qc.csv --out_split_dp data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
+python preproc_scripts/final/generate_cohort_qc.py --spec-fp data/proc/nist20_qtof_cid_safe19659/spec_df.pkl --frag-dp data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags --eligible-split data/split/nist20_qtof_cid_safe19659_random_base --out data/proc/nist20_qtof_cid_safe19659/cohort_qc.csv
+python preproc_scripts/final/make_random_split.py --base_split_dp data/split/nist20_qtof_cid_safe19659_random_base --qc_csv data/proc/nist20_qtof_cid_safe19659/cohort_qc.csv --mol_df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --out_split_dp data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --target_count 19659 --target_molecules 2274 --seed 42
 python preproc_scripts/prepare_scaffold_split.py --source-split data/split/nist20_qtof_cid_safe19659_qcv1_trainonly --mol-df data/proc/nist20_qtof_cid_safe19659/mol_df.pkl --output-split data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42 --seed 42
 ```
 
-The QC script only filters the random training partition; validation and test IDs remain unchanged. The exact cohort and QC inputs must come from the same licensed export. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
+QC metrics are generated locally from the licensed spectra and tracked depth-3 candidate DAGs. The cohort-wide QC rule first fixes exactly 19,659 spectra from 2,274 molecular connectivity groups; only then are the molecule-disjoint random and scaffold-disjoint partitions generated from the same `cohort_ids.csv`. The historical `qcv1_trainonly` directory name is retained solely as the locked artifact identifier. No test spectrum is used for fitting, early stopping, hyperparameter selection, or ablation selection.
 
 ## Training
 
@@ -74,7 +75,7 @@ python train/train.py refinement
 python train/train.py evaluation
 ```
 
-`python train/train.py all` runs the same five-stage sequence. Inputs come from `config/train.yml`; runtime configurations and checkpoints are created under `$FERA_MS_RUNS_DIR`. The repository does not ship checkpoints.
+`python train/train.py all` runs the same four top-level phases: base → control → refinement → evaluation. Inputs come from `config/train.yml`; runtime configurations and checkpoints are created under `$FERA_MS_RUNS_DIR`. The repository does not ship checkpoints.
 
 Three paired seeds for the molecule-disjoint and scaffold-disjoint protocols:
 
@@ -91,13 +92,13 @@ The mainline command is `python train/train.py evaluation`. With a completed see
 
 ```bash
 python test/evaluate_chun.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42
+python test/evaluate_ace_perturbation.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42 --ace-mode median
 python test/evaluate_ace_perturbation.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42 --ace-mode shuffled
 python test/evaluate_metric_robustness.py --seed-dir runs/experiments/molecule_disjoint_three_seeds/seed_42 --seed 42
 python test/run_candidate_space_coverage.py
-python test/run_cumulative_refinement_analysis.py
 ```
 
-Each evaluator reads model artifacts from the supplied seed directory and writes under that directory or `runs/experiments/`; it does not train or select a checkpoint on the test set.
+Each evaluator reads model artifacts from the supplied seed directory and writes under that directory or `runs/experiments/`; it does not train or select a checkpoint on the test set. Median-ACE replacement computes the median from the training loader unless a locked training value is explicitly supplied with `--ace-median`; it never falls back to the test distribution.
 
 For molecular identification, first build the licensed/local PubChem candidate pools with `test/build_retrieval_candidates.py`, then run:
 
@@ -105,7 +106,9 @@ For molecular identification, first build the licensed/local PubChem candidate p
 python test/run_molecular_retrieval.py --splits random scaffold --seeds 42 43 44
 ```
 
-Set `FERA_MS_RETRIEVAL_ROOT` if the candidate pools are outside the default run directory. Candidate caches and retrieval outputs are intentionally not versioned.
+The builder derives target membership directly from the two tracked split contracts and uses the repository-local `test/retrieval/candidate_pool.py` implementation for structure validation, connectivity deduplication, true-target injection, and Morgan ranking. It has no dependency on a sibling or historical checkout. Set `FERA_MS_RETRIEVAL_ROOT` if the candidate pools are outside the default run directory. Candidate caches and retrieval outputs are intentionally not versioned.
+
+Statistical inference follows the manuscript protocol. Spectrum-prediction metrics are averaged across the three seeds before 20,000 molecule-clustered bootstrap replicates, with one Holm correction over the required 32 comparisons. Retrieval uses 20,000 paired molecule bootstrap replicates and one independent Holm correction over the required 48 comparisons (3 baselines x 2 splits x 4 metrics x 2 aggregations). Both analysis scripts reject incomplete comparison families instead of silently correcting a smaller set.
 
 ## Ablations
 
@@ -118,11 +121,12 @@ bash ablation_studies/fera_ms_global_ace_ablation/run_all_seeds.sh
 
 The first command is a non-training wiring check. The second performs the formal seeds 42/43/44 run.
 
-The two rendering-component controls and the candidate-reranker control are:
+The two rendering-component controls, candidate-reranker control, and spectrum-allocator control are:
 
 ```bash
 bash ablation_studies/fera_ms_panelb_ablation/scripts/run_remaining_panelb_ablation.sh
 bash ablation_studies/fera_ms_core_ablation/scripts/run_no_candidate_reranker.sh
+bash ablation_studies/fera_ms_core_ablation/scripts/run_no_spectrum_allocator.sh
 ```
 
 These scripts preserve the locked split, seed, upstream checkpoints, losses, and evaluation metrics; only their documented ablation switch is changed.

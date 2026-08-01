@@ -72,7 +72,7 @@ No baseline-related deletion remains unclassified.
 | `runs/**/_frozen_inputs/models/{neims,massformer,fragnnet_d3}/scaffold/seed_*/config.yml` | `REQUIRED_CONFIG` | Restored as canonical `configs/scaffold/seed_*.yml` |
 | Local formal ICEBERG and GrAFF random/scaffold configs | `REQUIRED_CONFIG` | Canonical copies added under their model directories |
 | Local formal `fragnnet` and FIORA runtime snapshots, previously outside Git | `REQUIRED_SOURCE` and `REQUIRED_PROVENANCE` | Filtered source-only canonical copies restored under `baseline_rebuild/baseline/source/`; data/results/binaries omitted; original licenses retained |
-| `runs/.../legacy_filter_candidates_source.py` | `DUPLICATE` | Not restored: the complete executable implementation is retained at `source/fragnnet/preproc_scripts/pubchem_ms2c/02_prepare_ms2c_candidates.py` |
+| Molecular-retrieval candidate filtering | `REIMPLEMENTED_LOCALLY` | The release entrypoint uses `test/retrieval/candidate_pool.py`; the independent baseline snapshot retains its own upstream implementation under `source/fragnnet/`. |
 | `code/src/ms2spectra/frag/compute_frags.c`, compiled `.so`, `massformer/algos.c`, compiled `.so` | `GENERATED_OUTPUT` | Not restored; tracked `.pyx` sources build these locally |
 | supervisor locks, success/readiness marker files and `.interrupted_before_resume` | `GENERATED_OUTPUT` | Not restored |
 | `train/experiments/**/code_backup/**` | `DUPLICATE` / `OBSOLETE` | Not restored; these were historical FERA-MS mainline backups, not baseline source; canonical training/evaluation files remain under `train/_impl/` and `test/` |

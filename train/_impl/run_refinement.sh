@@ -13,9 +13,6 @@ BASE_CONFIG="$RUNS_ROOT/global_ace_control_ce_trajectory_ablation/control/config
 
 BASE_CHECKPOINT="$RUNS_ROOT/global_ace_control_ce_trajectory_ablation/control/model_best.ckpt"
 
-GLOBAL_ACE_CONTROL_REFERENCE="0.5970845222"
-FULL_MODEL_REFERENCE="0.6055593451708329"
-
 FRESH=0
 
 if [ "${1:-}" = "--fresh" ]; then
@@ -185,10 +182,8 @@ metric() {
 
 echo
 echo "================================================================================================"
-echo "full model-FULL-063 PIPELINE"
+echo "FERA-MS REFINEMENT PIPELINE"
 echo "================================================================================================"
-echo "global ACE control reference : $GLOBAL_ACE_CONTROL_REFERENCE"
-echo "full model reference : $FULL_MODEL_REFERENCE"
 echo "test used      : False"
 echo "output         : $OUT"
 echo "================================================================================================"
@@ -196,6 +191,7 @@ echo "==========================================================================
 python - <<'PY' \
     2>&1 \
     | tee "$OUT/preflight/preflight.log"
+import os
 from pathlib import Path
 
 import torch

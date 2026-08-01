@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RETRIEVAL_ROOT = (
     ROOT
     / "runs/experiments/molecular_retrieval/"
-      "pubchem_legacy_full"
+      "pubchem_fixed50"
 )
 
 OUT_DIR = (
@@ -659,6 +659,14 @@ def main():
     comparisons = pd.DataFrame(
         comparison_rows
     )
+
+    if len(comparisons) != 48:
+        raise RuntimeError(
+            "Expected exactly 48 retrieval comparisons "
+            "(3 baselines x 2 splits x 4 metrics x "
+            "2 aggregations), got "
+            f"{len(comparisons)}."
+        )
 
     comparisons[
         "p_value_holm"

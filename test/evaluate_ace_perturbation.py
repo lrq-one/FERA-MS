@@ -741,15 +741,11 @@ def _prepare_ace_plan(
     true_ace = torch.cat(chunks)
 
     if ACE_MODE == "median":
-        median_value = (
-            float(ACE_MEDIAN)
-            if ACE_MEDIAN is not None
-            else float(
-                torch.median(
-                    true_ace
-                )
+        if ACE_MEDIAN is None:
+            raise RuntimeError(
+                "Median ACE must be computed from the training split before test evaluation"
             )
-        )
+        median_value = float(ACE_MEDIAN)
 
         print(
             "[ACE perturbation] "
@@ -780,6 +776,13 @@ def _prepare_ace_plan(
         return true_ace[permutation]
 
     return true_ace
+
+
+def _compute_training_ace_median(loader: object) -> float:
+    chunks = [_extract_primary_ace(batch) for batch in loader]
+    if not chunks:
+        raise RuntimeError("Training DataLoader is empty; cannot compute ACE median")
+    return float(torch.median(torch.cat(chunks)))
 
 
 def _assign_ace_slot(
@@ -1244,12 +1247,20 @@ def main() -> None:
         .force_final_peak_distillation_arch(config)
     )
 
-    validation_dataset, test_dataset = (
-        init_dataset(
+    needs_training_median = ACE_MODE == "median" and ACE_MEDIAN is None
+    if needs_training_median:
+        training_dataset, validation_dataset, test_dataset = init_dataset(
+            config,
+            splits=("train", "val", "test"),
+        )
+        training_loader = init_dataloader(training_dataset, config)
+        ACE_MEDIAN = _compute_training_ace_median(training_loader)
+        print(f"[ACE perturbation] training-split median ACE: {ACE_MEDIAN}")
+    else:
+        validation_dataset, test_dataset = init_dataset(
             config,
             splits=("val", "test"),
         )
-    )
 
     validation_loader = init_dataloader(
         validation_dataset,

@@ -4,9 +4,10 @@
 |---|---|---|---|---|---|
 | MSP/MOL parsing | `preproc_scripts/prepare_dataframes.py` | CLI | licensed NIST20 MSP/MOL | `data/df/` | no training |
 | Standardization | `preproc_scripts/prepare_processed_data.py` | CLI | parsed table | processed spectrum/molecule/annotation pickles | no training |
-| Cohort and random split | `preproc_scripts/prepare_split.py`, `preproc_scripts/final/make_random_split.py` | CLI | processed tables, DAG eligibility, train QC | molecule-disjoint IDs | QC affects training only; validation/test are fixed |
-| Scaffold split | `preproc_scripts/prepare_scaffold_split.py` | CLI, seed 42 | fixed cohort plus molecular scaffolds | 60/20/20 scaffold-disjoint IDs | no model fitting |
 | Fragment candidates | `preproc_scripts/prepare_dag_features.py` | CLI, depth 3 | processed molecules/spectra | compressed DAG cache | no model fitting |
+| Cohort QC | `preproc_scripts/final/generate_cohort_qc.py`, `preproc_scripts/final/make_random_split.py` | CLI | processed spectra, DAG candidates, broad eligible pool | fixed 19,659-spectrum/2,274-molecule `cohort_ids.csv` | cohort-wide; performed before either formal split |
+| Random split | `preproc_scripts/final/make_random_split.py` | CLI, seed 42 | fixed cohort plus connectivity keys | molecule-disjoint random IDs | no model fitting |
+| Scaffold split | `preproc_scripts/prepare_scaffold_split.py` | CLI, seed 42 | the same `cohort_ids.csv` plus molecular scaffolds | 60/20/20 scaffold-disjoint IDs | no model fitting |
 | Backbone | `python train/train.py base` | `config/train.yml` → `runs/_config/` | processed data, split, DAGs | GINE/cut-chemistry checkpoint | validation selects checkpoint; test is evaluated only after selection |
 | Retained control | `python train/train.py control` | generated control config | frozen/selected base stage | control continuation checkpoint | initialized from base; validation only for selection |
 | CE/formula/H refinement | `python train/train.py refinement` | locked refinement settings in `config/train.yml` | control checkpoint | formula-to-peak refinement checkpoints | upstream initialization retained; validation selects each stage |

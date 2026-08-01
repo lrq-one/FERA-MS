@@ -96,7 +96,7 @@ do
 done
 
 echo "============================================================"
-echo "A5: WITHOUT CHEMICAL CANDIDATE RERANKING"
+echo "NO_CANDIDATE_RERANKER"
 echo "============================================================"
 echo "LightGBM alpha : 0.0"
 echo "Allocator      : retrained from random initialization"
@@ -122,7 +122,7 @@ do
         SOURCE="$SOURCE_ROOT/seed_${SEED}/full_fera_ms"
 
         CONFIG="$SOURCE_ROOT/seed_${SEED}/global_ace_control_ce_trajectory_ablation/control/config.yml"
-        final peak distillation="$SOURCE/final_peak_distillation/final_peak_distillation_best_state.pt"
+        FINAL_PEAK_DISTILLATION="$SOURCE/final_peak_distillation/final_peak_distillation_best_state.pt"
         REGRESSOR="$SOURCE/candidate_reranking/candidate_reranker_regressor.pkl"
 
         OUT="$RUN_ROOT/$SPLIT/seed_${SEED}"
@@ -135,7 +135,7 @@ do
         echo "START split=$SPLIT seed=$SEED"
         echo "============================================================"
         echo "config     : $CONFIG"
-        echo "final peak distillation       : $final peak distillation"
+        echo "final peak distillation       : $FINAL_PEAK_DISTILLATION"
         echo "feature pack: $REGRESSOR"
         echo "output     : $OUT"
         echo "============================================================"
@@ -146,8 +146,8 @@ do
             continue
         fi
 
-        if [ ! -s "$final peak distillation" ]; then
-            echo "MISSING_FINAL_PEAK_DISTILLATION=$final peak distillation"
+        if [ ! -s "$FINAL_PEAK_DISTILLATION" ]; then
+            echo "MISSING_FINAL_PEAK_DISTILLATION=$FINAL_PEAK_DISTILLATION"
             FAILED=1
             continue
         fi
@@ -167,7 +167,7 @@ do
         python -u "$ALLOCATOR_SCRIPT" \
           --template "$TEMPLATE" \
           --config "$CONFIG" \
-          --ckpt_path "$final peak distillation" \
+          --ckpt_path "$FINAL_PEAK_DISTILLATION" \
           --regressor_path "$REGRESSOR" \
           --out_dir "$OUT" \
           --seed "$SEED" \
@@ -452,7 +452,7 @@ publication.to_csv(
 
 print()
 print("=" * 110)
-print("A5 COMPLETED RUN SUMMARY")
+print("NO_CANDIDATE_RERANKER COMPLETED RUN SUMMARY")
 print("=" * 110)
 print(
     publication.to_string(
@@ -487,7 +487,7 @@ fi
 
 echo
 echo "============================================================"
-echo "A5 FINAL STATUS"
+echo "NO_CANDIDATE_RERANKER FINAL STATUS"
 echo "============================================================"
 echo "FAILED=$FAILED"
 echo "RUN_ROOT=$RUN_ROOT"

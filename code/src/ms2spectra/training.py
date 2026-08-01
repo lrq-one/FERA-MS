@@ -139,7 +139,7 @@ class SpectrumPL(pl.LightningModule):
 			total = sum(p.numel() for p in self.model.parameters())
 
 			print(
-				f"[MYMODEL train_scope] scope={generic_scope}, "
+				f"[train_scope] scope={generic_scope}, "
 				f"trainable={trainable}, total={total}, "
 				f"trainable_frac={trainable / max(total, 1):.4f}"
 			)
@@ -147,10 +147,10 @@ class SpectrumPL(pl.LightningModule):
 			shown = 0
 			for name, p in self.model.named_parameters():
 				if p.requires_grad:
-					print(f"[MYMODEL trainable] {name} {tuple(p.shape)}")
+					print(f"[trainable] {name} {tuple(p.shape)}")
 					shown += 1
 					if shown >= 20:
-						print("[MYMODEL trainable] ...")
+						print("[trainable] ...")
 						break
 
 			return

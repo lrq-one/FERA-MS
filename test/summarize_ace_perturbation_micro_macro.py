@@ -30,7 +30,7 @@ SPLIT_ROOT = (
     ROOT
     / "data"
     / "split"
-    / "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
+    / "nist20_qtof_cid_safe19659_qcv1_trainonly"
 )
 
 OUTPUT_ROOT = (

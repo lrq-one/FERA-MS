@@ -23,13 +23,13 @@ REFERENCE_DIR = (
 TARGET_DIR = (
     ROOT
     / "runs/experiments/molecular_retrieval/"
-      "pubchem_legacy_full/candidate_d3_20260723/frag/dags"
+      "pubchem_fixed50/candidate_dags/frag/dags"
 )
 
 AUDIT_PATH = (
     ROOT
     / "runs/experiments/molecular_retrieval/"
-      "pubchem_legacy_full/candidate_d3_20260723/"
+      "pubchem_fixed50/candidate_dags/"
       "nl_reconstruction_audit.json"
 )
 

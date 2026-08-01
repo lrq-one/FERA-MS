@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import importlib.util
 import json
 import os
 import sqlite3
-import sys
 import time
 import traceback
 import urllib.error
@@ -19,14 +17,11 @@ import numpy as np
 import pandas as pd
 from rdkit import RDLogger
 
+from retrieval.candidate_pool import filter_candidates
+
 
 ROOT = Path(__file__).resolve().parents[1]
-
-TARGET_FP = (
-    ROOT
-    / "runs/experiments/molecular_retrieval_source_audit"
-    / "retrieval_target_coverage.csv"
-)
+FILTER_SOURCE = ROOT / "test/retrieval/candidate_pool.py"
 
 MOL_FP = (
     ROOT
@@ -34,21 +29,22 @@ MOL_FP = (
     / "mol_df.pkl"
 )
 
-LEGACY_FP = (
-    ROOT
-    / "../old/preproc_scripts/pubchem_ms2c"
-    / "02_prepare_ms2c_candidates.py"
-).resolve()
-
-OLD_SRC = (
-    ROOT
-    / "../old/src"
-).resolve()
-
 OUT_DIR = (
     ROOT
     / "runs/experiments/molecular_retrieval"
-    / "pubchem_legacy_full"
+    / "pubchem_fixed50"
+)
+
+TARGET_FP = OUT_DIR / "retrieval_target_coverage.csv"
+
+RANDOM_SPLIT_DIR = (
+    ROOT
+    / "data/split/nist20_qtof_cid_safe19659_qcv1_trainonly"
+)
+
+SCAFFOLD_SPLIT_DIR = (
+    ROOT
+    / "data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42"
 )
 
 TARGET_OUT_DIR = OUT_DIR / "target_pools"
@@ -94,9 +90,7 @@ for directory in [
     )
 
 for path in [
-    TARGET_FP,
     MOL_FP,
-    LEGACY_FP,
 ]:
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -197,49 +191,6 @@ def chunks(
         ]
 
 
-print("=" * 112)
-print("LOAD LEGACY FILTER")
-print("=" * 112)
-print("LEGACY SOURCE:", LEGACY_FP)
-
-sys.path.insert(
-    0,
-    str(OLD_SRC),
-)
-
-module_spec = (
-    importlib.util.spec_from_file_location(
-        "legacy_prepare_ms2c_candidates",
-        LEGACY_FP,
-    )
-)
-
-if (
-    module_spec is None
-    or module_spec.loader is None
-):
-    raise RuntimeError(
-        f"Cannot import {LEGACY_FP}"
-    )
-
-legacy = (
-    importlib.util.module_from_spec(
-        module_spec
-    )
-)
-
-module_spec.loader.exec_module(
-    legacy
-)
-
-if not hasattr(
-    legacy,
-    "filter_candidates",
-):
-    raise RuntimeError(
-        "filter_candidates was not found"
-    )
-
 RDLogger.DisableLog(
     "rdApp.*"
 )
@@ -250,13 +201,49 @@ print("=" * 112)
 print("LOAD CURRENT TARGETS")
 print("=" * 112)
 
-coverage = pd.read_csv(
-    TARGET_FP
-)
-
 mol_df = pd.read_pickle(
     MOL_FP
 ).copy()
+
+
+def build_target_coverage() -> pd.DataFrame:
+    rows = []
+    for split_name, split_dir in (
+        ("random_test", RANDOM_SPLIT_DIR),
+        ("scaffold_test", SCAFFOLD_SPLIT_DIR),
+    ):
+        ids_path = split_dir / "test_ids.csv"
+        if not ids_path.is_file():
+            raise FileNotFoundError(ids_path)
+        ids = pd.read_csv(ids_path)[["mol_id"]].drop_duplicates()
+        current = ids.merge(
+            mol_df[["mol_id", "inchikey_s", "exact_mw"]],
+            on="mol_id",
+            how="left",
+            validate="one_to_one",
+        )
+        current.insert(0, "split", split_name)
+        current = current.rename(
+            columns={
+                "mol_id": "target_mol_id",
+                "inchikey_s": "target_connectivity_key",
+                "exact_mw": "target_exact_mass",
+            }
+        )
+        rows.append(current)
+
+    result = pd.concat(rows, ignore_index=True)
+    if result[
+        ["target_connectivity_key", "target_exact_mass"]
+    ].isna().any().any():
+        raise RuntimeError("Some retrieval targets are missing molecular metadata")
+
+    TARGET_FP.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(TARGET_FP, index=False)
+    return result
+
+
+coverage = build_target_coverage()
 
 coverage["target_mol_id"] = (
     pd.to_numeric(
@@ -1450,7 +1437,7 @@ def validate_cached_pool(
             len(candidate_df)
             == int(
                 metadata[
-                    "legacy_filtered_count"
+                    "filtered_count"
                 ]
             )
             and int(
@@ -1539,7 +1526,7 @@ def build_target_pool(
             ),
             "raw_cid_count": 0,
             "complete_property_count": 0,
-            "legacy_filtered_count": 0,
+            "filtered_count": 0,
             "true_structure_count": 0,
             "true_structure_rank": None,
             "ready_50": 0,
@@ -1575,7 +1562,7 @@ def build_target_pool(
         returned_mol_id,
         returned_smiles,
         candidate_df,
-    ) = legacy.filter_candidates(
+    ) = filter_candidates(
         list(complete_rows),
         target_smiles,
         target_mol_id,
@@ -1747,7 +1734,7 @@ def build_target_pool(
         "complete_property_count": (
             complete_property_count
         ),
-        "legacy_filtered_count": int(
+        "filtered_count": int(
             len(candidate_df)
         ),
         "true_structure_count": (
@@ -1822,7 +1809,7 @@ manifest = {
     "created_at_utc": utc_now(),
     "protocol_name": (
         "PubChem current PUG REST "
-        "10ppm Morgan-base fragment model top50"
+        "10ppm Morgan-ranked fixed-50"
     ),
     "target_source": str(
         TARGET_FP
@@ -1840,12 +1827,12 @@ manifest = {
             MOL_FP
         )
     ),
-    "legacy_filter_source": str(
-        LEGACY_FP
+    "filter_source": str(
+        FILTER_SOURCE
     ),
-    "legacy_filter_sha256": (
+    "filter_source_sha256": (
         sha256_file(
-            LEGACY_FP
+            FILTER_SOURCE
         )
     ),
     "script_path": str(
@@ -1870,14 +1857,14 @@ manifest = {
     "fingerprint": "Morgan radius 2",
     "ranking": (
         "Tanimoto descending using "
-        "legacy filter_candidates"
+        "repository filter_candidates"
     ),
     "maximum_candidate_count": (
         MAX_CANDIDATES
     ),
     "maximum_includes_true_target": True,
     "target_injection": (
-        "legacy filter appends the "
+        "repository filter appends the "
         "target before filtering and "
         "connectivity deduplication"
     ),
@@ -1998,7 +1985,7 @@ for target_index, row in (
             "complete_property_count": (
                 None
             ),
-            "legacy_filtered_count": (
+            "filtered_count": (
                 None
             ),
             "true_structure_count": None,
@@ -2038,7 +2025,7 @@ for target_index, row in (
         "raw="
         f"{result.get('raw_cid_count')} "
         "filtered="
-        f"{result.get('legacy_filtered_count')} "
+        f"{result.get('filtered_count')} "
         "true_count="
         f"{result.get('true_structure_count')} "
         "ready_50="
@@ -2218,13 +2205,13 @@ if (
 ):
     print()
     print(
-        "PUBCHEM_LEGACY_FULL_"
+        "PUBCHEM_FIXED50_"
         "CANDIDATE_BUILD_COMPLETE"
     )
 else:
     print()
     print(
-        "PUBCHEM_LEGACY_FULL_"
+        "PUBCHEM_FIXED50_"
         "CANDIDATE_BUILD_INCOMPLETE"
     )
 

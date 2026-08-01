@@ -35,7 +35,7 @@ SPLIT = (
     "scaffold60_20_20_seed42"
 )
 
-OLD_ROOT = os.environ.get("FERA_MS_LEGACY_BASELINE_ROOT", str(BASE))
+OLD_ROOT = os.environ.get("FERA_MS_BASELINE_ROOT", str(BASE))
 
 JOBS = [
     {

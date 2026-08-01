@@ -74,8 +74,8 @@ RETAINED_CONTROL_CUSTOM = RUNTIME_CONFIG["continuation_stage"]
 
 OUTPUT_ROOT = RUNS_ROOT / "structural_backbone_gine_cutchem_only"
 
-INITIAL_TRAINING_DIR = OUTPUT_ROOT / "initial_training_base_model_40ep"
-CONTINUATION_DIR = OUTPUT_ROOT / "continuation_retained_control_10ep"
+INITIAL_TRAINING_DIR = OUTPUT_ROOT / "structural_backbone_initial"
+CONTINUATION_DIR = OUTPUT_ROOT / "retained_control_continuation"
 FINAL_DIR = OUTPUT_ROOT / "final"
 
 MONITOR = "val_cos_sim_0.01_epoch/mean"
@@ -746,7 +746,7 @@ def train_stage(
 
     if (
         resume_ckpt_path
-        and "initial_training_base_model_40ep"
+        and "structural_backbone_initial"
         not in checkpoint_dir
     ):
         resume_ckpt_path = None
@@ -928,7 +928,7 @@ def main() -> None:
 
     initial_training_score, initial_training_checkpoint = (
         train_stage(
-            name="INITIAL_TRAINING_STRUCTURAL_BACKBONE_GINE_40EP",
+            name="STRUCTURAL_BACKBONE_INITIAL",
             run_dir=INITIAL_TRAINING_DIR,
             config=initial_training_config,
             initialization_checkpoint=None,
@@ -939,7 +939,7 @@ def main() -> None:
 
     continuation_score, continuation_checkpoint = (
         train_stage(
-            name="CONTINUATION_STRUCTURAL_BACKBONE_RETAINED_CONTROL_10EP",
+            name="RETAINED_CONTROL_CONTINUATION",
             run_dir=CONTINUATION_DIR,
             config=continuation_config,
             initialization_checkpoint=(

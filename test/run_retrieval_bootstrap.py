@@ -9,7 +9,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 
-OLD_SCRIPT = (
+CORE_SCRIPT = (
     ROOT
     / "test/run_retrieval_bootstrap_core.py"
 )
@@ -22,15 +22,15 @@ OUT_DIR = (
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_old_module():
+def load_core_module():
     spec = importlib.util.spec_from_file_location(
         "retrieval_bootstrap_base",
-        OLD_SCRIPT,
+        CORE_SCRIPT,
     )
 
     if spec is None or spec.loader is None:
         raise RuntimeError(
-            f"Cannot import {OLD_SCRIPT}"
+            f"Cannot import {CORE_SCRIPT}"
         )
 
     module = importlib.util.module_from_spec(
@@ -101,7 +101,7 @@ def scalar_metric(
 
 
 def main():
-    base = load_old_module()
+    base = load_core_module()
 
     loaded = {}
 
@@ -437,6 +437,14 @@ def main():
     comparisons = pd.DataFrame(
         comparison_rows
     )
+
+    if len(comparisons) != 48:
+        raise RuntimeError(
+            "Expected exactly 48 retrieval comparisons "
+            "(3 baselines x 2 splits x 4 metrics x "
+            "2 aggregations), got "
+            f"{len(comparisons)}."
+        )
 
     comparisons[
         "p_value_holm"

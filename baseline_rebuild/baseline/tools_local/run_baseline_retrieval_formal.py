@@ -43,7 +43,7 @@ ROOT = (
     Path(os.environ.get("FERA_MS_RUNS_DIR", PROJECT / "runs"))
     / "experiments"
     / "molecular_retrieval"
-    / "pubchem_legacy_full"
+    / "pubchem_fixed50"
 )
 
 RETRIEVAL_ROOT = ROOT / "baseline_molecular_retrieval"
@@ -63,7 +63,7 @@ TEMPLATE = (
 
 CANDIDATE_PROC = (
     ROOT
-    / "candidate_d3_20260723"
+    / "candidate_dags"
     / "proc"
 )
 
@@ -79,7 +79,7 @@ CANDIDATE_SPEC = (
 
 FRAG_DP = (
     ROOT
-    / "candidate_d3_20260723"
+    / "candidate_dags"
     / "frag"
     / "dags"
 )
@@ -2108,7 +2108,7 @@ def load_split_plan(
     if "candidate_formula" not in plan.columns:
         candidate_master_path = (
             ROOT
-            / "inference_ready_pools_20260723"
+            / "inference_ready_pools"
             / (
                 "molecular_retrieval_inference_ready_"
                 "candidates.csv.gz"

@@ -16,3 +16,10 @@ experiments:
       retrain_allocator: true
       preserve_candidate_features: true
     training_scope: allocator_only
+  no_spectrum_allocator:
+    formal_name: Without spectrum-wise residual allocation
+    implementation:
+      preserve_final_peak_distillation_backbone: true
+      preserve_candidate_reranker: true
+      omit_spectrum_allocator: true
+    training_scope: none

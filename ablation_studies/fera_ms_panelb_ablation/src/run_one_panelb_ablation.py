@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import yaml
 
 
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[3])).resolve()
@@ -36,7 +35,7 @@ from train._impl import control_finetuning
 
 RANDOM_SPLIT = (
     "data/split/"
-    "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
+    "nist20_qtof_cid_safe19659_qcv1_trainonly"
 )
 
 VARIANTS: dict[str, dict[str, Any]] = {
@@ -503,11 +502,11 @@ def main() -> None:
     structural_backbone_root = run_root / "structural_backbone"
     initial_training_dir = (
         structural_backbone_root
-        / "initial_training_base_model_40ep"
+        / "structural_backbone_initial"
     )
     continuation_dir = (
         structural_backbone_root
-        / "continuation_retained_control_10ep"
+        / "retained_control_continuation"
     )
     final_dir = (
         structural_backbone_root

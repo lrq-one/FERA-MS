@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from rdkit import Chem
@@ -39,12 +38,12 @@ PROTOCOLS = {
         "train_ids":
             ROOT
             / "data/split/"
-              "nist20_qtof_cid_safe19659_qcbase_model_trainonly/"
+              "nist20_qtof_cid_safe19659_qcv1_trainonly/"
               "train_ids.csv",
         "test_ids":
             ROOT
             / "data/split/"
-              "nist20_qtof_cid_safe19659_qcbase_model_trainonly/"
+              "nist20_qtof_cid_safe19659_qcv1_trainonly/"
               "test_ids.csv",
     },
     "scaffold": {
@@ -119,9 +118,6 @@ def choose_score_file(
 
         if "final" in text:
             value += 5
-
-        if "/old/" in text:
-            value -= 100
 
         return (
             value,

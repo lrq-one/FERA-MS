@@ -28,10 +28,10 @@ import torch
 
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
 RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
-BASE = Path(os.environ.get("FERA_MS_RETRIEVAL_ROOT", RUNS_ROOT / "experiments/molecular_retrieval/pubchem_legacy_full")).resolve()
-POOL_DIR = BASE / "inference_ready_pools_20260723"
-FROZEN_DIR = BASE / "frozen_manifest_20260723"
-CANDIDATE_DIR = BASE / "candidate_d3_20260723"
+BASE = Path(os.environ.get("FERA_MS_RETRIEVAL_ROOT", RUNS_ROOT / "experiments/molecular_retrieval/pubchem_fixed50")).resolve()
+POOL_DIR = BASE / "inference_ready_pools"
+FROZEN_DIR = BASE / "frozen_manifest"
+CANDIDATE_DIR = BASE / "candidate_dags"
 PROC_DIR = CANDIDATE_DIR / "proc"
 DAG_DIR = CANDIDATE_DIR / "frag/dags"
 OUTPUT_ROOT = BASE / "ours_spectrum_allocator_molecular_retrieval"

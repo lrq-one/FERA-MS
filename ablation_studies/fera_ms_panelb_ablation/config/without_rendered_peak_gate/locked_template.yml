@@ -6,7 +6,7 @@ wandb_tags: null
 wandb_root_dir: checkpoint
 spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
 mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
-split_dp: data/split/nist20_qtof_cid_safe19659_qcbase_model_trainonly
+split_dp: data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
 frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
 magma_dp: data/magma
 ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl

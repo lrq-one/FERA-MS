@@ -594,11 +594,11 @@ template:
   spectrum_objective_high_ce_weight: 5.0
 base_stage:
   wandb_name: structural_backbone_renderer_gate_collision_energy
-  wandb_group: UNIFIED_40EP
+  wandb_group: STRUCTURAL_BACKBONE
   seed: 42
   spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
   mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
-  split_dp: data/split/nist20_qtof_cid_safe19659_qcbase_model_trainonly
+  split_dp: data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
   frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
   ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl
   spec_params:
@@ -835,12 +835,12 @@ base_stage:
   support_oracle_support_oracle_weight: 0.0
   lr_schedule: false
 continuation_stage:
-  wandb_name: MYMODEL_retained_control_scope_all_without_support_oracle
-  wandb_group: MYMODEL_RETAINED_CONTROL_SCOPE_CONTROL
+  wandb_name: retained_control_scope_all_without_support_oracle
+  wandb_group: RETAINED_CONTROL
   seed: 42
   spec_fp: data/proc/nist20_qtof_cid_safe19659/spec_df.pkl
   mol_fp: data/proc/nist20_qtof_cid_safe19659/mol_df.pkl
-  split_dp: data/split/nist20_qtof_cid_safe19659_qcbase_model_trainonly
+  split_dp: data/split/nist20_qtof_cid_safe19659_qcv1_trainonly
   frag_dp: data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags
   ann_fp: data/proc/nist20_qtof_cid_safe19659/ann_df.pkl
   spec_params:

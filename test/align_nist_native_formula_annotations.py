@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -25,31 +26,18 @@ SAFE_SPEC_PATH = (
     / "spec_df.pkl"
 )
 
-OLD_ANN_CANDIDATES = (
-    (
-        ROOT
-        / ".."
-        / "old"
-        / "data"
-        / "proc"
-        / "nist20_full"
-        / "ann_df.pkl"
-    ).resolve(),
-    (
-        ROOT.parent
-        / "old"
-        / "data"
-        / "proc"
-        / "nist20_full"
-        / "ann_df.pkl"
-    ).resolve(),
-)
+NATIVE_ANNOTATION_PATH = Path(
+    os.environ.get(
+        "FERA_MS_NATIVE_ANNOTATION_PATH",
+        ROOT / "data/proc/nist20_full/ann_df.pkl",
+    )
+).resolve()
 
 RANDOM_SPLIT_ROOT = (
     ROOT
     / "data"
     / "split"
-    / "nist20_qtof_cid_safe19659_qcbase_model_trainonly"
+    / "nist20_qtof_cid_safe19659_qcv1_trainonly"
 )
 
 SCAFFOLD_SPLIT_ROOT = (
@@ -112,17 +100,13 @@ def require_file(path: Path) -> Path:
     return path.resolve()
 
 
-def find_old_annotation_file() -> Path:
-    for path in OLD_ANN_CANDIDATES:
-        if path.is_file():
-            return path.resolve()
-
+def find_native_annotation_file() -> Path:
+    if NATIVE_ANNOTATION_PATH.is_file():
+        return NATIVE_ANNOTATION_PATH
     raise FileNotFoundError(
-        "没有找到旧NIST20注释文件。已检查：\n"
-        + "\n".join(
-            str(path)
-            for path in OLD_ANN_CANDIDATES
-        )
+        "NIST20 native annotation file not found: "
+        f"{NATIVE_ANNOTATION_PATH}. Set FERA_MS_NATIVE_ANNOTATION_PATH "
+        "to the licensed local file."
     )
 
 
@@ -490,7 +474,7 @@ safe_spec_path = require_file(
     SAFE_SPEC_PATH
 )
 
-old_ann_path = find_old_annotation_file()
+old_ann_path = find_native_annotation_file()
 
 print()
 print("=" * 96)

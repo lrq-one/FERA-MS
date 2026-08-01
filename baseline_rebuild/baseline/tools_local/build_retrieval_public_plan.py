@@ -18,7 +18,7 @@ ROOT = (
     Path(os.environ.get("FERA_MS_RUNS_DIR", OURS / "runs"))
     / "experiments"
     / "molecular_retrieval"
-    / "pubchem_legacy_full"
+    / "pubchem_fixed50"
 )
 
 OUT = (
@@ -37,27 +37,27 @@ QUERY_SPEC_PATH = (
 
 CANDIDATE_PATH = (
     ROOT
-    / "inference_ready_pools_20260723"
+    / "inference_ready_pools"
     / "molecular_retrieval_inference_ready_candidates.csv.gz"
 )
 
 MAPPING_PATH = (
     ROOT
-    / "candidate_d3_20260723"
+    / "candidate_dags"
     / "proc"
     / "candidate_structure_mapping.csv.gz"
 )
 
 DAG_DIR = (
     ROOT
-    / "candidate_d3_20260723"
+    / "candidate_dags"
     / "frag"
     / "dags"
 )
 
 MEMBERSHIP_DIR = (
     ROOT
-    / "frozen_manifest_20260723"
+    / "frozen_manifest"
 )
 
 SPLIT_PATHS = {

@@ -533,11 +533,11 @@ runs_root = Path(sys.argv[2])
 paths = [
     runs_root / (
         "structural_backbone_gine_cutchem_only/"
-        "initial_training_base_model_40ep/config.yml"
+        "structural_backbone_initial/config.yml"
     ),
     runs_root / (
         "structural_backbone_gine_cutchem_only/"
-        "continuation_retained_control_10ep/config.yml"
+        "retained_control_continuation/config.yml"
     ),
     runs_root / (
         "global_ace_control_ce_trajectory_ablation/"
