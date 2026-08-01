@@ -11,9 +11,6 @@ import ms2spectra.utils.data_utils as data_utils
 from ms2spectra.utils.misc_utils import booltype
 from ms2spectra.utils.proc_utils import filter_spec_mol, merge_spec_df
 
-"""
-面向质谱碎片预测模型（如 FragGNN）的核心特征工程脚本，它基于前序标准化的分子（mol_df）和质谱（spec_df）数据，完成「分子碎裂路径 DAG 生成」「碎片匹配统计计算」「多粒度指标分析」三大核心任务，最终输出可直接用于模型训练 / 评估的碎片特征和统计指标，是连接原始质谱数据与机器学习模型的关键桥梁。
-"""
 def print_and_log(name,series,wandb_flag,stats_d):
 
 	stats = series.describe()
@@ -343,60 +340,3 @@ if __name__ == "__main__":
 	tqdm.pandas()
 
 	main(args)
-
-
-"""
-步骤 1：初始化与参数校验
-解析命令行参数（如最大碎裂深度、计算超时时间、容忍度列表、数据集筛选条件等），校验max_time不超过 JOBLIB 并行计算的超时阈值；
-初始化 WandB（若wandb_mode非disabled）：配置项目 / 实体 / 运行名，将所有参数记录到 WandB，方便实验复现；
-加载前序预处理好的mol_df.pkl（分子特征）和spec_df.pkl（质谱谱图）。
-步骤 2：数据过滤与合并
-按指定条件（元素、数据集、前体类型、碎裂模式、离子模式、仪器类型等）过滤无效数据（filter_spec_mol）；
-合并相同实验条件的谱图（merge_spec_df）生成m_spec_df（合并谱图版），减少重复计算；
-输出过滤后的数据量（谱图数、分子数），并统计分子的原子数、键数等基础特征。
-步骤 3：分子碎裂 DAG 生成（最核心）
-DAG（有向无环图）是描述分子碎裂路径的核心结构，这一步为每个分子生成碎裂 DAG 并提取特征：
-准备输入：遍历mol_df，组装每个分子的计算参数（mol 对象、mol_id、最大碎裂深度、最大氢转移数、超时时间、是否考虑同位素等）；
-并行生成 DAG：调用frag_utils.timed_get_dags（带超时控制）并行生成碎片 DAG，避免单个分子计算卡死，返回 DAG 相关特征；
-整理碎片统计：
-生成frag_stats_df，包含 DAG 核心特征（节点数、边数、稀疏性、公式冗余度、氢转移索引等）；
-过滤 DAG 生成失败的条目，统计失败数并记录到 WandB；
-统计全局唯一分子式数量、DAG 深度分布等关键指标。
-步骤 4：定义质谱碎片统计函数
-compute_spectra_stats是核心统计函数，按不同容忍度 / 氢转移数计算碎片匹配指标：
-遍历指定的容忍度（如0.01绝对误差、5ppm相对误差）和氢转移数（1~max_h_transfer）；
-计算 7 类核心指标（召回率 / 加权召回率 / 精确率 / 峰占比 / 公式占比等），指标命名规则为指标名_容忍度_h氢转移数（如recall_5ppm_h2）；
-区分绝对误差（数值）和相对误差（ppm）的计算逻辑，返回结构化的统计结果。
-步骤 5：多粒度质谱碎片统计计算
-分别处理「原始谱图（spec_id）」和「合并谱图（group_id）」两种粒度，流程完全一致：
-合并谱图数据与碎片统计数据（peak_spec_df），确保无重复条目；
-准备统计输入行（峰数据、公式峰 m/z、容忍度列表等）；
-并行调用compute_spectra_stats计算谱图级统计指标，保存为spec_stats_df/m_spec_stats_df；
-按mol_id聚合谱图级指标，得到分子级统计数据，保存为mol_stats_df/m_mol_stats_df；
-调用print_and_log记录所有指标的统计描述，更新全局统计字典。
-步骤 6：结果保存
-将全局统计字典（包含所有指标的均值 / 标准差 / 分位数等）保存为global_stats.json；
-DAG 文件保存到frag_dp/dags目录（可选压缩）；
-所有统计 DataFrame 保存为 pkl 格式（保留复杂数据类型，如列表 / 字典）。
-步骤 7：收尾
-关闭 WandB（若开启），完成整个流程。
-3. 主入口：参数解析与合法性校验
-解析命令行参数（覆盖碎片生成、统计、WandB 配置、数据过滤等所有维度）；
-校验 WandB 参数合法性（非 disabled 模式时必须指定wandb_run_name）；
-启用 tqdm 的 pandas 适配，调用main函数执行核心流程。
-核心输入输出说明
-输入	输出
-预处理后的mol_df.pkl/spec_df.pkl	1. DAG 文件：frag_dp/dags/（分子碎裂路径图，可选压缩）；
-2. 谱图级统计：spec_stats_df.pkl/m_spec_stats_df.pkl；
-3. 分子级统计：mol_stats_df.pkl/m_mol_stats_df.pkl；
-4. 全局统计：global_stats.json（所有指标的描述性统计）
-命令行参数（过滤 / 计算参数）	控制台输出：数据量、失败数、DAG 深度分布、各指标统计；
-WandB（可选）：指标可视化图表
-总结
-核心目标：为质谱碎片预测模型生成分子碎裂 DAG 特征，并计算不同容忍度 / 氢转移数下的碎片匹配指标（召回率 / 精确率等）；
-关键特色：
-并行计算 + 超时控制：避免单个分子计算卡死，提升效率；
-多粒度分析：覆盖「原始谱图 / 合并谱图 / 分子」三个维度；
-多条件统计：支持不同误差容忍度、氢转移数的碎片匹配计算；
-应用场景：输出的特征和统计指标可直接用于 FragGNN 等模型的训练、评估，或质谱碎片算法的性能对比。
-"""

@@ -162,7 +162,6 @@ def build_stage_configs() -> tuple[
     )
 
     # ==========================================================
-    # structural backbone唯一两个模型变化。
     # ==========================================================
     initial_training["frag_gnn_type"] = "GINE"
 
@@ -179,7 +178,6 @@ def build_stage_configs() -> tuple[
     initial_training["frag_params"] = frag_params
 
     # ==========================================================
-    # 仅运行控制，不改变训练目标。
     # ==========================================================
     initial_training.update(
         {
@@ -310,7 +308,6 @@ def build_stage_configs() -> tuple[
         )
 
     # ==========================================================
-    # 防止上次失败refined variant的设置混入。
     # ==========================================================
     assertions = {
         "initial_training_frag_gnn_type":
@@ -935,7 +932,6 @@ def main() -> None:
             run_dir=INITIAL_TRAINING_DIR,
             config=initial_training_config,
             initialization_checkpoint=None,
-            # 保证完整跑满40轮。
             patience=1000,
             min_delta=0.0,
         )

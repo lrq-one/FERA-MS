@@ -159,7 +159,6 @@ def normalize_identifier(
         lower=False,
     )
 
-    # 避免CSV或pickle中的整数ID被显示成123.0。
     result = result.str.replace(
         r"^(-?\d+)\.0$",
         r"\1",

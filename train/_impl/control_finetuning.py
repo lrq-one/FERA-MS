@@ -243,7 +243,6 @@ def build_config(
             split_override,
         )
 
-    # 必须保持structural backbone结构，不能混入连续CE。
     assert (
         config["frag_gnn_type"]
         == "GINE"

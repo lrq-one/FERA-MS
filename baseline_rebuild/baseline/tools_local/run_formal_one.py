@@ -156,7 +156,6 @@ def mirror_checkpoints(
                     previous = observed.get(key)
                     observed[key] = identity
 
-                    # 等待连续两次大小不变，避免复制未写完的文件。
                     if previous != identity:
                         continue
 

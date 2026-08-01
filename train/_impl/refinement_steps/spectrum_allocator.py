@@ -128,11 +128,6 @@ def normalize_target_mass_per_spec(target_mass, bidx, batch_size):
 
 
 def alias_rich_feature_keys(res, extra_schema):
-    """
-    当前 diagnostics/87 可能输出 fragment_rich_features；
-    老的 candidate reranker regressor pack 可能记录的是 fragment_rich_features。
-    这里做别名，避免 regressor 输入 60D 里 26D rich features 变成全 0。
-    """
     keys = {k for k, _ in extra_schema}
 
     if "fragment_rich_features" in keys:

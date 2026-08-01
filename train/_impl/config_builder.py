@@ -2,14 +2,6 @@
 """
 Stage A: Unified base model -> retained control-style low-LR all-parameter transfer.
 
-核心原则：
-1. 仅使用当前本地仓库文件；
-2. 不修改历史 diagnostics 脚本；
-3. 加载 base model checkpoint 的模型权重，但不恢复历史 optimizer / epoch；
-4. 保留 base model 网络结构和 base model loss；
-5. 只迁移 retained control 的 optimizer、低学习率、scheduler、scope=all 和 no-support_oracle 设置；
-6. 根据 validation global cosine 保存 best checkpoint；
-7. 训练结束后仅对 best validation checkpoint 测试一次。
 """
 
 from __future__ import annotations
@@ -265,12 +257,6 @@ def prepare_effective_config(
     retained_control_custom: dict[str, Any],
     epochs: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """
-    base model 是结构和 loss 基础。
-
-    这里只从 retained control 迁移训练策略相关字段，绝不把 retained control 的其他历史模块
-    或结构开关覆盖进 base model。
-    """
     effective_base_config = deep_merge(template_cfg, base_model_custom)
     effective_retained_control_config = deep_merge(template_cfg, retained_control_custom)
 
@@ -299,8 +285,6 @@ def prepare_effective_config(
             transfer[key] = copy.deepcopy(effective_retained_control_config[key])
             copied[key] = copy.deepcopy(effective_retained_control_config[key])
 
-    # 搜索本地配置中额外的 scheduler / optimizer 控制字段。
-    # 只复制名称明确属于优化和学习率调度的字段。
     for key, value in effective_retained_control_config.items():
         key_lower = key.lower()
 
@@ -318,7 +302,6 @@ def prepare_effective_config(
     transfer["min_epochs"] = 1
     transfer["max_epochs"] = int(epochs)
 
-    # 所有 base model 参数参与低学习率联合收敛。
     if "spectrum_refiner_train_scope" in transfer:
         transfer["spectrum_refiner_train_scope"] = "all"
         copied["spectrum_refiner_train_scope"] = "all"
@@ -327,7 +310,6 @@ def prepare_effective_config(
         transfer["train_scope"] = "all"
         copied["train_scope"] = "all"
 
-    # 明确关闭 support oracle。
     if "use_support_oracle_support_oracle_reweight_loss" in transfer:
         transfer["use_support_oracle_support_oracle_reweight_loss"] = False
         copied["use_support_oracle_support_oracle_reweight_loss"] = False
@@ -336,7 +318,6 @@ def prepare_effective_config(
         transfer["support_oracle_support_oracle_weight"] = 0.0
         copied["support_oracle_support_oracle_weight"] = 0.0
 
-    # 保证按照 validation cosine 选 best，训练结束后测试一次。
     transfer["eval_test_split"] = True
     transfer["disable_checkpoints"] = False
     transfer["delete_checkpoints"] = False
@@ -365,7 +346,6 @@ def prepare_effective_config(
         }
     )
 
-    # 禁止意外启用 support oracle。
     assert not bool(
         transfer.get(
             "use_support_oracle_support_oracle_reweight_loss",
@@ -380,10 +360,6 @@ def prepare_effective_config(
 
 
 def create_runtime_links(root: Path, run_dir: Path) -> None:
-    """
-    runner 在 run_dir 中执行，使 tmp_ckpt 不污染仓库根目录。
-    同时给相对 data/... 路径创建本地链接。
-    """
     link_names = [
         "data",
         "code",
@@ -564,7 +540,6 @@ def main() -> int:
         )
         transfer_cfg["seed"] = 42
 
-        # 早停由本脚本直接注入Trainer，避免依赖本地模板版本。
         if "early_stopping" in transfer_cfg:
             transfer_cfg["early_stopping"] = False
 
@@ -737,8 +712,6 @@ def main() -> int:
                     "base model checkpoint 中没有可用的 state_dict"
                 )
 
-            # 严格加载，结构只要与 base model 不一致就立即报错，
-            # 禁止 missing/unexpected key 静默继续训练。
             self.load_state_dict(
                 state_dict,
                 strict=True,
@@ -805,7 +778,6 @@ def main() -> int:
 
         canonical_best = None
         if best_candidates:
-            # ModelCheckpoint 默认只保留 validation 最优模型。
             source_best = max(
                 best_candidates,
                 key=lambda p: p.stat().st_mtime,

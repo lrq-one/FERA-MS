@@ -1761,8 +1761,6 @@ def run_combination(
         success_path,
     )
 
-    # 完整组已合并并写出指标后，删除增量分片，
-    # 避免同时保存一份分片和一份最终总文件。
     shutil.rmtree(
         parts_dir,
         ignore_errors=True,

@@ -570,7 +570,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		self.ce_fragment_gate_use_depth = ce_fragment_gate_use_depth
 
 		if self.use_ce_fragment_gate:
-			# 第一版要求 CE embedding 存在；保持 ce_insert_location=mlp 即可复用 ce_embedder
 			assert self.ce_insert_location != "none", \
 				"use_ce_fragment_gate=True requires ce_insert_location != none"
 			assert self.ce_insert_size > 0, self.ce_insert_size
@@ -1281,7 +1280,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			assert self.ce_insert_size > 0, self.ce_insert_size
 
 		if self.predict_oos:
-			# 原始 OOS head 保持不变：只看 molecule pool + fragment pool
 			base_oos_input_size = self.mol_embedder.hidden_size + self.frag_embedder.hidden_size
 
 			oos_mlp_kwargs = {
@@ -1296,7 +1294,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			self.oos_module = MLPBlocks(**oos_mlp_kwargs)
 
 			# ===== Our CE-aware OOS residual correction =====
-			# 不替换原 OOS，只加一个 zero-init residual delta。
 			if self.use_ce_oos_head:
 				ce_oos_input_size = base_oos_input_size + self.ce_insert_size
 				self.ce_oos_delta_module = MLPBlocks(
@@ -1309,7 +1306,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 					normalization="none",
 				)
 
-				# 最后一层 zero init，让初始 delta=0，等价于 CE-Gate base_model
 				last_linear = None
 				for m in self.ce_oos_delta_module.modules():
 					if isinstance(m, nn.Linear):
@@ -1826,8 +1822,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			).reshape(batch_frag_num_nodes, -1)
 
 			# Earlier fragment-DAG depth features are not scalar at D3;
-			# 而是 num_depth 维 one-hot / multi-column 表示。
-			# CE-Gate 只需要一个归一化 depth scalar，所以这里转成 [N_frag, 1]。
 			if raw_frag_depth.shape[1] == 1:
 				frag_depth_scalar = raw_frag_depth.float()
 				depth_denom = max(float(self.num_depth - 1), 1.0)
@@ -1850,7 +1844,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			frag_depth_value = frag_depth_scalar / depth_denom
 
-			# 原来的 depth embedding 逻辑保持不变，给 Fragment GNN 用
 			frag_depth = self.depth_embedder(raw_frag_depth)
 			frag_ndata.append(frag_depth)
 		# edge complement
@@ -1880,8 +1873,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		if num_hs_diff > 0:
 			# ===== Multi-peak-aware formula pruning =====
 			# The earlier renderer assumed one peak per formula.
-			# 加入 neutral-loss pseudo peaks 后，每个 formula 可能有多个 peak，
-			# 所以必须按 peak-entry 级别重新映射，而不能按 formula 级别简单 mask。
 
 			old_frag_formula_cumsizes = frag_formula_cumsizes
 			old_frag_formula_peak_idxs = frag_formula_peak_idxs
@@ -1936,8 +1927,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			frag_node_offsets = frag_formula_cumsizes[frag_node_batch_idxs]
 
 			# ===== peak stuff: multi-peak aware =====
-			# old_frag_formula_peak_idxs 是每个 peak-entry 对应的 local formula idx。
-			# 先转成 old global formula idx。
 			old_peak_batch_idxs = th.repeat_interleave(
 				th.arange(batch_size, device=device),
 				old_frag_formula_peak_sizes
@@ -1948,7 +1937,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 				+ old_frag_formula_cumsizes[:-1][old_peak_batch_idxs]
 			)
 
-			# 只保留仍然存在于 new formula set 里的 peak entries。
 			peak_keep_mask = th.isin(
 				old_peak_global_formula_idxs,
 				frag_joint_formula_idxs_un
@@ -1956,8 +1944,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			kept_old_global_formula_idxs = old_peak_global_formula_idxs[peak_keep_mask]
 
-			# frag_joint_formula_idxs_un 是 unique 后的旧 global formula idx，
-			# searchsorted 得到它们在新 formula table 中的位置。
 			kept_new_global_formula_idxs = th.searchsorted(
 				frag_joint_formula_idxs_un,
 				kept_old_global_formula_idxs
@@ -1970,7 +1956,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 
 			kept_batch_idxs = frag_formula_batch_idxs[kept_new_global_formula_idxs]
 
-			# 转回每个 graph 内的 local formula idx，给后面 rendering 用。
 			frag_formula_peak_idxs = (
 				kept_new_global_formula_idxs
 				- frag_formula_cumsizes[:-1][kept_batch_idxs]
@@ -2242,9 +2227,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			frag_embed_base_parts = [0.5 * frag_embed_gnn + 0.5 * frag_embed_node]
 
 		# ===== Our CE-Gated Fragment Activation =====
-		# 对 fragment node embedding 做 CE-conditioned FiLM 调制。
-		# 注意：这里仍保留后面的 ce_insert_location == "mlp" 拼接，
-		# 这样初期不会破坏原模型的信息路径。
 		if self.use_ce_fragment_gate:
 			assert ce_embed is not None, "CE gate requires ce_embed"
 			ce_node_embed = ce_embed[frag_node_batch_idxs]
@@ -3229,7 +3211,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			)
 
 		if self.predict_oos:
-            # 原始 OOS logits
 			base_oos_input = th.cat(
                 [mol_embed_gnn_pool, frag_embed_gnn_pool],
                 dim=1,
@@ -3237,7 +3218,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 			oos_logits = self.oos_module(base_oos_input).flatten()
 
             # ===== Our CE-aware OOS residual correction =====
-            # 注意：这里不是替换 OOS，而是 residual 修正。
 			if self.use_ce_oos_head:
 				assert ce_embed is not None, "CE-aware OOS requires ce_embed"
 				assert ce_embed.shape[0] == batch_size, (ce_embed.shape, batch_size)
@@ -3248,7 +3228,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
                 )
 				ce_oos_delta = self.ce_oos_delta_module(ce_oos_input).flatten()
 
-                # tanh + scale，防止 CE delta 过大，破坏 OOS 分支
 				oos_logits = oos_logits + self.ce_oos_delta_scale * th.tanh(ce_oos_delta)
 
 			oos_logprobs = F.logsigmoid(oos_logits)
@@ -3508,9 +3487,6 @@ class FragGNNModel(nn.Module, CEModel, PrecModel, InstModel):
 		# convert to spectrum
 		# ===== Multi-peak-aware formula rendering =====
 		# The earlier renderer used one peak per non-null formula when num_isotopes=1,
-		# 所以可以用 frag_formula_sizes-1 来 repeat formula offset。
-		# 加入 neutral-loss pseudo peaks 后，每个 formula 可能有多个 peak-entry，
-		# 因此 offset 必须按 peak-entry 的 batch idx 来取。
 		spec_mzs = frag_formula_peak_mzs
 
 		spec_batch_idxs = th.repeat_interleave(

@@ -8,16 +8,7 @@ import glob
 from ms2spectra.utils.data_utils import rdkit_import, seq_apply, par_apply, parse_mass_gym_ce_str
 from ms2spectra.utils.misc_utils import flatten_lol
 
-"""
-标准化的质谱（MS/MS）数据预处理工具，核心作用是将不同格式（MSP、.ms、MS Gym TSV 等）的原始质谱数据解析、清洗、标准化后，
-统一转换为 Pandas DataFrame 格式，并导出为 JSON/CSV 文件，方便后续的数据分析或机器学习模型训练。
-"""
 
-"""
-MSP_KEY_DICT：将 MSP 格式文件的原始字段（如PrecursorMZ）映射为标准化字段（如prec_mz）；
-MS_KEY_DICT：将.ms 格式文件的元数据字段（如>parentmass）映射为标准化字段；
-META_KEYS/SPEC_KEYS：区分.ms 文件中的「元数据字段」和「质谱峰数据字段」。
-"""
 MSP_KEY_DICT = {
 	"Precursor_type": "prec_type",
 	"Spectrum_type": "spec_type",
@@ -59,10 +50,6 @@ MS_KEY_DICT = {
 META_KEYS = list(MS_KEY_DICT.keys())
 SPEC_KEYS = [">ms1peaks",">ms1merged",">ms2peaks",">ms2merged",">collision"]
 
-"""
-这个函数专门从 MSP 文件的Comments字段中提取嵌式信息（比如computed SMILES、MoNA Rating）—— 
-因为这些信息不是独立字段，而是嵌套在Comments里，需要按字符匹配的方式单独解析。
-"""
 def extract_info_from_comments(comments,key):
 	start_idx = comments.find(key)
 	if start_idx == -1:
@@ -80,13 +67,6 @@ def extract_info_from_comments(comments,key):
 """
 Convert data from MSMS database format to pandas dataframe with JSON
 No type conversions or filtering: all of that is done downstream
-"""
-"""
-解析 MSP 格式文件
-逐行读取 MSP 文件，处理特殊行（如同时包含CAS#和NIST#的行）；
-识别Num peaks字段，标记后续行为「质谱峰数据」并收集；
-提取Comments中的嵌式信息（SMILES / 评分等）；
-将所有条目整理为 Pandas DataFrame，支持限制处理的条目数（num_entries）。
 """
 def preproc_msp(msp_fp,keys,num_entries):
 	""" """
@@ -155,12 +135,6 @@ def preproc_msp(msp_fp,keys,num_entries):
 	msp_df = msp_df.dropna(axis=0,how="all")
 	return msp_df
 
-"""
-解析 NIST .MOL 文件
-遍历指定目录下的所有.MOL 文件（分子结构文件）；
-通过 RDKit 读取 MOL 文件，生成分子的 SMILES 字符串；
-关联spec_id（文件命名中的 ID），生成包含「spec_id + smiles」的 DataFrame。
-"""
 def preproc_nist_mol(mol_dp):
 	""" read in all .MOL files and return a df """
 
@@ -184,12 +158,6 @@ def preproc_nist_mol(mol_dp):
 	mol_df_entries = par_apply(mol_fp_iter,proc_mol_file)
 	mol_df = pd.DataFrame(mol_df_entries)
 	return mol_df
-"""
-数据合并与校验
-清理 MSP 解析结果的无关列，按映射字典重命名字段；
-将 MSP 数据与 MOL 数据按spec_id合并（补充 MSP 中缺失的 SMILES）；
-校验数据完整性（如 SMILES 是否非空），补充统一的dset_spec_id字段。
-"""
 def merge_and_check(msp_df,mol_df,rename_dict):
 
 	# get rid of the columns that you don't care about
@@ -213,13 +181,6 @@ def merge_and_check(msp_df,mol_df,rename_dict):
 	spec_df = spec_df.reset_index(drop=True)
 	return spec_df
 
-"""
-解析.ms 格式文件（配合 meta 文件）
-先读取.ms 文件的元数据文件（TSV 格式），补充标准化字段；
-遍历所有.ms 文件，提取元数据（如母离子质量、仪器类型）和 MS2 峰数据；
-按「质谱级别（MS1/MS2）+ 碰撞能量」拆分条目，补充标准化字段（如ion_mode）；
-合并元数据，生成统一的 DataFrame。
-"""
 def preproc_ms_files(ms_dp,ms_meta_fp,keys,num_entries):
 
 	# read in meta file
@@ -311,13 +272,6 @@ def preproc_ms_files(ms_dp,ms_meta_fp,keys,num_entries):
 	ms_df = ms_df.drop(columns=["dset_spec_id_base"])
 	ms_df = ms_df.reset_index(drop=True)
 	return ms_df
-"""
-解析 MS Gym TSV 文件
-筛选 MS Gym 数据集的指定子集（simulation_challenge/extra/all）；
-将分离的mzs（质荷比）和intensities（强度）字段合并为peaks（质谱峰）字段；
-字段重命名、解析碰撞能量（拆分常规 / 归一化 / 梯度能量）；
-补充标准化字段（如ion_mode/spec_type），并拆分fold（数据集划分）信息到单独文件。
-"""
 def process_ms_gym(ms_gym_tsv_fp, subset):
 	ms_df = pd.read_csv(ms_gym_tsv_fp, sep="\t")
  

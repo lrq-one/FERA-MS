@@ -8,19 +8,6 @@ import ms2spectra.utils.data_utils as data_utils
 from ms2spectra.utils.data_utils import par_apply_series, par_apply_df_rows, seq_apply_df_rows
 from ms2spectra.utils.misc_utils import booltype
 
-"""
-质谱（MS/MS）数据的深度清洗与标准化预处理脚本，它承接上一步生成的统一格式 CSV 文件，
-进一步完成分子结构标准化、字段类型转换、数据一致性校验、特征提取等核心操作，
-最终输出三个结构化的核心 DataFrame（spec_df、mol_df、ann_df）和调试用数据，
-为后续的质谱数据分析、机器学习建模（如碎片预测、化合物识别）提供高质量的结构化数据集。
-"""
-"""
-加载并合并多源数据集
-功能：读取上一步生成的多个数据集 CSV 文件，合并为统一的 DataFrame，支持采样限制条目数。
-遍历指定数据集（如nist20_hr、mona23），读取每个数据集的{dset}_df.csv文件，添加dset字段标记数据来源；
-若指定num_entries>0，对每个数据集固定随机种子（保证可复现）采样指定数量条目；
-合并所有数据集，重置索引，返回统一的all_df。
-"""
 def load_df(df_dp,dsets,num_entries):
 	
 	dfs = []
@@ -237,58 +224,3 @@ if __name__ == "__main__":
 	print(f"> ann_df {ann_df.shape}")
 	print(f"> ann_df num nan:")
 	print(ann_df.isna().sum())
- 
- 
-"""
-步骤 1：去重与分子结构标准化
-按dset + dset_spec_id去重（解决 MoNA 等数据集重复条目问题）；
-通过 RDKit 将 SMILES→mol 对象→再转回 SMILES（标准化分子结构，统一立体化学、格式等）；
-过滤无法生成 mol/SMILES 的无效条目（记录到no_mol_df）；
-为每个唯一 SMILES 分配唯一mol_id（方便后续关联分子与质谱数据）。
-步骤 2：拆分注释数据（ann_df）
-复制注释相关核心字段（dset_spec_id/mol_id/notes/peaks/dset）到ann_df，后续专门处理注释信息。
-步骤 3：质谱字段标准化与类型转换
-解析peaks字符串为结构化数据，计算质谱分辨率res；
-标准化仪器类型（inst_type）、碎裂模式（frag_mode）；
-解析碰撞能量（col_energy）为绝对碰撞能量（ace） 和归一化碰撞能量（nce），删除原字段；
-标准化前体离子类型（prec_type）、离子模式（ion_mode）；
-转换prec_mz（前体质荷比）、exact_mass（精确质量）为数值类型；
-将peaks中的质荷比 / 强度转为浮点数，解析保留指数（ri）为标准化格式；
-筛选 spec_df 核心字段，重置spec_id（保证跨数据集唯一）。
-步骤 4：生成分组 ID（group_id）
-按「分子 + 前体类型 + 仪器类型 + 碎裂模式 + 谱类型 + 离子模式 + 数据集」分组，为每组分配唯一group_id（标记 “相同化合物 + 相同实验条件” 的条目）。
-步骤 5：生成分子特征表（mol_df）
-基于唯一 SMILES 生成mol_df，提取分子级核心特征：
-标识类：简化版 InChIKey、Murcko 骨架、分子式、InChI；
-质量类：常规分子量、精确分子量；
-结构类：原子数、键数、电荷、是否单分子、自由基数量；
-过滤无效 mol 条目，同步删除 spec_df 中对应无效mol_id的条目。
-步骤 6：数据一致性校验（核心质量控制）
-校验 spec_df 与 mol_df 的字段一致性，找出并输出不一致条目（保证数据无矛盾）：
-分子式一致性：对比 spec_df 的formula和 mol_df 生成的formula；
-InChIKey 一致性：对比 spec_df 的inchikey（前 14 位）和 mol_df 的inchikey_s；
-精确质量一致性：对比 spec_df 的exact_mass和 mol_df 的exact_mw（误差 > 0.1 视为不一致）；
-删除所有不一致条目，保证数据集质量。
-步骤 7：补全缺失的前体质荷比（prec_mz）
-基于 mol_df 的精确分子量和前体离子类型（prec_type），推断并补全 spec_df 中缺失的prec_mz值。
-步骤 8：处理注释数据（ann_df）
-关联 spec_df/mol_df 的信息到 ann_df；
-解析注释信息，提取注释峰的 m/z、产物、损失、同位素、精确 m/z 等特征；
-过滤空注释、无峰的条目，清理冗余字段后重置索引。
-步骤 9：返回结果
-返回标准化后的spec_df（质谱谱图信息）、mol_df（分子特征）、ann_df（注释信息），以及调试用的不一致数据（no_mol_df/diff_formula_df等）。
-4. 主函数：流程控制与结果保存
-解析命令行参数（数据路径、输出路径、条目数、是否覆盖已有文件、目标数据集列表）；
-复用逻辑：若指定不覆盖且已有spec_df.pkl/mol_df.pkl，直接加载已有文件；否则执行load_df + preprocess_spec；
-保存结果：将核心 DataFrame 保存为 pkl 文件（二进制格式，保留类型信息），调试数据也保存为 pkl；
-输出统计：打印各 DataFrame 的形状、缺失值数量，方便检查数据质量。
-输入输出说明
-输入	输出
-上一步生成的{dset}_df.csv	核心文件：spec_df.pkl（质谱谱图）、mol_df.pkl（分子特征）、ann_df.pkl（注释）
-（如 nist20_hr_df.csv）	调试文件：no_mol_df.pkl、diff_formula_df.pkl 等（记录异常数据）
-控制台输出：各 DataFrame 形状、缺失值统计、一致性校验结果
-总结
-核心目标：将初步标准化的质谱数据进一步清洗、校验、特征提取，生成spec_df（谱图）、mol_df（分子）、ann_df（注释）三个结构化核心表；
-关键价值：通过分子结构标准化、数据一致性校验（分子式 / 质量 / InChIKey）、缺失值补全，保证数据集高质量、无矛盾；
-应用场景：输出的 pkl 文件可直接用于质谱碎片预测、化合物识别、质谱数据挖掘等机器学习 / 数据分析任务。
- """

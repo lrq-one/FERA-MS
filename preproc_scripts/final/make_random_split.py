@@ -23,14 +23,12 @@ def main():
 
     qc = pd.read_csv(args.qc_csv)
 
-    # 保证只处理原 random train 里的 spec
     df = train_ids.merge(qc, on=["spec_id", "mol_id", "group_id"], how="left")
 
     missing_qc = df["support_PWR_abs006"].isna().sum()
     if missing_qc > 0:
         print("[WARN] missing QC rows:", missing_qc)
 
-    # 缺 QC 的默认当作坏样本
     for c in [
         "n_peaks",
         "max_intensity_frac",
@@ -50,7 +48,6 @@ def main():
     df["support_PWR_abs006"] = df["support_PWR_abs006"].fillna(0.0)
     df["support_PR_abs006"] = df["support_PR_abs006"].fillna(0.0)
 
-    # hard bad: 非常明显的问题谱图
     df["bad_too_few_peaks"] = df["n_peaks"] < 3
     df["bad_low_support"] = df["support_PWR_abs006"] < 0.35
     df["bad_precursor_dominated"] = df["precursor_survival_yield"] > 0.95
@@ -66,7 +63,6 @@ def main():
     ]
     df["hard_bad"] = df[hard_bad_cols].any(axis=1)
 
-    # soft bad score：越大越差
     support_bad = (1.0 - df["support_PWR_abs006"]).clip(0.0, 1.0)
     precursor_bad = df["precursor_survival_yield"].clip(0.0, 1.0)
     single_peak_bad = df["max_intensity_frac"].clip(0.0, 1.0)
@@ -84,7 +80,6 @@ def main():
     n_total = len(df)
     target_keep = int(round(n_total * args.target_keep_rate))
 
-    # 先去掉 hard bad，再按 bad_score 保留最好的 target_keep 个
     candidates = df[~df["hard_bad"]].copy()
 
     if len(candidates) >= target_keep:

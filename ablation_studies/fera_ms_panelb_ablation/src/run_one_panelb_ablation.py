@@ -255,7 +255,6 @@ def inspect_real_model(
             ),
     }
 
-    # 所有实验共同保持的结构。
     assert (
         actual["frag_gnn_type_config"]
         == "GINE"
@@ -534,7 +533,6 @@ def main() -> None:
     print("test used during training: False")
     print("=" * 100)
 
-    # 构建与正式structural backbone完全一致的两个阶段。
     initial_training_reference, continuation_reference = (
         base_training.build_stage_configs()
     )
@@ -624,7 +622,6 @@ def main() -> None:
         continuation_score=continuation_score,
     )
 
-    # 再次从最终保存配置实例化检查。
     inspect_real_model(
         selected_config,
         variant,
@@ -633,7 +630,6 @@ def main() -> None:
         / "structural_backbone_selected_final_preflight.json",
     )
 
-    # 将原global ACE control代码的输入和输出全部改到当前消融目录。
     control_finetuning.BASE_CONFIG = (
         final_dir
         / "config.yml"

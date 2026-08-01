@@ -9,10 +9,6 @@ class CEFragmentFiLM(nn.Module):
 
     h'_v = h_v * (1 + gamma(CE, depth_v)) + beta(CE, depth_v)
 
-    设计原则：
-    1. 初始接近 identity，不破坏 baseline；
-    2. 在 fragment node 层调制，而不是只在最后 MLP concat CE；
-    3. 可以在论文图里画成 Energy-aware Fragment Activation。
     """
 
     def __init__(
@@ -41,7 +37,6 @@ class CEFragmentFiLM(nn.Module):
             nn.Linear(gate_hidden_size, hidden_size * 2),
         )
 
-        # 关键：最后一层零初始化，让模型初始等价于原 baseline
         last = self.net[-1]
         nn.init.zeros_(last.weight)
         nn.init.zeros_(last.bias)

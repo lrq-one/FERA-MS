@@ -651,7 +651,6 @@ def _frontier_components_after_cut(
 
         comps.append(np.array(sorted(comp), dtype=np.int32))
 
-    # 如果断键之后仍然只有一个连通块，说明这个 bond 不是有效断裂候选，比如环内边。
     if len(comps) <= 1:
         return []
 

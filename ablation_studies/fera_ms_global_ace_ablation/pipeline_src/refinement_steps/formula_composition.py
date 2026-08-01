@@ -33,7 +33,6 @@ def load_state_dict(path):
 
 
 def override_cfg(cfg, args):
-    # 启用模型内部的 formula-composition residual。
     cfg["use_formula_comp_residual"] = True
     cfg["formula_comp_hidden_size"] = int(args.hidden)
     cfg["formula_comp_dropout"] = float(args.dropout)
@@ -41,21 +40,16 @@ def override_cfg(cfg, args):
     cfg["formula_comp_center_per_spectrum"] = True
     cfg["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
-    # ===== 关键修复：dataset 侧也必须生成 frag_formula_comp_feats =====
-    # model.py 会检查 batch 中存在 frag_formula_comp_feats；
-    # 这个字段只由 dataset 在 frag_params.formula_comp_feats=True 时生成。
     cfg.setdefault("frag_params", {})
     cfg["frag_params"]["formula_comp_feats"] = True
     cfg["frag_params"]["formula_comp_feat_size"] = int(args.formula_comp_feat_size)
 
-    # ===== 训练也走 local m-z renderer 0.01Da official-style renderer，而不是 train/eval mismatch =====
     cfg["use_binned_spectrum_renderer"] = True
     cfg["binned_spectrum_renderer_apply_train"] = True
     cfg["binned_spectrum_renderer_bin_res"] = float(args.bin_res)
     cfg["binned_spectrum_renderer_preserve_mass"] = True
     cfg["binned_spectrum_renderer_max_bins"] = int(args.max_bins)
 
-    # ===== 用已有 CE-weighted binned aux，直接对官方 bin intensity 对齐 =====
     cfg["use_ce_weighted_binned_aux_loss"] = bool(args.ce_binned_aux_weight > 0)
     cfg["ce_binned_aux_loss_weight"] = float(args.ce_binned_aux_weight)
     cfg["ce_binned_aux_mid_threshold"] = 20.0
@@ -64,7 +58,6 @@ def override_cfg(cfg, args):
     cfg["ce_binned_aux_mid_weight"] = float(args.mid_w)
     cfg["ce_binned_aux_high_weight"] = float(args.high_w)
 
-    # ===== support oracle 是 fixed-support intensity allocation，先允许小权重 =====
     cfg["use_support_oracle_support_oracle_reweight_loss"] = bool(args.support_oracle_weight > 0)
     cfg["support_oracle_support_oracle_weight"] = float(args.support_oracle_weight)
     cfg["support_oracle_oracle_bin_res"] = float(args.bin_res)
@@ -107,7 +100,6 @@ def freeze_for_formula_composition(model, train_formula_module=False, train_refi
 
 
 def set_formula_composition_train_mode(model, train_formula_module=False, train_refiner=False):
-    # 冻结主干时，主模型保持 eval，避免 frozen dropout 改分布。
     model.eval()
 
     for name, module in model.model.named_modules():
@@ -131,7 +123,6 @@ def pick_metric_key(res, token):
     if not keys:
         return None
 
-    # 优先官方 0.01 binned cos/jss
     def score_key(k):
         s = 0
         if "0.01" in k:
@@ -267,7 +258,6 @@ def score_val(summary, baseline):
     mid_drop = max(0.0, mid0 - mid)
     jss_drop = max(0.0, jss0 - jss)
 
-    # 不允许像 prior formula attempt 那样 cos 微涨但 JSS 大掉。
     return g + 0.50 * mid + 0.05 * high - 5.0 * low_drop - 4.0 * mid_drop - 3.0 * jss_drop
 
 

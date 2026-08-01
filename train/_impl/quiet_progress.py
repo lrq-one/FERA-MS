@@ -65,7 +65,6 @@ def process(record, delimiter):
         record,
     ).strip()
 
-    # 第一阶段开始训练前，所有初始化信息原样显示。
     if not training_started:
         epoch_match = epoch_pattern.search(
             clean
@@ -87,7 +86,6 @@ def process(record, delimiter):
         .strip()
     )
 
-    # 后续阶段标题只用于识别epoch重置，不显示。
     if (
         heading
         and stage_heading_pattern.fullmatch(
@@ -107,13 +105,11 @@ def process(record, delimiter):
         )
 
         if last_local_epoch is None:
-            # 首次看到epoch时沿用checkpoint中的真实编号。
             global_epoch = local_epoch + 1
             last_local_epoch = local_epoch
             expect_new_stage = False
 
         elif expect_new_stage or local_epoch < last_local_epoch:
-            # 新stage内部epoch重新从0开始，但前台总编号继续累加。
             global_epoch += 1
             last_local_epoch = local_epoch
             expect_new_stage = False
@@ -122,21 +118,18 @@ def process(record, delimiter):
             global_epoch += local_epoch - last_local_epoch
             last_local_epoch = local_epoch
 
-        # 将每个阶段自己的 Epoch 0/1/... 改成连续的 1/2/...
         rewritten = epoch_pattern.sub(
             f"Epoch {global_epoch}:",
             record,
             count=1,
         )
 
-        # 保留 \r，确保tqdm仍然是动态进度条。
         write_output(
             rewritten,
             delimiter,
         )
         return
 
-    # 后续阶段只显示训练结果、最终指标和错误。
     if any(
         token.lower() in clean.lower()
         for token in important_tokens

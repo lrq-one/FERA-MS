@@ -174,7 +174,6 @@ old_ann = pd.read_pickle(
 spec = old_spec.copy()
 ann = old_ann.copy()
 
-# 注释表与完整谱表的稳定连接键。
 for frame in (spec, ann):
     frame["_dset"] = norm_text(
         frame["dset"]
@@ -248,7 +247,6 @@ current_connectivities = set(
     .tolist()
 )
 
-# 关键修复：prec_type也必须在current_spec中生成标准化列。
 protocol_columns = (
     "prec_type",
     "inst_type",
@@ -398,7 +396,6 @@ mh_mask = (
     == "[M+H]+"
 )
 
-# 广义字符串筛选。
 qtof_mask = (
     annotated["_inst_type"]
     .str.contains(
@@ -435,7 +432,6 @@ hcd_mask = (
     )
 )
 
-# 与当前数据实际标签完全一致的筛选。
 current_inst_mask = (
     annotated["_inst_type"]
     .isin(current_inst_values)
