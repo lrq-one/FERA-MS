@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
@@ -27,6 +29,7 @@ REQUIRED = (
     "README.md",
     "LICENSE_PENDING.md",
     "CITATION.cff",
+    "THIRD_PARTY_NOTICES.md",
     "requirements.txt",
     "environment.yml",
     "config/train.yml",
@@ -41,7 +44,9 @@ REQUIRED = (
     "preproc_scripts/04_prepare_split.py",
     "docs/PIPELINE.md",
     "docs/REPRODUCIBILITY.md",
+    "docs/SOURCE_PROVENANCE.md",
     "data/README.md",
+    "licenses/FraGNNet-BSD-2-Clause.txt",
 )
 FORBIDDEN_DIR_NAMES = {
     "__pycache__",
@@ -156,10 +161,79 @@ def main() -> int:
         if path.exists() and path.stat().st_size > 50 * 1024 * 1024:
             fail(f"tracked file exceeds 50 MB: {path.relative_to(ROOT)}", failures)
         relative = path.relative_to(ROOT)
+        if (
+            len(relative.parts) >= 2
+            and relative.parts[:2] == ("data", "split")
+            and path.suffix.lower() == ".csv"
+        ):
+            fail(f"tracked record-level split CSV: {relative}", failures)
+        if relative.parts and relative.parts[0] == "data" and any(
+            part in {"raw", "proc", "frag"} for part in relative.parts[1:]
+        ):
+            fail(f"tracked licensed/derived data path: {relative}", failures)
         if path.suffix in FORBIDDEN_ARTIFACT_SUFFIXES:
             fail(f"tracked generated/model artifact: {relative}", failures)
         if "nist20" in path.name.lower() and path.suffix.lower() in {".msp", ".mol", ".pkl", ".bz2"}:
             fail(f"tracked NIST20 data: {relative}", failures)
+
+    for nested_git in ROOT.rglob(".git"):
+        if nested_git.resolve() != (ROOT / ".git").resolve():
+            fail(f"nested third-party Git checkout: {nested_git.relative_to(ROOT)}", failures)
+
+    notice = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    for baseline in ("NEIMS", "MassFormer", "FraGNNet-D3", "GrAFF-MS", "ICEBERG", "FIORA"):
+        if baseline not in notice:
+            fail(f"third-party notice missing baseline: {baseline}", failures)
+    for integrated_scope in (
+        "code/src/ms2spectra/massformer/",
+        "code/src/ms2spectra/graff/",
+        "code/src/ms2spectra/iceberg/",
+    ):
+        if integrated_scope not in notice:
+            fail(f"third-party notice missing integrated scope: {integrated_scope}", failures)
+
+    provenance = (ROOT / "docs/SOURCE_PROVENANCE.md").read_text(encoding="utf-8")
+    source_suffixes = {".py", ".pyx", ".sh", ".yml", ".yaml", ".toml"}
+    covered_roots = {
+        "code",
+        "train",
+        "test",
+        "preproc_scripts",
+        "ablation_studies",
+        "baseline_rebuild",
+        "config",
+        "scripts",
+    }
+    covered_root_files = {"setup.py", "pyproject.toml", "sitecustomize.py", "environment.yml"}
+    for path in git_files():
+        relative = path.relative_to(ROOT)
+        if path.suffix.lower() not in source_suffixes:
+            continue
+        if relative.parts[0] not in covered_roots and str(relative) not in covered_root_files:
+            fail(f"source file outside provenance scopes: {relative}", failures)
+    if "214 tracked" not in provenance:
+        fail("source provenance report lacks audited inventory count", failures)
+
+    citation = yaml.safe_load((ROOT / "CITATION.cff").read_text(encoding="utf-8"))
+    expected_title = (
+        "FERA-MS: Formula- and collision-energy-aware tandem mass spectrum "
+        "prediction for molecular identification"
+    )
+    if citation.get("title") != expected_title:
+        fail("CITATION.cff title mismatch", failures)
+    if citation.get("version") != "0.1.0":
+        fail("CITATION.cff version mismatch", failures)
+    if str(citation.get("date-released")) != "2026-08-01":
+        fail("CITATION.cff release date mismatch", failures)
+    if citation.get("license") == "BSD-3-Clause" and "**BLOCKED**" in notice:
+        fail("BSD-3-Clause claimed while provenance blockers remain", failures)
+    if (ROOT / "LICENSE").exists() and "**BLOCKED**" in notice:
+        fail("root LICENSE present while provenance blockers remain", failures)
+
+    readme_lower = readme.lower()
+    split_disclosure = "record-level" in readme_lower and "not included" in readme_lower
+    if not split_disclosure:
+        fail("README lacks explicit record-level split non-distribution statement", failures)
 
     if failures:
         print(f"RELEASE_CHECK_FAILED ({len(failures)} issue(s))")

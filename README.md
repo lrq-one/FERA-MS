@@ -12,7 +12,7 @@ The implementation combines a structural GINE backbone and cut-chemistry feature
 - `train/`: single-seed and three-seed mainline entrypoints.
 - `test/`: locked evaluation, CHUN, ACE perturbation, robustness, candidate-space, and molecular-identification analyses.
 - `ablation_studies/`: validated global-only CE, m/z-offset, rendered-gate, and no-reranker controls.
-- `baseline_rebuild/`: baseline configurations and orchestration; licensed data, checkpoints, and third-party source checkouts are not bundled.
+- `baseline_rebuild/`: baseline configurations, launchers, and aggregation utilities. The integrated NEIMS, MassFormer, FraGNNet-D3, GrAFF-MS, and ICEBERG implementations remain under `code/src/ms2spectra/`; FIORA is invoked through its separately installed CLI.
 - `docs/`: pipeline and reproducibility details.
 
 ## Environment and installation
@@ -32,7 +32,7 @@ The editable install compiles `ms2spectra.frag.compute_frags` and `ms2spectra.ma
 
 NIST20 is licensed data and cannot be redistributed in this repository. Obtain and export the NIST 2020 MS/MS library under your own license. No MSP, MOL, processed pickle, fragment DAG, PubChem cache, checkpoint, prediction array, or result table is included.
 
-Expected local layout:
+Expected local layout after local regeneration (none of these data or split files are tracked):
 
 ```text
 data/raw/nist_20/hr_nist_msms.MSP
@@ -43,7 +43,7 @@ data/split/nist20_qtof_cid_safe19659_scaffold60_20_20_seed42/{train,val,test}_id
 data/frag/nist20_qtof_cid_safe19659_d3_mhp_qtof_cid_nl_v1/dags/
 ```
 
-See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked commands. Split ID files are omitted because their redistribution status has not been confirmed; the scripts regenerate them from licensed local data.
+See `data/README.md` for schemas and `preproc_scripts/README.md` for the checked commands. Record-level train/validation/test CSV files are not included because their redistribution status has not been confirmed. They are deterministically regenerated from a licensed local NIST20 export using the tracked seeds, grouping rules, cohort counts, and overlap assertions.
 
 ## Preprocessing, splits, and depth-3 DAGs
 
@@ -129,8 +129,8 @@ These scripts preserve the locked split, seed, upstream checkpoints, losses, and
 
 ## Baselines
 
-Baseline configs are under `baseline_rebuild/baseline/`. Third-party source checkouts and licensed data are deliberately external. Set `FERA_MS_BASELINE_SOURCE` for NEIMS/MassFormer/FraGNNet-D3/GrAFF-MS, `FERA_MS_ICEBERG_SOURCE` for ICEBERG, or `FERA_MS_FIORA_WORKSPACE` for FIORA, then run the corresponding `run_all.sh`/`run_final.sh`. See the baseline README for required inputs and outputs.
+Baseline configs are under `baseline_rebuild/baseline/`. The repository retains the baseline model implementations that are integrated into the original FERA-MS codebase; licensed data, checkpoints, predictions, and nested Git checkouts are not included. The historical baseline wrappers use `FERA_MS_BASELINE_SOURCE` and `FERA_MS_ICEBERG_SOURCE` to identify the package-compatible local source snapshot used for the reported runs. FIORA remains a separately installed command-line package selected with `FERA_MS_FIORA_WORKSPACE`. See the baseline README and `THIRD_PARTY_NOTICES.md` for the exact current provenance limitations.
 
 ## Citation and license
 
-Citation metadata are in `CITATION.cff`. The manuscript citation should replace the provisional software citation when publication metadata are available. No open-source license has yet been selected; see `LICENSE_PENDING.md`. NIST20 remains governed by its separate license.
+Citation metadata are in `CITATION.cff`; no DOI, journal metadata, ORCID, or preferred publication citation is asserted. The FERA-MS license remains pending until the integrated baseline-source provenance audit is closed; see `LICENSE_PENDING.md`, `THIRD_PARTY_NOTICES.md`, and `docs/SOURCE_PROVENANCE.md`. NIST20 and third-party components remain governed by their separate terms.

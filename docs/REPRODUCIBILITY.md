@@ -2,7 +2,7 @@
 
 ## From a licensed NIST20 export
 
-Install the environment and package, place the MSP/MOL export under `data/raw/`, and execute the six preprocessing/split commands in the root README. This route creates processed pickles, the fixed random/scaffold ID sets, and the depth-3 DAG cache. The exact 19,659-spectrum cohort requires the same NIST20 release/export fields and the train-only QC table; neither can be redistributed here.
+Install the environment and package, place the MSP/MOL export under `data/raw/`, and execute the six preprocessing/split commands in the root README. This route locally creates processed pickles, the fixed random/scaffold ID sets, and the depth-3 DAG cache. No record-level split CSV is included in this release. The exact 19,659-spectrum cohort requires the same licensed NIST20 release/export fields and the train-only QC table; neither can be redistributed here.
 
 ## From processed data
 
@@ -18,6 +18,8 @@ Place the completed stage directories under `$FERA_MS_RUNS_DIR` using the names 
 - Paired seeds: `bash train/run_molecule_disjoint_3seeds.sh` uses 42, 43, and 44.
 - Scaffold: `bash train/run_scaffold_disjoint_3seeds.sh` uses the fixed scaffold split through `MS2_SPLIT_DP`.
 - `FERA_MS_ROOT` and `FERA_MS_RUNS_DIR` make repository and output locations portable.
+
+The split scripts regenerate local CSVs with the recorded seed and molecule/scaffold grouping rules, then assert zero group overlap among train, validation, and test. These generated record lists remain untracked.
 
 Validation is used for checkpoint selection and stage-level model selection. Test spectra are never used for training, tuning, early stopping, ablation selection, or retrieval-model selection.
 
