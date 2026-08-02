@@ -8,6 +8,7 @@ RUNS_ROOT="${FERA_MS_RUNS_DIR:-$ROOT/runs}"
 OUT="$RUNS_ROOT/full_fera_ms"
 DIAG="$ROOT/train/_impl/refinement_steps"
 TEMPLATE="$RUNS_ROOT/_config/template.yml"
+PYTHON_BIN="${FERA_MS_PYTHON:-python}"
 
 BASE_CONFIG="$RUNS_ROOT/global_ace_control_ce_trajectory_ablation/control/config.yml"
 
@@ -68,7 +69,7 @@ if ! command -v nvidia-smi >/dev/null 2>&1; then
     exit 1
 fi
 
-python - <<'PY'
+"$PYTHON_BIN" - <<'PY'
 import torch
 
 if not torch.cuda.is_available():
@@ -92,7 +93,7 @@ if [ "$PREFLIGHT_CODE" -ne 0 ]; then
     exit 1
 fi
 
-python - "$ROOT/config/train.yml" \
+"$PYTHON_BIN" - "$ROOT/config/train.yml" \
     > "$OUT/mainline_hparams.env" \
     2> "$OUT/mainline_hparams.log" <<'PY_HPARAMS'
 import os
@@ -175,7 +176,7 @@ run_stage() {
 }
 
 metric() {
-    python "$ROOT/train/_impl/stage_metrics.py" \
+    "$PYTHON_BIN" "$ROOT/train/_impl/stage_metrics.py" \
         metric \
         "$1"
 }
@@ -188,7 +189,7 @@ echo "test used      : False"
 echo "output         : $OUT"
 echo "================================================================================================"
 
-python - <<'PY' \
+"$PYTHON_BIN" - <<'PY' \
     2>&1 \
     | tee "$OUT/preflight/preflight.log"
 import os
@@ -207,6 +208,7 @@ import importlib.util
 
 
 root = Path(os.environ["FERA_MS_ROOT"])
+runs_root = Path(os.environ["FERA_MS_RUNS_DIR"])
 
 script = (
     root
@@ -239,9 +241,9 @@ class Args:
 
 
 config = load_config(
-    root / "runs/_config/template.yml",
-    root
-    / "runs/global_ace_control_ce_trajectory_ablation/"
+    runs_root / "_config/template.yml",
+    runs_root
+    / "global_ace_control_ce_trajectory_ablation/"
     "control/config.yml",
 )
 
@@ -265,8 +267,8 @@ model = FragGNNPL(
 )
 
 checkpoint = torch.load(
-    root
-    / "runs/global_ace_control_ce_trajectory_ablation/"
+    runs_root
+    / "global_ace_control_ce_trajectory_ablation/"
     "control/model_best.ckpt",
     map_location="cpu",
     weights_only=False,
@@ -378,7 +380,7 @@ FORMULA_COMPOSITION_CKPT="$OUT/formula_composition_refinement/formula_compositio
 if [ ! -f "$FORMULA_COMPOSITION_CKPT" ]; then
     run_stage \
         "formula_composition_refinement" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/formula_composition.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -418,7 +420,7 @@ COLLISION_ENERGY_RESPONSE_CKPT="$OUT/collision_energy_response_refinement/collis
 if [ ! -f "$COLLISION_ENERGY_RESPONSE_CKPT" ]; then
     run_stage \
         "collision_energy_response_refinement" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/collision_energy_response.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -502,7 +504,7 @@ NEURAL_REFINEMENT_CHECKPOINT="$OUT/neural_refinement/neural_refinement_best_stat
 if [ ! -f "$NEURAL_REFINEMENT_CHECKPOINT" ]; then
     run_stage \
         "neural_refinement" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -533,7 +535,7 @@ PEAK_DISTILLATION_WARMUP_CKPT="$OUT/peak_distillation_warmup/neural_refinement_b
 if [ ! -f "$PEAK_DISTILLATION_WARMUP_CKPT" ]; then
     run_stage \
         "peak_distillation_warmup" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -564,7 +566,7 @@ PEAK_DISTILLATION_CONTINUATION_CKPT="$OUT/peak_distillation_continuation/neural_
 if [ ! -f "$PEAK_DISTILLATION_CONTINUATION_CKPT" ]; then
     run_stage \
         "peak_distillation_continuation" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -595,7 +597,7 @@ FRAGMENT_REPRESENTATION_CKPT="$OUT/fragment_representation_refinement/neural_ref
 if [ ! -f "$FRAGMENT_REPRESENTATION_CKPT" ]; then
     run_stage \
         "fragment_representation_refinement" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -627,7 +629,7 @@ BOUNDED_RESIDUAL_FLOW_CKPT="$OUT/bounded_residual_flow_refinement/neural_refinem
 if [ ! -f "$BOUNDED_RESIDUAL_FLOW_CKPT" ]; then
     run_stage \
         "bounded_residual_flow_refinement" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/neural_refinement.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -659,7 +661,7 @@ else
 fi
 
 BOUNDED_RESIDUAL_FLOW_SELECTED="$(
-    python "$ROOT/train/_impl/stage_metrics.py" \
+    "$PYTHON_BIN" "$ROOT/train/_impl/stage_metrics.py" \
         select \
         --before "$OUT/bounded_residual_flow_refinement/neural_refinement_val_epoch0_before.csv" \
         --best "$OUT/bounded_residual_flow_refinement/neural_refinement_best_val.csv" \
@@ -681,7 +683,7 @@ FINAL_PEAK_DISTILLATION_CKPT="$OUT/final_peak_distillation/final_peak_distillati
 if [ ! -f "$FINAL_PEAK_DISTILLATION_CKPT" ]; then
     run_stage \
         "final_peak_distillation" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/peak_distillation.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -759,7 +761,7 @@ CANDIDATE_RERANKER_PKL="$OUT/candidate_reranking/candidate_reranker_regressor.pk
 run_candidate_reranker() {
     run_stage \
         "candidate_reranking" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/candidate_reranker.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \
@@ -822,7 +824,7 @@ else
 fi
 
 BEST_ALPHA="$(
-    python - "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" <<'PY_ALPHA'
+    "$PYTHON_BIN" - "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" <<'PY_ALPHA'
 import math
 import sys
 
@@ -916,7 +918,7 @@ if [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
     exit 1
 fi
 
-if ! python -c '
+if ! "$PYTHON_BIN" -c '
 import math
 import sys
 
@@ -950,7 +952,7 @@ SPECTRUM_ALLOCATOR_CKPT="$OUT/spectrum_allocation/spectrum_allocator_allocator_b
 if [ ! -f "$SPECTRUM_ALLOCATOR_CKPT" ]; then
     run_stage \
         "spectrum_allocation" \
-        python -u \
+        "$PYTHON_BIN" -u \
         "$DIAG/spectrum_allocator.py" \
         --template "$TEMPLATE" \
         --config "$BASE_CONFIG" \

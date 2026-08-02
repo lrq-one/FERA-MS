@@ -107,6 +107,9 @@ def run_shell(
     path: Path,
     *arguments: str,
 ) -> None:
+    environment = os.environ.copy()
+    environment["FERA_MS_PYTHON"] = sys.executable
+
     subprocess.run(
         [
             "bash",
@@ -114,6 +117,7 @@ def run_shell(
             *arguments,
         ],
         cwd=ROOT,
+        env=environment,
         check=True,
     )
 
