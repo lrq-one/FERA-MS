@@ -6,6 +6,7 @@ import json
 import os
 import pickle
 import random
+import sys
 import warnings
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,6 +34,15 @@ warnings.filterwarnings(
 
 
 ROOT = Path(os.environ.get("FERA_MS_ROOT", Path(__file__).resolve().parents[1])).resolve()
+
+for import_path in (
+    ROOT / "code/src",
+    ROOT / "code",
+    ROOT,
+):
+    if str(import_path) not in sys.path:
+        sys.path.insert(0, str(import_path))
+
 RUNS_ROOT = Path(os.environ.get("FERA_MS_RUNS_DIR", ROOT / "runs")).resolve()
 
 RUN_ROOT = RUNS_ROOT / "full_fera_ms"

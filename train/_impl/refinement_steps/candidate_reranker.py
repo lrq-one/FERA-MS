@@ -1,6 +1,10 @@
 import argparse
+import json
 import math
+import os
 import pickle
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -879,28 +883,108 @@ def sample_candidate_rows(feats, residual, pos, target_mass, pred_prob, batch, r
     )
 
 
+def train_lightgbm_isolated(X, y, w, args):
+    """Fit LightGBM without loading it into the PyTorch/OpenMP process."""
+    fit_dir = Path(args.out_dir) / ".lightgbm_fit"
+    fit_dir.mkdir(parents=True, exist_ok=True)
+
+    x_path = fit_dir / "X.npy"
+    y_path = fit_dir / "y.npy"
+    w_path = fit_dir / "w.npy"
+    params_path = fit_dir / "params.json"
+    model_path = fit_dir / "model.pkl"
+
+    params = {
+        "objective": "regression",
+        "n_estimators": int(args.n_estimators),
+        "learning_rate": float(args.gbdt_lr),
+        "num_leaves": int(args.num_leaves),
+        "max_depth": int(args.max_depth),
+        "min_child_samples": int(args.min_child_samples),
+        "subsample": float(args.subsample),
+        "colsample_bytree": float(args.colsample_bytree),
+        "reg_alpha": float(args.reg_alpha),
+        "reg_lambda": float(args.reg_lambda),
+        "random_state": int(args.seed),
+        "n_jobs": int(args.num_workers),
+        "verbose": -1,
+    }
+
+    paths = (
+        x_path,
+        y_path,
+        w_path,
+        params_path,
+        model_path,
+    )
+
+    try:
+        np.save(x_path, X, allow_pickle=False)
+        np.save(y_path, y, allow_pickle=False)
+        np.save(w_path, w, allow_pickle=False)
+        params_path.write_text(
+            json.dumps(params, sort_keys=True),
+            encoding="utf-8",
+        )
+
+        child_env = os.environ.copy()
+        # Repository sitecustomize imports torch when this variable is set.
+        # Removing it keeps the LightGBM worker free of torch's bundled
+        # libgomp; random_state above preserves the locked model seed.
+        child_env.pop("MS2_GLOBAL_SEED", None)
+
+        helper = Path(__file__).with_name(
+            "lightgbm_isolated_fit.py"
+        )
+
+        print(
+            "[candidate reranker] fitting LightGBM in isolated process:",
+            helper,
+            flush=True,
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                "-u",
+                str(helper),
+                "--x",
+                str(x_path),
+                "--y",
+                str(y_path),
+                "--weight",
+                str(w_path),
+                "--params",
+                str(params_path),
+                "--output",
+                str(model_path),
+            ],
+            check=True,
+            env=child_env,
+        )
+
+        with model_path.open("rb") as handle:
+            return pickle.load(handle)
+    finally:
+        for path in paths:
+            path.unlink(missing_ok=True)
+        try:
+            fit_dir.rmdir()
+        except OSError:
+            pass
+
+
 def train_regressor(X, y, w, args):
     backend = args.backend.lower()
 
     if backend in ["auto", "lightgbm", "lgbm"]:
         try:
-            import lightgbm as lgb
-            model = lgb.LGBMRegressor(
-                objective="regression",
-                n_estimators=int(args.n_estimators),
-                learning_rate=float(args.gbdt_lr),
-                num_leaves=int(args.num_leaves),
-                max_depth=int(args.max_depth),
-                min_child_samples=int(args.min_child_samples),
-                subsample=float(args.subsample),
-                colsample_bytree=float(args.colsample_bytree),
-                reg_alpha=float(args.reg_alpha),
-                reg_lambda=float(args.reg_lambda),
-                random_state=int(args.seed),
-                n_jobs=int(args.num_workers),
-                verbose=-1,
+            model = train_lightgbm_isolated(
+                X,
+                y,
+                w,
+                args,
             )
-            model.fit(X, y, sample_weight=w)
             print("[candidate reranker] trained backend: lightgbm")
             return model, "lightgbm"
         except Exception as e:
