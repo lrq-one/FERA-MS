@@ -1,4 +1,4 @@
-name: Temporary English source cleanup
+name: Temporary diagnostic wording verification
 on:
   push:
     branches:
@@ -6,149 +6,61 @@ on:
 permissions:
   contents: write
 jobs:
-  translate:
+  polish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-      - name: Translate only Chinese-bearing source lines and verify unchanged logic
+      - name: Fix only verified English translation artifacts
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import ast, re, subprocess
+          import ast
           from pathlib import Path
-          han=re.compile(r'[\u3400-\u9fff\uf900-\ufaff]+')
-          mapping={}
-          for line in Path('.github/temporary_english_mapping.tsv').read_text(encoding='utf-8').splitlines():
-              if not line:continue
-              chinese, english=line.split('\t',1)
-              assert chinese not in mapping
-              mapping[chinese]=english
-          fixes={
-              'source split Duplicate spec_id':'Duplicate spec_id in source split',
-              'Not found in batch found in ACE tensor':'ACE tensor not found in batch',
-              'Not found in test batch found in ACE field':'ACE field not found in test batch',
-              'Not found in batch found in ACE field':'ACE field not found in batch',
-              'After alignment,spec_id':'After alignment, spec_id',
-              'Must provide--':'Must provide --',
-              'Not found CHUN assignment':'CHUN assignment not found',
-              'Not found test evaluation call':'Test evaluation call not found',
-              'Cannot extract from build_batch_tensors':'Cannot obtain batch size from build_batch_tensors',
-              'output batch size':' output.',
-              'CHUN matching is disabled in the benchmark benchmark version':'CHUN matching is disabled in the benchmark version',
-              'locked NL Reference cache':'Locked NL reference cache',
-              'experiment 5 Candidate cache':'Experiment 5 candidate cache',
-              'Duplicate entries in the same row NL':'Duplicate NL entries in the same row',
-              'Not detected:nvidia-smi, stopped':'nvidia-smi was not detected; stopping',
-              'contains unexpected missing keys':'contains unexpected missing keys',
-              'exists unexpected keys':'contains unexpected keys',
-              'Cannot extract from {path} extract global cosine':'Cannot extract global cosine from {path}',
-              'Cannot extract from checkpoint read state_dict':'Cannot read state_dict from checkpoint',
-              'must be provided when using--variant':'requires --variant',
-              'regressor already exists；rerun only':'regressor already exists; rerun only',
-              'already exists；':'already exists; ',
-              'already exists; rerun only':'already exists; rerun only',
-              'already exists.':'already exists.',
-              'benchmarker':'benchmark',
-              'Summarize across three random seeds:ACE':'Summarize ACE',
-              'stratified CBIN、JSS':'stratified CBIN, JSS',
-              'across different seed in':'across different seeds:',
-              'Current seed42 relevant files in':'Related files in current seed42 directory',
-              'Validation 0.01 Da cosine reproduction failed':'Validation 0.01-Da cosine reproduction failed',
-              'To prevent evaluating the wrong model, stopped test evaluation':'Stopping test evaluation to avoid using an incorrect model',
-              'Found ACE field but could not replace it':'ACE field found but could not be replaced',
-              'Test set produced no batch':'Test set yielded no batches',
-              'After excluding warmup no valid test spectra remain':'No valid test spectra remain after excluding warmup',
-              'missing global ACE':'Missing global ACE',
-              'test DataLoader':'Test DataLoader',
-              'ACE Perturbation':'ACE perturbation',
-              'seed{seed} locked':'seed {seed} locked',
-              'seed{seed} Incorrect':'seed {seed}: incorrect',
-              'Incorrect test-spectrum count':'Incorrect test spectrum count',
-              'seed{seed} row-count':'seed {seed} row-count',
-              'baseline 24 groups':'The 24 baseline groups',
-              'clustered micro Molecule':'Clustered-micro molecule',
-              'experiment 8 Result':'Experiment 8 result',
-              'Output directory already exists':'Output directory already exists',
-              'Current training.py Missing':'Current training.py is missing',
-              'Add when rerunning: --overwrite':'Use --overwrite to rerun',
-              'spec_count invalid sum':'Invalid spec_count sum',
-              'seed configuration audit':'Seed configuration audit',
-              'three-seed summary':'Three-seed summary',
+          changes={
+            'test/benchmark_final_model.py':[('" output.."','" output."')],
+            'test/evaluate_metric_robustness.py':[('"runtime spectrum_allocator in"','"In runtime spectrum_allocator, "')],
+            'test/rebuild_retrieval_neutral_losses.py':[
+              ('f"{len(reference_files)}  "','f"{len(reference_files)} files"'),
+              ('f"{len(LOSSES)}  , cache column count={width}"','f"{len(LOSSES)} losses, cache column count={width}"'),
+              ('"[3/5] Run on the locked cache:100%rule-replay validation"','"[3/5] Verify 100% rule replay on the locked cache"'),
+              ('f"{len(reference_rows)}  rows, "','f"{len(reference_rows)} rows, "'),
+              ('f"{len(unique_formulas)}  unique formulas all match"','f"{len(unique_formulas)} unique formulas all match"'),
+              ('f"{len(target_files)}  , workers={WORKERS}"','f"{len(target_files)} files, workers={WORKERS}"'),
+              ('"[2/5] Fix NL template: "','"[2/5] Lock NL template: "'),
+              ('f"reference NL column count mismatch: {dict(widths)}"','f"Reference NL column count mismatch: {dict(widths)}"')],
+            'test/run_paired_bootstrap.py':[
+              ('f"{label} exists NaN or nonnumeric"','f"{label} contains NaN or nonnumeric values"'),
+              ('f"seed{seed} "','f"seed {seed}: "'),
+              ('"Missing coverage for 3-seed spectra"','"Some spectra are missing one or more of the three seeds"')],
+            'test/summarize_ace_stratified.py':[
+              ('"Summarize ACE stratified CBIN, JSS and CHUN results."','"Summarize ACE-stratified CBIN, JSS and CHUN results across three random seeds."'),
+              ('"For example runs/experiments/"','"For example, runs/experiments/"')],
+            'test/summarize_metric_robustness.py':[
+              ('f"seed {seed} has"','f"seed {seed} has "'),
+              ('f"seed {seed} Incorrect','f"seed {seed}: incorrect')],
+            'train/_impl/run_refinement.sh':[
+              ('"Not detected:nvidia-smi, stopped."','"nvidia-smi was not detected; stopping."'),
+              ('"[RESUME] spectrum allocator allocator already exists."','"[RESUME] spectrum allocator already exists."')],
           }
-          paths=subprocess.check_output(['git','ls-files','-z']).split(b'\0')
-          changed=[]; records=[]; scanned=0
-          for raw in paths:
-              if not raw:continue
-              name=raw.decode('utf-8','surrogateescape')
-              if name=='.github/temporary_english_mapping.tsv':continue
-              path=Path(name)
-              if not path.is_file():continue
-              data=path.read_bytes()
-              if b'\0' in data:continue
-              try:content=data.decode('utf-8')
-              except UnicodeDecodeError:continue
-              scanned+=1
-              if not han.search(content):continue
-              def translate(line):
-                  def convert(match):
-                      chinese=match.group()
-                      if chinese not in mapping:raise ValueError(f'Unmapped Chinese in {name}: {chinese}')
-                      value=mapping[chinese]
-                      before=line[match.start()-1] if match.start() else ''
-                      after=line[match.end()] if match.end()<len(line) else ''
-                      if before and before.isascii() and (before.isalnum() or before in '}]') and value and value[0].isalnum():value=' '+value
-                      if after and after.isascii() and (after.isalnum() or after=='{') and value and value[-1].isalnum():value+=' '
-                      return value
-                  rendered=han.sub(convert,line)
-                  for old,new in fixes.items():rendered=rendered.replace(old,new)
-                  for old,new in [('：',': '),('，',', '),('。','.'),('；','; '),('、',', '),('，',', ')]:rendered=rendered.replace(old,new)
-                  return rendered
-              output=[]
-              for index,line in enumerate(content.splitlines(keepends=True),1):
-                  new=translate(line) if han.search(line) else line
-                  if new!=line:records.append(f'{name}\t{index}\t{line.strip()}\t{new.strip()}')
-                  output.append(new)
-              revised=''.join(output)
-              assert not han.search(revised),name
-              if path.suffix=='.py':ast.parse(revised,filename=name)
-              path.write_text(revised,encoding='utf-8')
-              changed.append(name)
-          assert len(changed)==26,(len(changed),changed)
-          with open('english_translation_audit.tsv','w',encoding='utf-8') as out:
-              out.write('path\tline\toriginal\ttranslation\n'+'\n'.join(records)+'\n')
-          print(f'REVIEWED_TRANSLATION scanned={scanned} changed_files={len(changed)} translated_lines={len(records)}')
-          remaining=[]
-          for raw in paths:
-              if not raw:continue
-              name=raw.decode('utf-8','surrogateescape')
-              if name=='.github/temporary_english_mapping.tsv':continue
-              path=Path(name)
-              if path.is_file():
-                  try:text=path.read_text(encoding='utf-8')
-                  except (UnicodeError,ValueError):continue
-                  if han.search(text):remaining.append(name)
-          assert not remaining,remaining
+          changes.update({file:[('"To prevent evaluating the wrong model, stopped test evaluation."','"Stopped test evaluation to avoid using an incorrect model."')] for file in ('test/evaluate_ace_perturbation.py','test/evaluate_chun.py','test/evaluate_metric_robustness.py')})
+          # Preserve the independent runtime-specific correction as well.
+          changes['test/evaluate_metric_robustness.py'].append(('"runtime spectrum_allocator in"','"In runtime spectrum_allocator, "'))
+          for name, replacements in changes.items():
+              path=Path(name); text=path.read_text(encoding='utf-8')
+              for old,new in replacements:
+                  if old not in text and new in text:continue
+                  assert old in text,(name,old)
+                  text=text.replace(old,new)
+              if name.endswith('.py'):ast.parse(text,filename=name)
+              path.write_text(text,encoding='utf-8')
           PY
           git diff --check
-          while IFS= read -r file; do
-            case "$file" in
-              *.sh) bash -n "$file" ;;
-            esac
-          done < <(git diff --name-only)
-          python -m compileall -q ablation_studies preproc_scripts test train code baseline_rebuild/baseline/source/fragnnet/src
+          bash -n train/_impl/run_refinement.sh
+          python -m compileall -q test train
           git add -u
           git diff --cached --stat
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Translate Chinese source diagnostics without changing computation'
+          git commit -m 'Polish English diagnostic translations without altering computation'
           git push origin HEAD:audit/iceberg-ce-recovery-20260918
-          echo 'ENGLISH_SOURCE_CLEANUP=COMMITTED'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: english-translation-audit
-          path: english_translation_audit.tsv
-          if-no-files-found: ignore
