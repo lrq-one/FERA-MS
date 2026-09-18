@@ -53,7 +53,7 @@ for node in ast.walk(evaluate_function):
             chun_assignments.append(node)
 
 if not chun_assignments:
-    raise RuntimeError("没有找到CHUN赋值。")
+    raise RuntimeError("CHUN assignment not found.")
 
 test_assignment = None
 
@@ -71,14 +71,14 @@ for node in ast.walk(main_function):
         break
 
 if test_assignment is None:
-    raise RuntimeError("没有找到test评价调用。")
+    raise RuntimeError("Test evaluation call not found.")
 
 parse_return_marker = (
     "    return parser.parse_args()\n"
 )
 
 if parse_return_marker not in source:
-    raise RuntimeError("无法定位parse_args返回。")
+    raise RuntimeError("Cannot locate parse_args return.")
 
 source = source.replace(
     parse_return_marker,
@@ -302,5 +302,5 @@ TARGET.write_text(
     encoding="utf-8",
 )
 
-print("已创建：", TARGET.resolve())
-print("CHUN匹配已在benchmark版本中关闭。")
+print("Created: ", TARGET.resolve())
+print("CHUN matching is disabled in the benchmark version.")

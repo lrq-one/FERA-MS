@@ -544,13 +544,13 @@ missing_ann = (
 
 if missing_safe:
     raise RuntimeError(
-        "safe spec缺少字段："
+        "safe spec missing fields: "
         f"{sorted(missing_safe)}"
     )
 
 if missing_ann:
     raise RuntimeError(
-        "native annotation缺少字段："
+        "native annotation missing fields: "
         f"{sorted(missing_ann)}"
     )
 
@@ -714,10 +714,10 @@ if chosen_keys is None:
 
     print()
     print(
-        "无法获得唯一注释映射。"
+        "Cannot obtain a unique annotation mapping."
     )
     print(
-        "歧义记录已写入：",
+        "Ambiguous records written to: ",
         AMBIGUITY_PATH,
     )
 
@@ -843,7 +843,7 @@ aligned = aligned.sort_values(
 
 if len(aligned) != len(safe):
     raise RuntimeError(
-        "对齐后行数发生变化："
+        "Row count changed after alignment: "
         f"safe={len(safe)}, "
         f"aligned={len(aligned)}"
     )
@@ -852,7 +852,7 @@ if aligned["spec_id"].nunique() != len(
     aligned
 ):
     raise RuntimeError(
-        "对齐后spec_id不唯一。"
+        "After alignment, spec_id is not unique."
     )
 
 coverage_rows = [

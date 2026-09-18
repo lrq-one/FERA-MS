@@ -89,7 +89,7 @@ def require_file(path: Path, label: str) -> Path:
 
     if not path.is_file():
         raise FileNotFoundError(
-            f"{label}不存在：{path}"
+            f"{label} does not exist: {path}"
         )
 
     return path
@@ -117,7 +117,7 @@ def load_module(
 
     if spec is None or spec.loader is None:
         raise RuntimeError(
-            f"无法加载模块：{path}"
+            f"Cannot load module: {path}"
         )
 
     module = importlib.util.module_from_spec(spec)
@@ -446,9 +446,9 @@ def evaluate_split(
             )
 
             raise RuntimeError(
-                "运行时spectrum_allocator中"
-                "没有找到锁定dense renderer。"
-                f"候选函数：{available}"
+                "In runtime spectrum_allocator, "
+                "Could not find the locked dense renderer."
+                f"Candidate functions: {available}"
             )
 
         metric_renderer = getattr(
@@ -756,7 +756,7 @@ def evaluate_split(
 
     if detail.empty:
         raise RuntimeError(
-            f"{split}逐谱结果为空。"
+            f"{split} Per-spectrum results are empty."
         )
 
     maximum_renderer_parity_difference = float(
@@ -790,7 +790,7 @@ def evaluate_split(
         > 2.0e-6
     ):
         raise RuntimeError(
-            f"{split} raw@0.01 renderer parity失败："
+            f"{split} raw@0.01 renderer parity failed: "
             f"max_abs="
             f"{maximum_renderer_parity_difference}"
         )
@@ -822,7 +822,7 @@ def main() -> None:
 
     template_path = require_file(
         ROOT / "runs/_config/template.yml",
-        "模板配置",
+        "template configuration",
     )
 
     def locate_seed_artifact(
@@ -862,9 +862,9 @@ def main() -> None:
 
         if not unique_candidates:
             print()
-            print(f"[缺少文件] {label}")
-            print("seed42目录：", seed_dir)
-            print("当前seed42中的相关文件：")
+            print(f"[Missing file] {label}")
+            print("seed42 directory: ", seed_dir)
+            print("Related files in current seed42 directory: ")
 
             for candidate in sorted(
                 seed_dir.rglob("*")
@@ -884,7 +884,7 @@ def main() -> None:
                     print("  ", candidate)
 
             raise FileNotFoundError(
-                f"无法定位{label}"
+                f"Cannot locate {label}"
             )
 
         def ranking_key(candidate: Path):
@@ -911,19 +911,19 @@ def main() -> None:
             key=ranking_key,
         )[0]
 
-        print(f"[自动定位] {label}:")
+        print(f"[Auto-located] {label}:")
         print(" ", selected)
 
         if len(unique_candidates) > 1:
             print(
-                f"  共发现{len(unique_candidates)}个候选，"
-                "已按seed42和路径关键词选择。"
+                f"  Found {len(unique_candidates)} candidates, "
+                "Selected using seed42 and path keywords."
             )
 
         return selected
 
     config_path = locate_seed_artifact(
-        label="seed42模型配置",
+        label="seed42 model configuration",
         exact_candidates=[
             seed_dir
             / "global_ace_control_ce_trajectory_ablation"
@@ -950,7 +950,7 @@ def main() -> None:
     )
 
     backbone_path = locate_seed_artifact(
-        label="seed42 final peak distillation模型",
+        label="seed42 final peak distillation model",
         exact_candidates=[
             seed_dir
             / "full_fera_ms"
@@ -969,7 +969,7 @@ def main() -> None:
     )
 
     reranker_path = locate_seed_artifact(
-        label="seed42 candidate reranker模型",
+        label="seed42 candidate reranker model",
         exact_candidates=[
             seed_dir
             / "full_fera_ms"
@@ -988,7 +988,7 @@ def main() -> None:
     )
 
     allocator_path = locate_seed_artifact(
-        label="seed42 spectrum allocator模型",
+        label="seed42 spectrum allocator model",
         exact_candidates=[
             seed_dir
             / "full_fera_ms"
@@ -1388,8 +1388,8 @@ def main() -> None:
 
     if not parity_passed:
         raise RuntimeError(
-            "验证集0.01 Da cosine复现失败，"
-            "为防止评错模型，停止test评价。"
+            "Validation 0.01-Da cosine reproduction failed, "
+            "Stopped test evaluation to avoid using an incorrect model."
         )
 
     test_metrics, test_detail = (

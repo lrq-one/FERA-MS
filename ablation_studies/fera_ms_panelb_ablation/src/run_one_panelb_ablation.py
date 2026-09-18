@@ -71,7 +71,7 @@ def ensure_inside_ablation_root(path: Path) -> None:
 
     if not resolved.is_relative_to(root):
         raise RuntimeError(
-            "检测到输出路径逃离ablation_studies："
+            "Output path escapes ablation_studies: "
             f"{resolved}"
         )
 
@@ -122,7 +122,7 @@ def apply_variant(
 
     if changed != expected:
         raise RuntimeError(
-            f"{stage_name}: 检测到非预期配置变化。\n"
+            f"{stage_name}: Unexpected configuration change detected.\n"
             f"actual={sorted(changed)}\n"
             f"expected={sorted(expected)}"
         )
@@ -494,8 +494,8 @@ def main() -> None:
 
     if run_root.exists():
         raise FileExistsError(
-            "该运行目录已经存在。"
-            "为避免覆盖，本程序拒绝启动：\n"
+            "This run directory already exists."
+            "To prevent overwriting, this program will not start: \n"
             f"{run_root}"
         )
 

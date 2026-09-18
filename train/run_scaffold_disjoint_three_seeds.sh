@@ -70,7 +70,7 @@ save_successful_outputs() {
         SOURCE="$RUNS_ROOT/$NAME"
 
         if [ ! -e "$SOURCE" ]; then
-            echo "[ERROR] 缺少输出：$SOURCE"
+            echo "[ERROR] Missing output: $SOURCE"
             return 1
         fi
 
@@ -249,7 +249,7 @@ allocator_seed = int(
 
 if allocator_seed != seed:
     raise RuntimeError(
-        "spectrum allocator seed不一致："
+        "spectrum allocator seed mismatch: "
         f"{allocator_seed} != {seed}"
     )
 
@@ -290,7 +290,7 @@ if summary[
     "test_used_for_selection"
 ]:
     raise RuntimeError(
-        "检测到test参与选择"
+        "Detected test involved in selection"
     )
 
 output_path.write_text(
@@ -504,7 +504,7 @@ main() {
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED structural backbone/retained control失败"
+            echo "[STOP] seed $SEED structural backbone/retained control failed"
             return "$CODE"
         fi
 
@@ -518,7 +518,7 @@ main() {
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED global ACE control失败"
+            echo "[STOP] seed $SEED global ACE control failed"
             return "$CODE"
         fi
 
@@ -566,7 +566,7 @@ for path in paths:
 
     if actual != expected:
         raise RuntimeError(
-            f"{path} seed不一致："
+            f"{path} seed mismatch: "
             f"{actual} != {expected}"
         )
 
@@ -578,7 +578,7 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed配置审计失败"
+            echo "[STOP] Seed configuration audit failed"
             return "$CODE"
         fi
 
@@ -592,7 +592,7 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED refinement失败"
+            echo "[STOP] seed $SEED refinement failed"
             return "$CODE"
         fi
 
@@ -600,7 +600,7 @@ PY
             "CANDIDATE_RERANKER_SEED=$SEED" \
             "$RUNS_ROOT/full_fera_ms/effective_seed.env"
         then
-            echo "[STOP] candidate reranker/spectrum allocator seed审计失败"
+            echo "[STOP] candidate reranker/spectrum allocator seed audit failed"
             cat \
                 "$RUNS_ROOT/full_fera_ms/effective_seed.env"
             return 1
@@ -615,7 +615,7 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED锁定评估失败"
+            echo "[STOP] seed $SEED locked evaluation failed"
             return "$CODE"
         fi
 
@@ -627,14 +627,14 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED molecule聚合失败"
+            echo "[STOP] seed $SEED molecule aggregation failed"
             return "$CODE"
         fi
 
         RESULT_PATH="$RESULT_ROOT/final_evaluation_with_molecule_aggregates.json"
 
         if [ ! -f "$RESULT_PATH" ]; then
-            echo "[STOP] 缺少最终结果：$RESULT_PATH"
+            echo "[STOP] Missing final result: $RESULT_PATH"
             return 1
         fi
 
@@ -648,7 +648,7 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED结果审计失败"
+            echo "[STOP] seed $SEED result audit failed"
             return "$CODE"
         fi
 
@@ -658,7 +658,7 @@ PY
         CODE=$?
 
         if [ "$CODE" -ne 0 ]; then
-            echo "[STOP] seed $SEED输出归档失败"
+            echo "[STOP] seed $SEED output archiving failed"
             return "$CODE"
         fi
 
@@ -678,7 +678,7 @@ PY
     CODE=$?
 
     if [ "$CODE" -ne 0 ]; then
-        echo "[STOP] 三种子汇总失败"
+        echo "[STOP] Three-seed summary failed"
         return "$CODE"
     fi
 

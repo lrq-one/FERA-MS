@@ -96,7 +96,7 @@ def parse_formula(formula: str) -> dict[str, int]:
 
     for match in TOKEN.finditer(formula):
         if match.start() != position:
-            raise ValueError(f"无法解析化学式：{formula}")
+            raise ValueError(f"Cannot parse molecular formula: {formula}")
 
         element, count = match.groups()
         result[element] = (
@@ -106,7 +106,7 @@ def parse_formula(formula: str) -> dict[str, int]:
         position = match.end()
 
     if position != len(formula):
-        raise ValueError(f"无法解析化学式：{formula}")
+        raise ValueError(f"Cannot parse molecular formula: {formula}")
 
     return result
 
@@ -134,7 +134,7 @@ def classify_delta(delta: float) -> str:
 
     if error > MATCH_TOLERANCE:
         raise RuntimeError(
-            f"未知NL质量差：delta={delta:.9f}, "
+            f"Unknown NL mass difference: delta={delta:.9f}, "
             f"nearest={name}, error={error:.9f}"
         )
 
@@ -151,17 +151,17 @@ target_files = sorted(
 
 if not reference_files:
     raise FileNotFoundError(
-        f"锁定NL参考缓存不存在：{REFERENCE_DIR}"
+        f"Locked NL reference cache does not exist: {REFERENCE_DIR}"
     )
 
 if not target_files:
     raise FileNotFoundError(
-        f"实验5候选缓存不存在：{TARGET_DIR}"
+        f"Experiment 5 candidate cache does not exist: {TARGET_DIR}"
     )
 
 print(
-    f"[1/5] 读取锁定NL参考缓存："
-    f"{len(reference_files)} 个",
+    f"[1/5] Read locked NL reference cache: "
+    f"{len(reference_files)} files",
     flush=True,
 )
 
@@ -188,7 +188,7 @@ for file_index, path in enumerate(reference_files, 1):
 
     if missing:
         raise RuntimeError(
-            f"参考缓存缺字段：{path} -> {sorted(missing)}"
+            f"Reference cache missing fields: {path} -> {sorted(missing)}"
         )
 
     base = as_numpy(cache["formula_peak_mzs"])
@@ -201,7 +201,7 @@ for file_index, path in enumerate(reference_files, 1):
         or nl_probs.ndim != 2
     ):
         raise RuntimeError(
-            f"参考缓存数组维度异常：{path}"
+            f"Unexpected reference-cache array dimensions: {path}"
         )
 
     if (
@@ -209,7 +209,7 @@ for file_index, path in enumerate(reference_files, 1):
         or nl_mzs.shape[0] != base.shape[0]
     ):
         raise RuntimeError(
-            f"参考缓存数组形状异常：{path}"
+            f"Unexpected reference-cache array shape: {path}"
         )
 
     widths[int(nl_mzs.shape[1])] += 1
@@ -237,7 +237,7 @@ for file_index, path in enumerate(reference_files, 1):
 
             if name in actual:
                 raise RuntimeError(
-                    f"同一行出现重复NL："
+                    f"Duplicate NL entries in the same row: "
                     f"{path.name}, formula={formula}, "
                     f"loss={name}"
                 )
@@ -255,13 +255,13 @@ for file_index, path in enumerate(reference_files, 1):
         or file_index == len(reference_files)
     ):
         print(
-            f"  已读取 {file_index}/{len(reference_files)}",
+            f"  Read {file_index}/{len(reference_files)}",
             flush=True,
         )
 
 if len(widths) != 1:
     raise RuntimeError(
-        f"参考NL列数不一致：{dict(widths)}"
+        f"Reference NL column count mismatch: {dict(widths)}"
     )
 
 width = next(iter(widths))
@@ -273,7 +273,7 @@ for name, _, _ in LOSSES:
 
     if not values:
         raise RuntimeError(
-            f"参考缓存中没有NL模板：{name}"
+            f"Reference cache lacks NL template: {name}"
         )
 
     values = np.asarray(values, dtype=np.float64)
@@ -281,14 +281,14 @@ for name, _, _ in LOSSES:
 
     if np.max(np.abs(values - median)) > 1.0e-6:
         raise RuntimeError(
-            f"NL掩码概率不固定：{name}"
+            f"NL mask probability is not fixed: {name}"
         )
 
     mask_probability[name] = median
 
 print(
-    f"[2/5] 固定NL模板："
-    f"{len(LOSSES)} 个，缓存列数={width}",
+    f"[2/5] Lock NL template: "
+    f"{len(LOSSES)} losses, cache column count={width}",
     flush=True,
 )
 
@@ -305,7 +305,7 @@ for index, (name, loss, mass) in enumerate(
     )
 
 print(
-    "[3/5] 对锁定缓存执行100%规则回放校验",
+    "[3/5] Verify 100% rule replay on the locked cache",
     flush=True,
 )
 
@@ -330,7 +330,7 @@ for formula, composition, base_mz, actual in reference_rows:
 
 if mismatches:
     print(
-        "规则回放未达到100%，不会改动实验5缓存。"
+        "Rule replay did not reach 100%, will not modify experiment 5 cache."
     )
 
     for item in mismatches:
@@ -342,14 +342,14 @@ if mismatches:
 
 print(
     f"  LOCKED_NL_PARITY_OK："
-    f"{len(reference_rows)} 行、"
-    f"{len(unique_formulas)} 个唯一化学式全部一致",
+    f"{len(reference_rows)} rows, "
+    f"{len(unique_formulas)} unique formulas all match",
     flush=True,
 )
 
 print(
-    f"[4/5] 增强实验5候选缓存："
-    f"{len(target_files)} 个，workers={WORKERS}",
+    f"[4/5] Enrich experiment 5 candidate cache: "
+    f"{len(target_files)} files, workers={WORKERS}",
     flush=True,
 )
 
@@ -452,7 +452,7 @@ with ThreadPoolExecutor(
             or index == len(target_files)
         ):
             print(
-                f"  已处理 {index}/{len(target_files)}："
+                f"  Processed {index}/{len(target_files)}: "
                 f"{dict(counts)}",
                 flush=True,
             )
@@ -492,7 +492,7 @@ for path in target_files:
 
 if valid != len(target_files):
     raise RuntimeError(
-        f"增强后完整缓存数异常："
+        f"Unexpected number of complete caches after enrichment: "
         f"{valid}/{len(target_files)}"
     )
 
@@ -532,6 +532,6 @@ print(
 )
 
 print(
-    f"审计文件：{AUDIT_PATH}",
+    f"Audit file: {AUDIT_PATH}",
     flush=True,
 )

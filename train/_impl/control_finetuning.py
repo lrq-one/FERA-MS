@@ -126,7 +126,7 @@ def load_full_config(path: Path) -> dict[str, Any]:
 
     if not isinstance(config, dict):
         raise TypeError(
-            f"配置顶层不是字典：{path}"
+            f"Top-level configuration is not a dictionary: {path}"
         )
 
     config[
@@ -408,7 +408,7 @@ def train_variant(
 
     if checkpoint_callback is None:
         raise RuntimeError(
-            "checkpoint callback不存在"
+            "checkpoint callback does not exist"
         )
 
     best_source = Path(
@@ -524,7 +524,7 @@ def main() -> None:
 
     if missing:
         raise FileNotFoundError(
-            "缺少必要文件：\n"
+            "Missing required files: \n"
             + "\n".join(
                 str(path)
                 for path in missing

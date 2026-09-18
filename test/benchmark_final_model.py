@@ -43,7 +43,7 @@ def option_value(
         if argument == option:
             if index + 1 >= len(arguments):
                 raise RuntimeError(
-                    f"{option}后面缺少参数值。"
+                    f"{option} requires an argument value."
                 )
 
             return arguments[index + 1]
@@ -212,7 +212,7 @@ def load_evaluator(
         or specification.loader is None
     ):
         raise RuntimeError(
-            f"无法加载：{path}"
+            f"Cannot load: {path}"
         )
 
     module = (
@@ -255,12 +255,12 @@ output_dir_argument = option_value(
 
 if seed_dir_argument is None:
     raise RuntimeError(
-        "必须提供--seed-dir。"
+        "Must provide --seed-dir."
     )
 
 if output_dir_argument is None:
     raise RuntimeError(
-        "必须提供--output-dir。"
+        "Must provide --output-dir."
     )
 
 seed_dir = resolve_path(
@@ -379,8 +379,8 @@ def timed_evaluate_split(
             )
         except Exception as error:
             raise RuntimeError(
-                "无法从build_batch_tensors"
-                "输出中取得batch size。"
+                "Cannot obtain batch size from build_batch_tensors"
+                " output."
             ) from error
 
         batch_sizes.append(
@@ -490,7 +490,7 @@ def timed_evaluate_split(
         == len(batch_sizes)
     ):
         raise RuntimeError(
-            "计时调用数量不一致："
+            "Timing call count mismatch: "
             f"build={len(build_times)}, "
             f"forward={len(forward_times)}, "
             f"batch={len(batch_sizes)}"
@@ -498,7 +498,7 @@ def timed_evaluate_split(
 
     if len(batch_sizes) == 0:
         raise RuntimeError(
-            "测试集没有产生任何batch。"
+            "Test set yielded no batches."
         )
 
     warmup_batches = min(
@@ -586,12 +586,12 @@ def timed_evaluate_split(
 
     if measured_spectra <= 0:
         raise RuntimeError(
-            "除去warmup后没有有效测试谱。"
+            "No valid test spectra remain after excluding warmup."
         )
 
     if measured_core_seconds <= 0.0:
         raise RuntimeError(
-            "有效计时时间为零。"
+            "Valid timing duration is zero."
         )
 
     per_batch.to_csv(
@@ -912,7 +912,7 @@ if not benchmark_state.get(
     False,
 ):
     raise RuntimeError(
-        "没有捕获到测试集效率结果。"
+        "No test-set efficiency results captured."
     )
 
 process_wall_seconds = float(

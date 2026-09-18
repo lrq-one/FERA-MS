@@ -608,7 +608,7 @@ def main():
 
         if saved_input_dim != input_dim:
             raise RuntimeError(
-                f"resume input_dim不一致："
+                f"resume input_dim mismatch: "
                 f"{saved_input_dim} != {input_dim}"
             )
 

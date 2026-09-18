@@ -317,7 +317,7 @@ def sanitize_metric(
 
     if numeric.isna().any():
         raise RuntimeError(
-            f"{label}存在NaN或非数值"
+            f"{label} contains NaN or nonnumeric values"
         )
 
     severe = (
@@ -331,7 +331,7 @@ def sanitize_metric(
 
     if severe.any():
         raise RuntimeError(
-            f"{label}存在严重越界："
+            f"{label} is severely out of range: "
             f"min={numeric.min()}, "
             f"max={numeric.max()}"
         )
@@ -414,7 +414,7 @@ missing_baseline_columns = (
 
 if missing_baseline_columns:
     raise RuntimeError(
-        "基线输入缺少字段："
+        "Baseline input missing fields: "
         f"{sorted(missing_baseline_columns)}"
     )
 
@@ -474,7 +474,7 @@ if (
     != expected_baseline_groups
 ):
     raise RuntimeError(
-        "基线24组不闭合。\n"
+        "The 24 baseline groups are incomplete.\n"
         f"Missing: "
         f"{sorted(expected_baseline_groups - actual_baseline_groups)}\n"
         f"Extra: "
@@ -537,7 +537,7 @@ for split, split_dir in OURS_DIRS.items():
 
         if missing:
             raise RuntimeError(
-                f"{source_fp}缺少字段："
+                f"{source_fp} missing fields: "
                 f"{sorted(missing)}"
             )
 
@@ -549,7 +549,7 @@ for split, split_dir in OURS_DIRS.items():
         ):
             raise RuntimeError(
                 f"{split}/Ours/seed{seed} "
-                f"谱数错误：{len(frame)}"
+                f"Incorrect spectrum count: {len(frame)}"
             )
 
         frame["spec_id"] = (
@@ -613,7 +613,7 @@ for split, split_dir in OURS_DIRS.items():
         ].duplicated().any():
             raise RuntimeError(
                 f"{split}/Ours/seed{seed}"
-                "存在重复spec_id"
+                "Duplicate spec_id"
             )
 
         molecule_count = int(
@@ -630,7 +630,7 @@ for split, split_dir in OURS_DIRS.items():
         ):
             raise RuntimeError(
                 f"{split}/Ours/seed{seed} "
-                f"分子数错误：{molecule_count}"
+                f"Incorrect molecule count: {molecule_count}"
             )
 
         ours_frames.append(
@@ -780,7 +780,7 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed}行数不一致"
+                    f"seed {seed} row-count mismatch"
                 )
 
             if not np.array_equal(
@@ -793,8 +793,8 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed}的"
-                    "spec_id集合不一致"
+                    f"seed {seed}: "
+                    "spec_id set mismatch"
                 )
 
             if not np.array_equal(
@@ -807,8 +807,8 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed}的"
-                    "spec_id→mol_id映射不一致"
+                    f"seed {seed}: "
+                    "spec_id→mol_id mapping mismatch"
                 )
 
             if not np.allclose(
@@ -823,7 +823,7 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed}的CE映射不一致"
+                    f"seed{seed} CE mapping mismatch"
                 )
 
     print(
@@ -877,7 +877,7 @@ if not (
     == 3
 ).all():
     raise RuntimeError(
-        "存在未覆盖3个种子的谱图"
+        "Some spectra are missing one or more of the three seeds"
     )
 
 seed_averaged.drop(
@@ -968,7 +968,7 @@ for split in EXPECTED:
         ):
             raise RuntimeError(
                 f"{split}/{model}: "
-                "种子平均后谱数错误"
+                "Incorrect spectrum count after averaging seeds"
             )
 
         if (
@@ -979,7 +979,7 @@ for split in EXPECTED:
         ):
             raise RuntimeError(
                 f"{split}/{model}: "
-                "种子平均后分子数错误"
+                "Incorrect molecule count after averaging seeds"
             )
 
 print(
@@ -1123,7 +1123,7 @@ for split in [
         ):
             raise RuntimeError(
                 f"{split}/{baseline_name}: "
-                "分子集合不一致"
+                "Molecule-set mismatch"
             )
 
         if not np.array_equal(
@@ -1136,7 +1136,7 @@ for split in [
         ):
             raise RuntimeError(
                 f"{split}/{baseline_name}: "
-                "每分子谱数不一致"
+                "Per-molecule spectrum counts differ"
             )
 
         baseline_spectrum = (
@@ -1172,7 +1172,7 @@ for split in [
         ):
             raise RuntimeError(
                 f"{split}/{baseline_name}: "
-                "逐谱集合不一致"
+                "Per-spectrum sets differ"
             )
 
         for metric in METRICS:
@@ -1370,7 +1370,7 @@ for split in [
                 raise RuntimeError(
                     f"{split}/{baseline_name}/"
                     f"{metric}: "
-                    "clustered micro分子顺序错误"
+                    "Clustered-micro molecule order mismatch"
                 )
 
             molecule_score_sums = (
@@ -1882,5 +1882,5 @@ if (
     )
 else:
     raise RuntimeError(
-        "实验8结果行数不闭合"
+        "Experiment 8 result row count is incomplete"
     )

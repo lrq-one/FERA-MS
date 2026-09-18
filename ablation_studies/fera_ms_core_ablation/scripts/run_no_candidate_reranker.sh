@@ -45,7 +45,7 @@ params = config.get("postprocessing_env")
 
 if not isinstance(params, dict):
     raise RuntimeError(
-        "config/train.yml 缺少 postprocessing_env"
+        "config/train.yml missing postprocessing_env"
     )
 
 for key, value in params.items():

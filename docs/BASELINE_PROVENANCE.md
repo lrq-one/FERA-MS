@@ -15,8 +15,7 @@ ICEBERG-ACE is not a second source repository. It selects the ICEBERG module in
 the same independent `fragnnet` baseline package through `model_type:
 iceberg_inten` and the locked ACE cohort configuration. The two source files
 used by the formal run are canonical under
-`source/fragnnet/src/fragnnet/iceberg/`; the excluded experimental CE-gate
-difference is recorded at
+`source/fragnnet/src/fragnnet/iceberg/`; the CE-gated adaptation restored by reversing the removal patch at
 `source/fragnnet/patches/iceberg_remove_experimental_ce_gate.patch`.
 
 ## Executable source chains
@@ -34,7 +33,7 @@ writes new outputs outside the tracked source tree.
 | NEIMS-ACE | `src/fragnnet/model.py` (`NeimsModel`), `pl_model.py` (`NeimsPL`), `dataset.py` (`SpecMolDataset`) | `loss.py`, `form_embedder.py`, `utils/**`, `runner.py` | `neims/configs/{random,scaffold}/seed_*.yml`, common formal/export/retrieval tools | processed NIST20 cohort, split IDs, generated checkpoint |
 | MassFormer-ACE | `src/fragnnet/massformer/{model,pl_model,nn_utils,data_utils}.py`, `algos.pyx`, shared `SpecMolDataset` | same shared runtime | `massformer/configs/{random,scaffold}/seed_*.yml` | processed cohort, split IDs, generated checkpoint |
 | FraGNNet-D3-ACE | `src/fragnnet/model.py` (`FragGNNModel`), `pl_model.py` (`FragGNNPL`), `dataset.py` (`SpecMolFragDataset`), `frag/compute_frags.pyx` | formula, fragment and spectrum utilities | `fragnnet_depth_three/configs/locked.yml` | processed cohort, depth-3 DAG cache, split IDs, generated checkpoint |
-| ICEBERG-ACE | `src/fragnnet/iceberg/{model,pl_model,dataset,fragmentation}.py`, `iceberg/common/**`, `iceberg/nn_utils/**` | shared runtime; `model_type: iceberg_inten` | `iceberg/configs/{random,scaffold}/seed_*.yml`; formal two-file variant described above | processed cohort, MAGMa cache, split IDs, generated checkpoint |
+| ICEBERG-ACE | `src/fragnnet/iceberg/{model,pl_model,dataset,fragmentation}.py`, `iceberg/common/**`, `iceberg/nn_utils/**` | shared runtime; `model_type: iceberg_inten` | `iceberg/configs/{random,scaffold}/seed_*.yml`; restored ACE-gated two-file variant described above | processed cohort, MAGMa cache, split IDs, generated checkpoint |
 | GrAFF-MS | `src/fragnnet/graff/{model,pl_model,dataset,data_utils,nn_utils}.py` | shared loss/formula/runtime utilities | `graff_ms/configs/{random,scaffold}/seed_*.yml`, local MAGMa-to-GrAFF annotation input | processed cohort, generated GrAFF annotation pickle, split IDs, generated checkpoint |
 | FIORA | `source/fiora/fiora/GNN/**`, `MOL/**`, `MS/**`, `IO/**`, `cli/predict.py` | native FIORA package only | `fiora/build_inputs.py`, `run_final.sh`, `eval_fiora_against_library_csv.py` | licensed cohort and external `fiora_OS_v1.0.0.pt` |
 
@@ -48,8 +47,10 @@ The retained `fragnnet` Python/Cython runtime was compared file-by-file with
 the local manuscript execution snapshot. Every file matches byte-for-byte
 except the documented selections below:
 
-1. `iceberg/model.py` and `iceberg/pl_model.py` match the formal ICEBERG run
-   snapshot rather than the main snapshot containing an experimental CE-gate.
+1. `iceberg/model.py` and `iceberg/pl_model.py` contain the recovered
+   ACE-gated adapter obtained by reversing the retained removal patch.
+   All six formal checkpoints were reported by the authors to contain CE parameters;
+   checkpoint loading and CE sensitivity are not independently validated here.
 2. `pyproject.toml` changes the inconsistent `MIT` metadata string to
    `BSD-2-Clause`, matching the unmodified bundled `LICENSE`.
 

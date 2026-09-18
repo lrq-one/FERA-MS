@@ -397,6 +397,18 @@ class IcebergIntenModel(nn.Module):
 		# Define map from output layer to attn
 		self.isomer_attn_out = copy.deepcopy(self.output_map)
 
+		# CE conditioning for safe19659 CE-aware benchmark.
+		# Stable gated residual: initialized as exact NoCE behavior.
+		self.ce_embed = nn.Sequential(
+			nn.Linear(1, self.hidden_size),
+			nn.SiLU(),
+			nn.Dropout(dropout),
+			nn.Linear(self.hidden_size, self.hidden_size),
+		)
+		self.ce_gate = nn.Parameter(th.zeros(1))
+		nn.init.zeros_(self.ce_embed[-1].weight)
+		nn.init.zeros_(self.ce_embed[-1].bias)
+
 		# Define buckets
 		self.mz_bin_res = mz_bin_res
 		self.mz_max = mz_max
@@ -427,6 +439,7 @@ class IcebergIntenModel(nn.Module):
 		masses=None,
 		root_forms=None,
 		frag_forms=None,
+		spec_ce=None,
 	):
 		"""forward _summary_
 
@@ -522,6 +535,15 @@ class IcebergIntenModel(nn.Module):
 			padded_hidden = new_hidden
 
 		padded_hidden = self.intermediate_out(padded_hidden)
+
+		# Add CE embedding after fragment/root hidden construction.
+		# spec_ce shape: [batch_size] or [batch_size, 1].
+		if spec_ce is not None:
+			ce = spec_ce.float().view(-1, 1).to(padded_hidden.device)
+			ce = th.clamp(ce, min=0.0, max=200.0) / 100.0
+			ce_h = self.ce_embed(ce).unsqueeze(1)
+			padded_hidden = padded_hidden + self.ce_gate * ce_h
+
 		batch_size, max_frags, hidden_dim = padded_hidden.shape
 
 		# Build up a mask

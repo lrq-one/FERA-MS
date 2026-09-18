@@ -21,7 +21,7 @@ if [ "${1:-}" = "--fresh" ]; then
 fi
 
 cd "$ROOT" || {
-    echo "无法进入：$ROOT"
+    echo "Cannot enter: $ROOT"
     exit 1
 }
 
@@ -32,7 +32,7 @@ export FERA_MS_RUNS_DIR="$RUNS_ROOT"
 if [ "$FRESH" -eq 1 ] && [ -d "$OUT" ]; then
     BACKUP="${OUT}.bak_$(date +%Y%m%d_%H%M%S)"
     mv "$OUT" "$BACKUP"
-    echo "旧输出已备份：$BACKUP"
+    echo "Previous outputs backed up to: $BACKUP"
 fi
 
 mkdir -p \
@@ -50,22 +50,22 @@ mkdir -p \
     "$OUT/spectrum_allocation" \
 
 if [ ! -f "$TEMPLATE" ]; then
-    echo "缺少模板：$TEMPLATE"
+    echo "Missing template: $TEMPLATE"
     exit 1
 fi
 
 if [ ! -f "$BASE_CONFIG" ]; then
-    echo "缺少global ACE control配置：$BASE_CONFIG"
+    echo "Missing global ACE control configuration: $BASE_CONFIG"
     exit 1
 fi
 
 if [ ! -f "$BASE_CHECKPOINT" ]; then
-    echo "缺少global ACE control checkpoint：$BASE_CHECKPOINT"
+    echo "Missing global ACE control checkpoint: $BASE_CHECKPOINT"
     exit 1
 fi
 
 if ! command -v nvidia-smi >/dev/null 2>&1; then
-    echo "没有检测到nvidia-smi，停止。"
+    echo "nvidia-smi was not detected; stopping."
     exit 1
 fi
 
@@ -73,7 +73,7 @@ fi
 import torch
 
 if not torch.cuda.is_available():
-    raise SystemExit("CUDA不可用")
+    raise SystemExit("CUDA is unavailable")
 
 print("CUDA:", torch.cuda.get_device_name(0))
 
@@ -82,14 +82,14 @@ try:
     print("LightGBM:", lightgbm.__version__)
 except Exception as exc:
     raise SystemExit(
-        f"LightGBM不可用：{exc!r}"
+        f"LightGBM is unavailable: {exc!r}"
     )
 PY
 
 PREFLIGHT_CODE=$?
 
 if [ "$PREFLIGHT_CODE" -ne 0 ]; then
-    echo "环境检查失败。"
+    echo "Environment preflight failed."
     exit 1
 fi
 
@@ -112,7 +112,7 @@ params = config.get("postprocessing_env")
 
 if not isinstance(params, dict):
     raise RuntimeError(
-        "缺少postprocessing_env配置"
+        "missing postprocessing_env configuration"
     )
 
 for key, value in params.items():
@@ -124,7 +124,7 @@ PY_HPARAMS
 HPARAM_CODE=$?
 
 if [ "$HPARAM_CODE" -ne 0 ]; then
-    echo "主线超参数读取失败。"
+    echo "Failed to read mainline hyperparameters."
     exit 1
 fi
 
@@ -310,7 +310,7 @@ bad_missing = [
 
 if bad_missing:
     raise RuntimeError(
-        "global ACE control→formula-composition refinement存在非预期missing keys："
+        "global ACE control→formula-composition refinement contains unexpected missing keys: "
         + repr(
             bad_missing[:40]
         )
@@ -318,7 +318,7 @@ if bad_missing:
 
 if unexpected:
     raise RuntimeError(
-        "global ACE control→formula-composition refinement存在unexpected keys："
+        "global ACE control→formula-composition refinement contains unexpected keys: "
         + repr(
             unexpected[:40]
         )
@@ -348,7 +348,7 @@ if not torch.isfinite(
     result["mean_loss"]
 ):
     raise RuntimeError(
-        "preflight mean_loss非有限值"
+        "preflight mean_loss is non-finite"
     )
 
 print(
@@ -366,7 +366,7 @@ PY
 PREFLIGHT_RUN=${PIPESTATUS[0]}
 
 if [ "$PREFLIGHT_RUN" -ne 0 ]; then
-    echo "global ACE control→formula-composition refinement兼容性检查失败。"
+    echo "global ACE control→formula-composition refinement compatibility check failed."
     exit 1
 fi
 
@@ -407,7 +407,7 @@ if [ ! -f "$FORMULA_COMPOSITION_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] formula-composition refinement checkpoint已存在。"
+    echo "[RESUME] formula-composition refinement checkpoint already exists."
 fi
 
 
@@ -453,7 +453,7 @@ if [ ! -f "$COLLISION_ENERGY_RESPONSE_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] collision-energy response refinement checkpoint已存在。"
+    echo "[RESUME] collision-energy response refinement checkpoint already exists."
 fi
 
 
@@ -522,7 +522,7 @@ if [ ! -f "$NEURAL_REFINEMENT_CHECKPOINT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] neural refinement checkpoint已存在。"
+    echo "[RESUME] neural refinement checkpoint already exists."
 fi
 
 
@@ -553,7 +553,7 @@ if [ ! -f "$PEAK_DISTILLATION_WARMUP_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] peak distillation warmup checkpoint已存在。"
+    echo "[RESUME] peak distillation warmup checkpoint already exists."
 fi
 
 
@@ -584,7 +584,7 @@ if [ ! -f "$PEAK_DISTILLATION_CONTINUATION_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] peak distillation continuation checkpoint已存在。"
+    echo "[RESUME] peak distillation continuation checkpoint already exists."
 fi
 
 
@@ -616,7 +616,7 @@ if [ ! -f "$FRAGMENT_REPRESENTATION_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] fragment representation refinement checkpoint已存在。"
+    echo "[RESUME] fragment representation refinement checkpoint already exists."
 fi
 
 
@@ -657,7 +657,7 @@ if [ ! -f "$BOUNDED_RESIDUAL_FLOW_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] bounded residual flow checkpoint已存在。"
+    echo "[RESUME] bounded residual flow checkpoint already exists."
 fi
 
 BOUNDED_RESIDUAL_FLOW_SELECTED="$(
@@ -741,7 +741,7 @@ if [ ! -f "$FINAL_PEAK_DISTILLATION_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] final peak distillation checkpoint已存在。"
+    echo "[RESUME] final peak distillation checkpoint already exists."
 fi
 
 FINAL_PEAK_DISTILLATION_COS="$(
@@ -808,7 +808,7 @@ if [ ! -f "$CANDIDATE_RERANKER_PKL" ]; then
         exit 1
     fi
 elif [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
-    echo "[RECOVER] regressor已存在；只重新运行validation alpha grid，不覆盖regressor。"
+    echo "[RECOVER] regressor already exists; rerun only validation alpha grid, do not overwrite regressor."
     REGRESSOR_SHA_BEFORE="$(sha256sum "$CANDIDATE_RERANKER_PKL" | awk '{print $1}')"
     run_candidate_reranker --load_regressor "$CANDIDATE_RERANKER_PKL"
     if [ $? -ne 0 ]; then
@@ -816,11 +816,11 @@ elif [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
     fi
     REGRESSOR_SHA_AFTER="$(sha256sum "$CANDIDATE_RERANKER_PKL" | awk '{print $1}')"
     if [ "$REGRESSOR_SHA_BEFORE" != "$REGRESSOR_SHA_AFTER" ]; then
-        echo "alpha-only recovery错误覆盖了已有regressor。"
+        echo "alpha-only recovery incorrectly overwrote existing regressor."
         exit 1
     fi
 else
-    echo "[RESUME] candidate reranker regressor和alpha summary均已存在。"
+    echo "[RESUME] candidate reranker regressor and alpha summary both already exist."
 fi
 
 BEST_ALPHA="$(
@@ -843,7 +843,7 @@ missing = required - set(frame.columns)
 
 if missing:
     raise RuntimeError(
-        "alpha表缺少字段："
+        "alpha table missing fields: "
         + repr(sorted(missing))
     )
 
@@ -877,7 +877,7 @@ frame = frame[
 
 if frame.empty:
     raise RuntimeError(
-        "alpha表没有有效结果"
+        "alpha table has no valid results"
     )
 
 best = (
@@ -906,7 +906,7 @@ PY_ALPHA
 ALPHA_CODE=$?
 
 if [ "$ALPHA_CODE" -ne 0 ] || [ -z "$BEST_ALPHA" ]; then
-    echo "无法提取candidate reranker最佳alpha。"
+    echo "Cannot extract candidate reranker best alpha."
     exit 1
 fi
 
@@ -914,7 +914,7 @@ printf '%s\n' "$BEST_ALPHA" \
     > "$OUT/candidate_reranking/best_alpha.txt"
 
 if [ ! -s "$OUT/candidate_reranking/candidate_reranker_alpha_val.csv" ]; then
-    echo "[STOP] candidate reranker缺少candidate_reranker_alpha_val.csv"
+    echo "[STOP] candidate reranker missing candidate_reranker_alpha_val.csv"
     exit 1
 fi
 
@@ -928,7 +928,7 @@ if not math.isfinite(value):
     raise ValueError(value)
 ' "$BEST_ALPHA"
 then
-    echo "[STOP] candidate reranker最佳alpha无效：'$BEST_ALPHA'"
+    echo "[STOP] candidate reranker best alpha invalid: '$BEST_ALPHA'"
     exit 1
 fi
 
@@ -995,7 +995,7 @@ if [ ! -f "$SPECTRUM_ALLOCATOR_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] spectrum allocator allocator已存在。"
+    echo "[RESUME] spectrum allocator already exists."
 fi
 
 

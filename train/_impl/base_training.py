@@ -572,7 +572,7 @@ def architecture_preflight(
         or ce_type != "embed"
     ):
         raise RuntimeError(
-            "structural backbone结构检查失败："
+            "structural backbone architecture check failed: "
             f"wrapper={wrapper_class}, "
             f"gnn_type={gnn_type}, "
             f"inner={inner_class}, "
@@ -582,7 +582,7 @@ def architecture_preflight(
 
     print(
         "[PREFLIGHT PASS] "
-        "唯一架构变化为GINE+cut_chem"
+        "The only architecture change is GINE+cut_chem"
     )
 
     print("=" * 96)
@@ -765,7 +765,7 @@ def train_stage(
 
     if checkpoint_callback is None:
         raise RuntimeError(
-            "checkpoint callback未创建"
+            "checkpoint callback was not created"
         )
 
     best_source = Path(
@@ -888,7 +888,7 @@ def main() -> None:
 
     if missing:
         raise FileNotFoundError(
-            "缺少必要文件：\n"
+            "Missing required files: \n"
             + "\n".join(
                 str(path)
                 for path in missing

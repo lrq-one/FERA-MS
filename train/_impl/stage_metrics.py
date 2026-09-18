@@ -22,7 +22,7 @@ def global_cosine(path: str | Path) -> float:
         denominator = float(frame["spec_count"].sum())
 
         if denominator <= 0:
-            raise RuntimeError(f"spec_count总和无效：{path}")
+            raise RuntimeError(f"Invalid spec_count sum: {path}")
 
         return float(
             (
@@ -39,7 +39,7 @@ def global_cosine(path: str | Path) -> float:
         return float(frame.iloc[0]["cos"])
 
     raise RuntimeError(
-        f"无法从{path}提取global cosine；"
+        f"Cannot extract global cosine from {path}; "
         f"columns={list(frame.columns)}"
     )
 
@@ -78,7 +78,7 @@ def best_alpha(path: str | Path) -> float:
 
     if "val_cos" not in frame.columns:
         raise RuntimeError(
-            f"alpha表缺少val_cos：{path}"
+            f"alpha table missing val_cos: {path}"
         )
 
     row = (
