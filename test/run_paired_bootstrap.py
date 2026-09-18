@@ -317,7 +317,7 @@ def sanitize_metric(
 
     if numeric.isna().any():
         raise RuntimeError(
-            f"{label} exists NaN or nonnumeric"
+            f"{label} contains NaN or nonnumeric values"
         )
 
     severe = (
@@ -793,7 +793,7 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed} "
+                    f"seed {seed}: "
                     "spec_id set mismatch"
                 )
 
@@ -807,7 +807,7 @@ for split in EXPECTED:
             ):
                 raise RuntimeError(
                     f"{split}/{model}/"
-                    f"seed{seed} "
+                    f"seed {seed}: "
                     "spec_id→mol_id mapping mismatch"
                 )
 
@@ -877,7 +877,7 @@ if not (
     == 3
 ).all():
     raise RuntimeError(
-        "Missing coverage for 3-seed spectra"
+        "Some spectra are missing one or more of the three seeds"
     )
 
 seed_averaged.drop(

@@ -124,7 +124,7 @@ for seed in (42, 43, 44):
 
     if len(detail) != 3931:
         raise RuntimeError(
-            f"seed {seed} Incorrect test spectrum count: "
+            f"seed {seed}: incorrect test spectrum count: "
             f"{len(detail)}"
         )
 
@@ -184,7 +184,7 @@ for seed in (42, 43, 44):
         )
 
         raise RuntimeError(
-            f"seed {seed} has"
+            f"seed {seed} has "
             f"{missing_count} spectra cannot be mapped to mol_id."
         )
 
@@ -199,7 +199,7 @@ for seed in (42, 43, 44):
 
     if len(per_molecule) != 456:
         raise RuntimeError(
-            f"seed {seed} Incorrect molecule count: "
+            f"seed {seed}: incorrect molecule count: "
             f"{len(per_molecule)}"
         )
 

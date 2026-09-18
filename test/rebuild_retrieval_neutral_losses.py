@@ -161,7 +161,7 @@ if not target_files:
 
 print(
     f"[1/5] Read locked NL reference cache: "
-    f"{len(reference_files)}  ",
+    f"{len(reference_files)} files",
     flush=True,
 )
 
@@ -261,7 +261,7 @@ for file_index, path in enumerate(reference_files, 1):
 
 if len(widths) != 1:
     raise RuntimeError(
-        f"reference NL column count mismatch: {dict(widths)}"
+        f"Reference NL column count mismatch: {dict(widths)}"
     )
 
 width = next(iter(widths))
@@ -287,8 +287,8 @@ for name, _, _ in LOSSES:
     mask_probability[name] = median
 
 print(
-    f"[2/5] Fix NL template: "
-    f"{len(LOSSES)}  , cache column count={width}",
+    f"[2/5] Lock NL template: "
+    f"{len(LOSSES)} losses, cache column count={width}",
     flush=True,
 )
 
@@ -305,7 +305,7 @@ for index, (name, loss, mass) in enumerate(
     )
 
 print(
-    "[3/5] Run on the locked cache:100%rule-replay validation",
+    "[3/5] Verify 100% rule replay on the locked cache",
     flush=True,
 )
 
@@ -342,14 +342,14 @@ if mismatches:
 
 print(
     f"  LOCKED_NL_PARITY_OK："
-    f"{len(reference_rows)}  rows, "
-    f"{len(unique_formulas)}  unique formulas all match",
+    f"{len(reference_rows)} rows, "
+    f"{len(unique_formulas)} unique formulas all match",
     flush=True,
 )
 
 print(
     f"[4/5] Enrich experiment 5 candidate cache: "
-    f"{len(target_files)}  , workers={WORKERS}",
+    f"{len(target_files)} files, workers={WORKERS}",
     flush=True,
 )
 

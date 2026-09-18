@@ -446,7 +446,7 @@ def evaluate_split(
             )
 
             raise RuntimeError(
-                "runtime spectrum_allocator in"
+                "In runtime spectrum_allocator, "
                 "Could not find the locked dense renderer."
                 f"Candidate functions: {available}"
             )
@@ -1389,7 +1389,7 @@ def main() -> None:
     if not parity_passed:
         raise RuntimeError(
             "Validation 0.01-Da cosine reproduction failed, "
-            "To prevent evaluating the wrong model, stopped test evaluation."
+            "Stopped test evaluation to avoid using an incorrect model."
         )
 
     test_metrics, test_detail = (

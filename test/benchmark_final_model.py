@@ -380,7 +380,7 @@ def timed_evaluate_split(
         except Exception as error:
             raise RuntimeError(
                 "Cannot obtain batch size from build_batch_tensors"
-                " output.."
+                " output."
             ) from error
 
         batch_sizes.append(

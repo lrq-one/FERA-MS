@@ -65,7 +65,7 @@ if [ ! -f "$BASE_CHECKPOINT" ]; then
 fi
 
 if ! command -v nvidia-smi >/dev/null 2>&1; then
-    echo "Not detected:nvidia-smi, stopped."
+    echo "nvidia-smi was not detected; stopping."
     exit 1
 fi
 
@@ -995,7 +995,7 @@ if [ ! -f "$SPECTRUM_ALLOCATOR_CKPT" ]; then
         exit 1
     fi
 else
-    echo "[RESUME] spectrum allocator allocator already exists."
+    echo "[RESUME] spectrum allocator already exists."
 fi
 
 

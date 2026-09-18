@@ -31,7 +31,7 @@ SUMMARY_METRICS = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Summarize ACE stratified CBIN, JSS and CHUN results."
+            "Summarize ACE-stratified CBIN, JSS and CHUN results across three random seeds."
         )
     )
     parser.add_argument(
@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         type=Path,
         help=(
-            "For example runs/experiments/"
+            "For example, runs/experiments/"
             "molecule_disjoint_three_seeds"
         ),
     )
