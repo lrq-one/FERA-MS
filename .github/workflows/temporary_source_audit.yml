@@ -1,69 +1,10 @@
-name: Temporary ICEBERG recovery audit
+name: Temporary source-maintenance runner
 on:
-  push:
-    branches:
-      - audit/iceberg-ce-recovery-20260918
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  restore:
+  prepare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-      - name: Restore exact retained ACE patch and correct provenance
-        shell: bash
-        run: |
-          set -euo pipefail
-          PATCH=baseline_rebuild/baseline/source/fragnnet/patches/iceberg_remove_experimental_ce_gate.patch
-          ROOT=baseline_rebuild/baseline/source/fragnnet
-          git apply --reverse --check --directory="$ROOT" "$PATCH"
-          git apply --reverse --directory="$ROOT" "$PATCH"
-          python - <<'PY'
-          import ast
-          from pathlib import Path
-          model=Path('baseline_rebuild/baseline/source/fragnnet/src/fragnnet/iceberg/model.py')
-          pl=Path('baseline_rebuild/baseline/source/fragnnet/src/fragnnet/iceberg/pl_model.py')
-          a=model.read_text(); b=pl.read_text()
-          assert 'self.ce_embed = nn.Sequential(' in a and 'self.ce_gate = nn.Parameter(' in a
-          assert 'padded_hidden = padded_hidden + self.ce_gate * ce_h' in a
-          assert 'spec_ce=iceberg_spec_ce,' in b and 'spec_ce_batch_idxs' in b
-          old='# per-spec_id targets. Note: ICEBERG forward does not consume spec_ce, so\n\t\t# this is an unmerged same-task ICEBERG-NoCE baseline.'
-          new='# per-spec_id targets. ACE is passed through the CE-adapted intensity model.\n\t\t# Retain the unmerged evaluation protocol.'
-          assert b.count(old)==2,b.count(old)
-          pl.write_text(b.replace(old,new))
-          def replace(path,old,new):
-              p=Path(path); s=p.read_text(); assert old in s,(path,old)
-              p.write_text(s.replace(old,new))
-          replace('docs/BASELINE_PROVENANCE.md',
-              'the excluded experimental CE-gate\ndifference is recorded at',
-              'the CE-gated adaptation restored by reversing the removal patch at')
-          replace('docs/BASELINE_PROVENANCE.md',
-              '1. `iceberg/model.py` and `iceberg/pl_model.py` match the formal ICEBERG run\n   snapshot rather than the main snapshot containing an experimental CE-gate.',
-              '1. `iceberg/model.py` and `iceberg/pl_model.py` contain the recovered\n   ACE-gated adapter obtained by reversing the retained removal patch.\n   All six formal checkpoints were reported by the authors to contain CE parameters;\n   checkpoint loading and CE sensitivity are not independently validated here.')
-          replace('docs/BASELINE_PROVENANCE.md',
-              'formal two-file variant described above',
-              'restored ACE-gated two-file variant described above')
-          replace('baseline_rebuild/baseline/source/fragnnet/UPSTREAM.md',
-              '- `src/fragnnet/iceberg/model.py` and `pl_model.py` are the two files from the\n  formal ICEBERG-ACE run snapshot. They remove an unrelated experimental\n  ICEBERG CE-gate while retaining the shared ACE cohort/configuration protocol.\n  The difference is recorded in `patches/iceberg_remove_experimental_ce_gate.patch`.',
-              '- `src/fragnnet/iceberg/model.py` and `pl_model.py` restore the ACE-gated\n  adaptation from the inverse of `patches/iceberg_remove_experimental_ce_gate.patch`.\n  An earlier release had excluded this branch despite the authors reporting CE\n  parameter keys in all six formal checkpoints. Checkpoint tensor values and\n  ACE-response sensitivity require separate verification.')
-          replace('baseline_rebuild/baseline/README.md',
-              'ACE cohort/config; formal source difference recorded under `source/fragnnet/patches/`',
-              'ACE cohort/config and restored CE-gated source; removal patch retained under `source/fragnnet/patches/`')
-          replace('THIRD_PARTY_NOTICES.md',
-              'formal source difference recorded in `source/fragnnet/patches/`',
-              'restored ACE-gated source; historical removal patch retained in `source/fragnnet/patches/`')
-          replace('baseline_rebuild/baseline/iceberg/UPSTREAM.md',
-              '- FERA-MS files: locked configs in `configs/`, `run_all.sh` and common adapters.',
-              '- FERA-MS files: locked configs in `configs/`, `run_all.sh` and common adapters.\n- The ACE gate and spectrum-specific CE forwarding were restored from the\n  inverse of `source/fragnnet/patches/iceberg_remove_experimental_ce_gate.patch`.\n  This restoration preserves the historical implementation and does not\n  establish that checkpoint CE responses were nonzero.')
-          ast.parse(model.read_text()); ast.parse(pl.read_text())
-          PY
-          git diff --check
-          git add baseline_rebuild/baseline/source/fragnnet/src/fragnnet/iceberg/model.py baseline_rebuild/baseline/source/fragnnet/src/fragnnet/iceberg/pl_model.py docs/BASELINE_PROVENANCE.md baseline_rebuild/baseline/source/fragnnet/UPSTREAM.md baseline_rebuild/baseline/README.md THIRD_PARTY_NOTICES.md baseline_rebuild/baseline/iceberg/UPSTREAM.md
-          git diff --cached --stat
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Restore checkpoint-compatible ICEBERG ACE source and correct provenance'
-          git push origin HEAD:audit/iceberg-ce-recovery-20260918
-          echo 'ACE_SOURCE_RESTORATION=COMMITTED'
+      - run: echo 'Temporary source cleanup is being prepared; no repository files are modified.'
