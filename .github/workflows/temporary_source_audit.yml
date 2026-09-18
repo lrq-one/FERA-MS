@@ -1,0 +1,56 @@
+name: Temporary source audit
+on:
+  push:
+    branches:
+      - audit/iceberg-ce-recovery-20260918
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit tracked files and patch applicability
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import io, re, subprocess, tokenize
+          from pathlib import Path
+          han = re.compile(r'[\u3400-\u9fff\uf900-\ufaff]')
+          paths = subprocess.check_output(['git','ls-files','-z']).split(b'\0')
+          count = files = lines = 0
+          with open('chinese_audit.tsv','w',encoding='utf-8') as out:
+              out.write('path\tline\tkind\ttext\n')
+              for raw in paths:
+                  if not raw: continue
+                  p = Path(raw.decode('utf-8','surrogateescape'))
+                  if not p.is_file(): continue
+                  data=p.read_bytes()
+                  if b'\0' in data: continue
+                  try: text=data.decode('utf-8')
+                  except UnicodeDecodeError: continue
+                  count+=1
+                  kinds={}
+                  if p.suffix=='.py':
+                      try:
+                          for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+                              if tok.type in (tokenize.COMMENT,tokenize.STRING) and han.search(tok.string):
+                                  for i in range(tok.start[0],tok.end[0]+1):
+                                      kinds[i]='COMMENT' if tok.type==tokenize.COMMENT else 'STRING_OR_DOCSTRING'
+                      except (tokenize.TokenError,IndentationError,SyntaxError): pass
+                  hits=0
+                  for i,line in enumerate(text.splitlines(),1):
+                      if han.search(line):
+                          out.write(f'{p}\t{i}\t{kinds.get(i,"OTHER")}\t{line.strip().replace(chr(9)," ")}\n')
+                          hits+=1;lines+=1
+                  if hits:files+=1
+          print(f'SCANNED_FILES={count} FILES_WITH_HAN={files} HAN_LINES={lines}')
+          PY
+          git apply --reverse --check --directory=baseline_rebuild/baseline/source/fragnnet baseline_rebuild/baseline/source/fragnnet/patches/iceberg_remove_experimental_ce_gate.patch
+          echo 'ICEBERG_REVERSE_PATCH_CHECK=PASS'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: temporary-chinese-audit
+          path: chinese_audit.tsv
