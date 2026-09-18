@@ -195,12 +195,12 @@ def find_detail_file(
     if len(candidates) == 0:
         raise FileNotFoundError(
             f"seed={seed}, mode={mode}: "
-            f"找不到逐谱测试结果，目录={base_dir}"
+            f"Per-spectrum test results not found, directory={base_dir}"
         )
 
     raise RuntimeError(
         f"seed={seed}, mode={mode}: "
-        f"找到多个候选逐谱文件：{candidates}"
+        f"Found multiple candidate per-spectrum files: {candidates}"
     )
 
 
@@ -465,7 +465,7 @@ missing_spec_columns = (
 
 if missing_spec_columns:
     raise RuntimeError(
-        "spec_df缺少字段："
+        "spec_df missing fields: "
         f"{sorted(missing_spec_columns)}"
     )
 
@@ -549,14 +549,14 @@ for seed in SEEDS:
 
         if missing:
             raise RuntimeError(
-                f"{detail_path}缺少字段："
+                f"{detail_path} missing fields: "
                 f"{sorted(missing)}"
             )
 
         if len(detail) != 3931:
             raise RuntimeError(
                 f"seed={seed}, mode={mode}: "
-                f"谱数={len(detail)}，应为3931"
+                f"spectrum count={len(detail)}, expected 3931"
             )
 
         if (
@@ -565,7 +565,7 @@ for seed in SEEDS:
         ):
             raise RuntimeError(
                 f"seed={seed}, mode={mode}: "
-                "spec_id不唯一"
+                "spec_id is not unique"
             )
 
         merged = detail.merge(
@@ -584,7 +584,7 @@ for seed in SEEDS:
 
             raise RuntimeError(
                 f"seed={seed}, mode={mode}: "
-                f"{missing_count}条谱无法映射mol_id"
+                f"{missing_count} spectra cannot be mapped to mol_id"
             )
 
         per_molecule = (
@@ -599,8 +599,8 @@ for seed in SEEDS:
         if len(per_molecule) != 456:
             raise RuntimeError(
                 f"seed={seed}, mode={mode}: "
-                f"分子数={len(per_molecule)}，"
-                "应为456"
+                f"molecule count={len(per_molecule)}, "
+                "expected 456"
             )
 
         mode_output_dir = (
@@ -1115,7 +1115,7 @@ print(
 if not all_protocol_checks_passed:
     print()
     print(
-        "实验4尚未通过全部协议检查。"
-        "请查看上面的PROTOCOL AUDIT。"
+        "experiment 4 has not passed all protocol checks."
+        "See the above PROTOCOL AUDIT."
     )
     sys.exit(2)

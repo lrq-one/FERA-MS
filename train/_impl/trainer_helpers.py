@@ -158,7 +158,7 @@ def load_state_dict_any(
         return pack
 
     raise TypeError(
-        f"无法从checkpoint读取state_dict：{path}"
+        f"Cannot read state_dict from checkpoint: {path}"
     )
 
 
@@ -223,7 +223,7 @@ def verify_inputs() -> None:
 
     if missing:
         raise FileNotFoundError(
-            "缺少必要输入：\n"
+            "Missing required inputs: \n"
             + "\n".join(
                 str(path)
                 for path in missing
@@ -253,7 +253,7 @@ def verify_inputs() -> None:
 
     if absent:
         raise RuntimeError(
-            "当前training.py缺少必要功能："
+            "Current training.py is missing required features: "
             + ", ".join(absent)
         )
 
@@ -488,8 +488,8 @@ def train_variant(
     if run_dir.exists():
         if not overwrite:
             raise FileExistsError(
-                f"输出目录已存在：{run_dir}\n"
-                "需要重跑时增加 --overwrite"
+                f"Output directory already exists: {run_dir}\n"
+                "Use --overwrite to rerun"
             )
 
         shutil.rmtree(run_dir)
@@ -641,7 +641,7 @@ def train_variant(
 
     if checkpoint_callback is None:
         raise RuntimeError(
-            "checkpoint callback未创建"
+            "checkpoint callback was not created"
         )
 
     best_path = Path(
@@ -650,7 +650,7 @@ def train_variant(
 
     if not best_path.is_file():
         raise FileNotFoundError(
-            f"最佳checkpoint不存在：{best_path}"
+            f"best checkpoint does not exist: {best_path}"
         )
 
     canonical_best = (
@@ -783,7 +783,7 @@ def make_leaderboard() -> None:
 
     if not rows:
         raise RuntimeError(
-            "没有找到任何screen_summary.json"
+            "No matching screen_summary.json"
         )
 
     rows.sort(
@@ -1096,7 +1096,7 @@ def main() -> None:
 
     if arguments.variant is None:
         raise ValueError(
-            "--mode train/test时必须提供--variant"
+            "--mode train/test requires --variant"
         )
 
     if arguments.mode == "train":

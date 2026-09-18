@@ -73,7 +73,7 @@ def _attach_molecule_ids(
 
     if missing_detail:
         raise RuntimeError(
-            "Per-spectrum结果缺少字段："
+            "Per-spectrum results lack fields: "
             + ", ".join(
                 sorted(missing_detail)
             )
@@ -100,7 +100,7 @@ def _attach_molecule_ids(
 
     if missing_mapping:
         raise RuntimeError(
-            "Split映射缺少字段："
+            "Split mapping lacks fields: "
             + ", ".join(
                 sorted(missing_mapping)
             )
@@ -133,7 +133,7 @@ def _attach_molecule_ids(
 
     if len(conflicts) > 0:
         raise RuntimeError(
-            "同一个spec_id对应多个mol_id："
+            "The same spec_id maps to multiple mol_id: "
             + repr(
                 conflicts.index[
                     :20
@@ -167,7 +167,7 @@ def _attach_molecule_ids(
         )
 
         raise RuntimeError(
-            "部分谱图没有mol_id映射："
+            "Some spectra have no mol_id mapping: "
             + repr(missing_ids)
         )
 

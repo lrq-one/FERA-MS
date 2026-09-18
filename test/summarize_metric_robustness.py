@@ -68,7 +68,7 @@ missing_mapping = (
 
 if missing_mapping:
     raise RuntimeError(
-        "spec_df缺少字段："
+        "spec_df missing fields: "
         f"{sorted(missing_mapping)}"
     )
 
@@ -118,19 +118,19 @@ for seed in (42, 43, 44):
 
     if missing:
         raise RuntimeError(
-            f"{detail_path}缺少字段："
+            f"{detail_path} missing fields: "
             f"{sorted(missing)}"
         )
 
     if len(detail) != 3931:
         raise RuntimeError(
-            f"seed {seed}测试谱数错误："
+            f"seed {seed} Incorrect test spectrum count: "
             f"{len(detail)}"
         )
 
     if detail["spec_id"].nunique() != 3931:
         raise RuntimeError(
-            f"seed {seed} spec_id不唯一。"
+            f"seed {seed} spec_id is not unique."
         )
 
     locked_field_difference = (
@@ -159,13 +159,13 @@ for seed in (42, 43, 44):
 
     if locked_field_max_abs > 1.0e-12:
         raise RuntimeError(
-            f"seed {seed}锁定raw字段不一致："
+            f"seed {seed} locked raw field mismatch: "
             f"{locked_field_max_abs}"
         )
 
     if renderer_parity_max_abs > 2.0e-6:
         raise RuntimeError(
-            f"seed {seed} renderer parity失败："
+            f"seed {seed} renderer parity failed: "
             f"{renderer_parity_max_abs}"
         )
 
@@ -184,8 +184,8 @@ for seed in (42, 43, 44):
         )
 
         raise RuntimeError(
-            f"seed {seed}有"
-            f"{missing_count}条谱无法映射mol_id。"
+            f"seed {seed} has"
+            f"{missing_count} spectra cannot be mapped to mol_id."
         )
 
     per_molecule = (
@@ -199,7 +199,7 @@ for seed in (42, 43, 44):
 
     if len(per_molecule) != 456:
         raise RuntimeError(
-            f"seed {seed}分子数错误："
+            f"seed {seed} Incorrect molecule count: "
             f"{len(per_molecule)}"
         )
 

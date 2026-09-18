@@ -7,7 +7,7 @@ ROOT="${FERA_MS_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 ABLATION_ROOT="$ROOT/ablation_studies/fera_ms_core_ablation"
 
 cd "$ROOT" || {
-    echo "无法进入项目目录：$ROOT"
+    echo "Cannot enter project directory: $ROOT"
     exit 1
 }
 

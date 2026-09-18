@@ -84,7 +84,7 @@ def load_pool():
 
     if pool["spec_id"].duplicated().any():
         raise RuntimeError(
-            "源split存在重复spec_id"
+            "Duplicate spec_id in source split"
         )
 
     if len(pool) != 19659 or pool["mol_id"].nunique() != 2274:
@@ -105,12 +105,12 @@ def attach_scaffolds(pool):
             mol_df = mol_df.reset_index()
         else:
             raise RuntimeError(
-                "mol_df中没有mol_id"
+                "mol_df lacks mol_id"
             )
 
     if "scaffold" not in mol_df.columns:
         raise RuntimeError(
-            "mol_df中没有scaffold"
+            "mol_df lacks scaffold"
         )
 
     mapping = (
@@ -168,7 +168,7 @@ def attach_scaffolds(pool):
         "scaffold_group"
     ].isna().any():
         raise RuntimeError(
-            "部分分子没有scaffold映射"
+            "Some molecules lack scaffold mapping"
         )
 
     return result
@@ -527,7 +527,7 @@ def main():
         for value in overlaps.values()
     ):
         raise RuntimeError(
-            f"存在跨split重叠：{overlaps}"
+            f"Detected cross-split overlap: {overlaps}"
         )
 
     for split in (
@@ -541,7 +541,7 @@ def main():
             "nonempty_murcko_scaffolds"
         ] < 10:
             raise RuntimeError(
-                f"{split}非空骨架数量过少"
+                f"{split} Too few nonempty scaffolds"
             )
 
     audit = {

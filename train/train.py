@@ -80,7 +80,7 @@ def prepare_runtime_config() -> None:
 
     if missing:
         raise RuntimeError(
-            "运行时配置生成不完整："
+            "Runtime configuration generation is incomplete: "
             + ", ".join(
                 sorted(missing)
             )

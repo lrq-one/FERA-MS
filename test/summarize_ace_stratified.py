@@ -31,7 +31,7 @@ SUMMARY_METRICS = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "汇总三个随机种子的ACE分层CBIN、JSS和CHUN结果。"
+            "Summarize ACE stratified CBIN, JSS and CHUN results."
         )
     )
     parser.add_argument(
@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         type=Path,
         help=(
-            "例如 runs/experiments/"
+            "For example runs/experiments/"
             "molecule_disjoint_three_seeds"
         ),
     )
@@ -66,7 +66,7 @@ def main() -> None:
 
     if not experiment_root.is_dir():
         raise FileNotFoundError(
-            f"实验目录不存在：{experiment_root}"
+            f"Experiment directory does not exist: {experiment_root}"
         )
 
     root_output_dir = (
@@ -86,7 +86,7 @@ def main() -> None:
 
         if not seed_dir.is_dir():
             raise FileNotFoundError(
-                f"缺少seed目录：{seed_dir}"
+                f"missing seed directory: {seed_dir}"
             )
 
         seed_output_dir = (
@@ -108,7 +108,7 @@ def main() -> None:
 
             if not source_path.is_file():
                 raise FileNotFoundError(
-                    f"缺少ACE分层结果：{source_path}"
+                    f"missing ACE stratified results: {source_path}"
                 )
 
             dataframe = pd.read_csv(source_path)
@@ -120,7 +120,7 @@ def main() -> None:
 
             if missing:
                 raise RuntimeError(
-                    f"{source_path}缺少字段："
+                    f"{source_path} missing fields: "
                     f"{sorted(missing)}"
                 )
 
@@ -205,8 +205,8 @@ def main() -> None:
 
         if len(spec_counts) != 1:
             raise RuntimeError(
-                f"{split}/{ce_bucket}在不同seed中"
-                f"spec_count不一致：{spec_counts}"
+                f"{split}/{ce_bucket} across different seeds:"
+                f"spec_count mismatch: {spec_counts}"
             )
 
         row: dict[str, Any] = {
