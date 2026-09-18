@@ -7,10 +7,11 @@ The files were copied byte-for-byte from the local source snapshot used for
 the manuscript NEIMS-ACE, MassFormer-ACE, FraGNNet-D3-ACE and GrAFF-MS runs,
 except for the following explicitly recorded release choices:
 
-- `src/fragnnet/iceberg/model.py` and `pl_model.py` are the two files from the
-  formal ICEBERG-ACE run snapshot. They remove an unrelated experimental
-  ICEBERG CE-gate while retaining the shared ACE cohort/configuration protocol.
-  The difference is recorded in `patches/iceberg_remove_experimental_ce_gate.patch`.
+- `src/fragnnet/iceberg/model.py` and `pl_model.py` restore the ACE-gated
+  adaptation from the inverse of `patches/iceberg_remove_experimental_ce_gate.patch`.
+  An earlier release had excluded this branch despite the authors reporting CE
+  parameter keys in all six formal checkpoints. Checkpoint tensor values and
+  ACE-response sensitivity require separate verification.
 - `pyproject.toml` says `BSD-2-Clause` to match the preserved upstream
   `LICENSE`; the archived snapshot had an inconsistent `MIT` metadata string.
 

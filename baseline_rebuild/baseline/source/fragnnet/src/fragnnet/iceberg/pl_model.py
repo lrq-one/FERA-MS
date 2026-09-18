@@ -35,10 +35,10 @@ class IcebergGenPL(SpectrumPL):
 		# Patched for safe19659 unmerged CE-specific benchmark.
 		# Official ICEBERG intensity code requires merged spectra, but for this
 		# baseline we keep the ICEBERG architecture unchanged and evaluate it on
-		# per-spec_id targets. Note: ICEBERG forward does not consume spec_ce, so
-		# this is an unmerged same-task ICEBERG-NoCE baseline.
+		# per-spec_id targets. ACE is passed through the CE-adapted intensity model.
+		# Retain the unmerged evaluation protocol.
 		if not self.hparams.spec_params["merge"]:
-			print(">> WARNING: running IcebergIntenPL with merge=False; architecture unchanged, spec_ce not used.")
+			print(">> WARNING: running IcebergIntenPL with merge=False; CE patch active, spec_ce is used.")
 
 		# compile
 		if self.hparams.compile:
@@ -497,10 +497,10 @@ class IcebergIntenPL(SpectrumPL):
 		# Patched for safe19659 unmerged CE-specific benchmark.
 		# Official ICEBERG intensity code requires merged spectra, but for this
 		# baseline we keep the ICEBERG architecture unchanged and evaluate it on
-		# per-spec_id targets. Note: ICEBERG forward does not consume spec_ce, so
-		# this is an unmerged same-task ICEBERG-NoCE baseline.
+		# per-spec_id targets. ACE is passed through the CE-adapted intensity model.
+		# Retain the unmerged evaluation protocol.
 		if not self.hparams.spec_params["merge"]:
-			print(">> WARNING: running IcebergIntenPL with merge=False; architecture unchanged, spec_ce not used.")
+			print(">> WARNING: running IcebergIntenPL with merge=False; CE patch active, spec_ce is used.")
 
 		# compile
 		if self.hparams.compile:
@@ -567,6 +567,30 @@ class IcebergIntenPL(SpectrumPL):
 
 	def forward(self,**kwargs):
 
+		# CE-aware patch for unmerged safe19659.
+		# Dataset provides one ACE per spectrum through spec_ce/spec_ce_batch_idxs.
+		# Use manual scatter_add instead of scatter_reduce because spec_ce is 1D
+		# while spec_ce_batch_idxs is also 1D; this avoids dimension mismatch.
+		iceberg_spec_ce = None
+		if ("spec_ce" in kwargs) and (kwargs["spec_ce"] is not None):
+			spec_ce = kwargs["spec_ce"].float().view(-1)
+			n_spec = int(kwargs["magma_num_frags"].shape[0])
+
+			if ("spec_ce_batch_idxs" in kwargs) and (kwargs["spec_ce_batch_idxs"] is not None):
+				idx = kwargs["spec_ce_batch_idxs"].long().view(-1).to(spec_ce.device)
+
+				ce_sum = th.zeros(n_spec, device=spec_ce.device, dtype=spec_ce.dtype)
+				ce_cnt = th.zeros(n_spec, device=spec_ce.device, dtype=spec_ce.dtype)
+
+				ce_sum.scatter_add_(0, idx, spec_ce)
+				ce_cnt.scatter_add_(0, idx, th.ones_like(spec_ce))
+
+				iceberg_spec_ce = ce_sum / ce_cnt.clamp_min(1.0)
+			else:
+				iceberg_spec_ce = spec_ce
+				if iceberg_spec_ce.numel() != n_spec:
+					iceberg_spec_ce = iceberg_spec_ce[:n_spec]
+
 		outputs = self.model(
 			graphs=kwargs["magma_frag_graphs"],
 			root_repr=kwargs["magma_root_reprs"],
@@ -580,5 +604,6 @@ class IcebergIntenPL(SpectrumPL):
 			root_forms=kwargs["magma_root_form_vecs"],
 			frag_forms=kwargs["magma_frag_form_vecs"],
 			adduct_form_deltas=kwargs.get("magma_adduct_form_deltas",None),
+			spec_ce=iceberg_spec_ce,
 		)
 		return outputs

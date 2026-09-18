@@ -6,6 +6,10 @@
   baseline runtime, selected by `model_type: iceberg_inten` and the locked ACE
   configs in this directory. There is no separate `iceberg_core` repository.
 - FERA-MS files: locked configs in `configs/`, `run_all.sh` and common adapters.
+- The ACE gate and spectrum-specific CE forwarding were restored from the
+  inverse of `source/fragnnet/patches/iceberg_remove_experimental_ce_gate.patch`.
+  This restoration preserves the historical implementation and does not
+  establish that checkpoint CE responses were nonzero.
 - License evidence: snapshot-level BSD-2-Clause notice at
   `../source/fragnnet/LICENSE`.
 - Release decision: the formal retained source, locked ACE configs and
